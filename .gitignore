@@ -25,6 +25,17 @@ models/
 uploads/
 faiss_index/
 
+# Python tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# ML experiment tracking
+mlruns/
+mlartifacts/
+
 # VS Code
 .vscode/
 

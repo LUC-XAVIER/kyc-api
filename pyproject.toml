@@ -1,0 +1,78 @@
+[project]
+name = "kyc-api"
+version = "0.1.0"
+description = "Automated biometric identity verification platform for Microfinance Institutions in Cameroon."
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+authors = [{ name = "Openxtech" }]
+
+# Core backend dependencies (API service). The heavy ML / dashboard stacks
+# live in optional groups so the API can be developed and tested without
+# installing TensorFlow, MediaPipe, FAISS, etc.
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+    "pgvector>=0.3",
+    "alembic>=1.13",
+    "pyjwt>=2.8",
+    "passlib[bcrypt]>=1.7",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+# ML pipeline (Phases 3 / 3b). Heavy; install when working on the pipeline.
+ml = [
+    "opencv-python>=4.9",
+    "pillow>=10.3",
+    "numpy>=1.26",
+    "pytesseract>=0.3.10",
+    "deepface>=0.0.92",
+    "tf-keras>=2.16",
+    "mediapipe>=0.10",
+    "faiss-cpu>=1.8",
+    "scikit-learn>=1.5",
+    "mlflow>=2.13",
+    "evidently>=0.4",
+]
+# Streamlit dashboard (Phase 4), a separate process that calls the API.
+dashboard = [
+    "streamlit>=1.36",
+    "plotly>=5.22",
+    "reportlab>=4.2",
+    "httpx>=0.27",
+]
+# Tooling and tests.
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff>=0.5",
+    "locust>=2.29",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 79          # PEP 8, per Design doc §4.2.2
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"     # Google docstring format, per Design doc §4.2.2
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q"
