@@ -72,6 +72,10 @@ ignore = ["D203", "D213"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"     # Google docstring format, per Design doc §4.2.2
 
+[tool.ruff.lint.per-file-ignores]
+# Migration scripts use the Alembic revision message as their docstring.
+"alembic/versions/*" = ["D"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
