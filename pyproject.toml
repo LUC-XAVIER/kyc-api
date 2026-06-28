@@ -72,6 +72,20 @@ ignore = ["D203", "D213"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"     # Google docstring format, per Design doc §4.2.2
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency injectors are designed to be called in argument
+# defaults; this is the framework idiom, not the B008 anti-pattern.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Security",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Form",
+    "fastapi.File",
+]
+
 [tool.ruff.lint.per-file-ignores]
 # Migration scripts use the Alembic revision message as their docstring.
 "alembic/versions/*" = ["D"]
