@@ -35,18 +35,14 @@ def provision(
         The plaintext API key (shown once; never stored).
     """
     plan = (
-        session.query(SubscriptionPlan)
-        .filter_by(name=plan_name)
-        .one_or_none()
+        session.query(SubscriptionPlan).filter_by(name=plan_name).one_or_none()
     )
     if plan is None:
         raise SystemExit(
             f"Plan {plan_name} not found — run scripts.seed_plans first."
         )
 
-    account = (
-        session.query(MfiAccount).filter_by(email=email).one_or_none()
-    )
+    account = session.query(MfiAccount).filter_by(email=email).one_or_none()
     if account is None:
         account = MfiAccount(name=name, email=email, plan_id=plan.id)
         session.add(account)

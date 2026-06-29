@@ -3,34 +3,9 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.core.security import generate_api_key
-from app.models import ApiKey, MfiAccount, SubscriptionPlan
-from app.models.enums import PlanName
+from tests.factories import create_mfi_with_key
 
 ACCOUNT_URL = "/api/v1/account"
-
-
-def _seed_account(db: Session) -> str:
-    """Create an MFI with one active API key; return the plaintext key."""
-    plan = db.query(SubscriptionPlan).filter_by(name=PlanName.STARTER).one()
-    account = MfiAccount(
-        name="Test MFI",
-        email="auth-test@example.com",
-        plan_id=plan.id,
-    )
-    db.add(account)
-    db.flush()
-
-    key = generate_api_key()
-    db.add(
-        ApiKey(
-            mfi_account_id=account.id,
-            hashed_key=key.hashed_key,
-            prefix=key.prefix,
-        )
-    )
-    db.flush()
-    return key.full_key
 
 
 def test_missing_key_is_unauthorized(api_client: TestClient) -> None:
@@ -52,7 +27,7 @@ def test_valid_key_returns_account_summary(
     api_client: TestClient, db_session: Session
 ) -> None:
     """A valid key resolves to its MFI and returns the summary."""
-    full_key = _seed_account(db_session)
+    _, full_key = create_mfi_with_key(db_session, name="Test MFI")
 
     resp = api_client.get(ACCOUNT_URL, headers={"X-API-Key": full_key})
 

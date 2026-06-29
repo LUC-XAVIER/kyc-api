@@ -15,6 +15,7 @@ from app.core.exceptions import AuthenticationError
 from app.core.security import hash_api_key
 from app.db.session import get_db
 from app.models import ApiKey, MfiAccount
+from app.services import subscription
 
 API_KEY_HEADER_NAME = "X-API-Key"
 # auto_error=False: we raise our own AuthenticationError (401 JSON) instead
@@ -57,3 +58,27 @@ def get_current_mfi(
     record.last_used_at = datetime.now(UTC)
     db.commit()
     return record.mfi_account
+
+
+def get_metered_mfi(
+    mfi: MfiAccount = Depends(get_current_mfi),
+    db: Session = Depends(get_db),
+) -> MfiAccount:
+    """Authenticate, roll the billing period, and enforce the quota.
+
+    Use this in place of :func:`get_current_mfi` on metered endpoints: it
+    blocks (402) when the account has exhausted its monthly quota.
+
+    Args:
+        mfi: The authenticated account (from :func:`get_current_mfi`).
+        db: Request-scoped database session.
+
+    Returns:
+        The authenticated, quota-cleared :class:`MfiAccount`.
+
+    Raises:
+        QuotaExceededError: If the account is over its plan limit.
+    """
+    subscription.roll_period_if_needed(db, mfi)
+    subscription.enforce_quota(mfi)
+    return mfi

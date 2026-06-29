@@ -31,14 +31,10 @@ class Base(DeclarativeBase):
 class UUIDMixin:
     """Adds a non-enumerable UUID primary key."""
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
 
 
 class TimestampMixin:
     """Adds a server-defaulted ``created_at`` timestamp."""
 
-    created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

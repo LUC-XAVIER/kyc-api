@@ -34,8 +34,13 @@ def test_face_embedding_vector_dimension() -> None:
 
 def test_tenant_owned_rows_carry_account_id() -> None:
     """Tenant-scoped tables expose mfi_account_id for multi-tenancy."""
-    for table in ("verifications", "agents", "api_keys",
-                  "audit_logs", "compliance_reports"):
+    for table in (
+        "verifications",
+        "agents",
+        "api_keys",
+        "audit_logs",
+        "compliance_reports",
+    ):
         assert "mfi_account_id" in Base.metadata.tables[table].c
 
 

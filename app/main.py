@@ -39,8 +39,11 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(api_router, prefix=settings.api_v1_prefix)
 
-    logger.info("%s application initialized (%s)", settings.app_name,
-                settings.environment)
+    logger.info(
+        "%s application initialized (%s)",
+        settings.app_name,
+        settings.environment,
+    )
     return app
 
 
