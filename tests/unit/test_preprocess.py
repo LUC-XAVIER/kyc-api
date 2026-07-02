@@ -5,11 +5,20 @@ suite stays green on an API-only install.
 """
 
 import importlib.util
+from pathlib import Path
 
 import pytest
 
 from app.core.exceptions import ValidationError
 from app.pipeline.stages import preprocess
+
+# Real reference documents used to exercise Haar-based zone cropping.
+_IDENTIFIERS = Path(__file__).parents[2] / "docs" / "Identifiers"
+_ID_FRONTS = {
+    "nic-v1": _IDENTIFIERS / "NIC- Version1" / "front.png",
+    "nic-v2": _IDENTIFIERS / "NIC- Version2" / "cni-front.jpg",
+    "passport": _IDENTIFIERS / "Passport" / "passport.png",
+}
 
 pytestmark = pytest.mark.skipif(
     importlib.util.find_spec("cv2") is None,
@@ -105,3 +114,51 @@ def test_deskew_leaves_upright_image_unchanged() -> None:
     result = preprocess._deskew(canvas)
 
     assert np.array_equal(result, canvas)
+
+
+@pytest.mark.parametrize(
+    ("shape", "photo_box", "expected"),
+    [
+        # Photo on the right (NIC v1) -> text is the wide strip on the left.
+        ((346, 516, 3), (322, 120, 180, 120), (0, 0, 322, 346)),
+        # Photo on top (NIC v2) -> text is the tall strip below it.
+        ((697, 440, 3), (90, 65, 300, 280), (0, 345, 440, 352)),
+        # Photo on the left (passport) -> text is the strip on the right.
+        ((433, 561, 3), (20, 95, 150, 150), (170, 0, 391, 433)),
+    ],
+)
+def test_largest_complement_picks_the_text_side(
+    shape: tuple[int, int, int],
+    photo_box: tuple[int, int, int, int],
+    expected: tuple[int, int, int, int],
+) -> None:
+    """Whichever side the photo is on, the text zone is the largest rest."""
+    assert preprocess._largest_complement(shape, photo_box) == expected
+
+
+@pytest.mark.parametrize("name", list(_ID_FRONTS))
+def test_crop_nic_zones_on_reference_documents(name: str) -> None:
+    """Each real ID front yields non-empty text and photo zones."""
+    import cv2
+
+    path = _ID_FRONTS[name]
+    if not path.exists():
+        pytest.skip(f"reference image missing: {path}")
+    image = cv2.imread(str(path))
+
+    zones = preprocess.crop_nic_zones(image)
+
+    assert zones.text_zone.size > 0
+    # The photo zone is a real crop, smaller than the whole document.
+    full_area = image.shape[0] * image.shape[1]
+    photo_area = zones.photo_zone.shape[0] * zones.photo_zone.shape[1]
+    assert 0 < photo_area < full_area
+
+
+def test_crop_nic_zones_without_a_portrait_raises() -> None:
+    """A blank document with no detectable face is rejected."""
+    import numpy as np
+
+    blank = np.full((400, 600, 3), 255, dtype=np.uint8)
+    with pytest.raises(ValidationError):
+        preprocess.crop_nic_zones(blank)
