@@ -29,14 +29,20 @@ class PipelineInput:
     Attributes:
         client_id: MFI-scoped client reference under verification.
         mfi_account_id: Owning tenant, used to scope duplicate search.
-        id_image: Raw bytes of the national ID document image.
+        id_front_image: Raw bytes of the ID document front.
         selfie_image: Raw bytes of the live selfie capture.
+        id_back_image: Raw bytes of the ID document back, when it has one.
+            NIC cards split fields across both sides — NIC v1 keeps the
+            expiry date and ID number on the back, NIC v2 the place of
+            birth — so this is required for NIC verification. Single-page
+            passports carry every field on the front and leave it ``None``.
     """
 
     client_id: str
     mfi_account_id: uuid.UUID
-    id_image: bytes
+    id_front_image: bytes
     selfie_image: bytes
+    id_back_image: bytes | None = None
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,7 @@ class OcrResult:
     place_of_birth: str | None = None
     expiry_date: date | None = None
     sex: Sex | None = None
+    occupation: str | None = None
     field_confidences: dict[str, float] = field(default_factory=dict)
 
 
