@@ -48,24 +48,25 @@ def _bilingual(french: str, english: str) -> str:
     return rf"{french}(?:\s*[/·]?\s*{english})?|{english}"
 
 
-# Bilingual (FR/EN) labels printed beside each value on the cards.
+# Bilingual (FR/EN) labels printed beside each value on the cards. Spaces
+# between words are optional (``\s*``) because OCR routinely fuses them.
 _SURNAME_LABEL = _bilingual(r"NOMS?", r"SURNAME")
 _GIVEN_LABEL = _bilingual(r"PR[EÉ]NOMS?", r"GIVEN\s*NAMES?")
-_DOB_LABEL = _bilingual(r"DATE\s+DE\s+NAISSANCE", r"DATE\s+OF\s+BIRTH")
-_POB_LABEL = _bilingual(r"LIEU\s+DE\s+NAISSANCE", r"PLACE\s+OF\s+BIRTH")
+_DOB_LABEL = _bilingual(r"DATE\s*DE\s*NAISSANCE", r"DATE\s*OF\s*BIRTH")
+_POB_LABEL = _bilingual(r"LIEU\s*DE\s*NAISSANCE", r"PLACE\s*OF\s*BIRTH")
 _EXPIRY_LABEL = _bilingual(
-    r"DATE\s+D[’'`]?EXPIRATION", r"DATE\s+OF\s+EXPIRY"
+    r"DATE\s*D[’'`]?EXPIRATION", r"DATE\s*OF\s*EXPIRY"
 )
 _SEX_LABEL = _bilingual(r"SEXE?", r"SEX")
 _OCCUPATION_LABEL = _bilingual(r"PROFESSION", r"OCCUPATION")
 _ID_LABEL = "|".join(
     (
-        _bilingual(r"NUM[EÉ]RO\s+CNI", r"NIC\s+NUMBER"),
+        _bilingual(r"NUM[EÉ]RO\s*CNI", r"NIC\s*NUMBER"),
         _bilingual(
-            r"NUM[EÉ]RO\s+D[’'`]?IDENTIFICATION", r"IDENTIFICATION\s+NUMBER"
+            r"NUM[EÉ]RO\s*D[’'`]?IDENTIFICATION", r"IDENTIFICATION\s*NUMBER"
         ),
-        _bilingual(r"N[°o]\s*D[’'`]?IDENTIFICATION", r"ID\s+N[o.]"),
-        r"PASSE?PORT\s+N[°o]?",
+        _bilingual(r"N[°o]\s*D[’'`]?IDENTIFICATION", r"ID\s*N[o.]"),
+        r"PASSE?PORT\s*N[°o]?",
     )
 )
 
@@ -187,18 +188,35 @@ def _parse_fields(text: str) -> _Fields:
 
 
 def _value_after(lines: list[str], label: str) -> str | None:
-    """Return the value printed after ``label``, on its line or the next."""
+    """Return the value printed after ``label``, on its line or the next.
+
+    The value may sit on the label's line or the row beneath it. Each
+    candidate is cleaned of surrounding OCR speckle; a same-line remainder
+    that cleans away to nothing (a stray mark after the label) is skipped
+    in favour of the next line, where the printed value usually sits.
+    """
     regex = re.compile(label, re.IGNORECASE)
     for index, line in enumerate(lines):
         match = regex.search(line)
         if match is None:
             continue
-        tail = line[match.end():].strip(" :/-\t")
+        tail = _clean_value(line[match.end():])
         if tail:
             return tail
         if index + 1 < len(lines):
-            return lines[index + 1].strip()
+            return _clean_value(lines[index + 1]) or None
     return None
+
+
+def _clean_value(raw: str) -> str:
+    """Trim OCR speckle around a value, keeping its meaningful core.
+
+    Strips leading/trailing runs that carry no letter or digit (stray
+    punctuation, guilloche marks) so ``'“ WILLIAMS ,'`` becomes
+    ``'WILLIAMS'`` while inner spacing is preserved.
+    """
+    match = re.search(r"[^\W_].*[^\W_]|[^\W_]", raw)
+    return match.group(0).strip() if match else ""
 
 
 def _parse_date(raw: str | None) -> date | None:
