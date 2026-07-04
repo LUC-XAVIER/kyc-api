@@ -11,7 +11,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date
 
-from app.models.enums import Sex, VerificationStatus
+from app.models.enums import DocumentType, Sex, VerificationStatus
 
 
 class RejectReason:
@@ -29,17 +29,22 @@ class PipelineInput:
     Attributes:
         client_id: MFI-scoped client reference under verification.
         mfi_account_id: Owning tenant, used to scope duplicate search.
+        document_type: Kind of document submitted. Selects side handling
+            and OCR parsing, and drives the ``id_back_image`` requirement.
         id_front_image: Raw bytes of the ID document front.
         selfie_image: Raw bytes of the live selfie capture.
         id_back_image: Raw bytes of the ID document back, when it has one.
             NIC cards split fields across both sides — NIC v1 keeps the
             expiry date and ID number on the back, NIC v2 the place of
-            birth — so this is required for NIC verification. Single-page
-            passports carry every field on the front and leave it ``None``.
+            birth — so a ``NIC`` document requires it. Single-page
+            ``PASSPORT`` documents carry every field on the front and leave
+            it ``None``. Enforcing that conditional rule is the caller's
+            job (the API layer / orchestrator), not this data holder.
     """
 
     client_id: str
     mfi_account_id: uuid.UUID
+    document_type: DocumentType
     id_front_image: bytes
     selfie_image: bytes
     id_back_image: bytes | None = None
