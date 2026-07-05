@@ -18,6 +18,7 @@ class RejectReason:
     """Machine-readable reject codes stored on ``Verification``."""
 
     OCR_FAILED = "OCR_FAILED"
+    ID_EXPIRED = "ID_EXPIRED"
     LIVENESS_FAILED = "LIVENESS_FAILED"
     FACE_MISMATCH = "FACE_MISMATCH"
 

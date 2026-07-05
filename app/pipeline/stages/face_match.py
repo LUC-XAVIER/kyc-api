@@ -47,9 +47,23 @@ def match_faces(
         A :class:`FaceMatchOutcome` with the similarity, the verdict, and
         the threshold used.
     """
-    similarity = _cosine_similarity(
-        represent_face(selfie), represent_face(portrait)
+    return match_embeddings(
+        represent_face(selfie), represent_face(portrait), threshold=threshold
     )
+
+
+def match_embeddings(
+    selfie_embedding: np.ndarray,
+    portrait_embedding: np.ndarray,
+    *,
+    threshold: float = DEFAULT_FACE_MATCH_THRESHOLD,
+) -> FaceMatchOutcome:
+    """Score two precomputed ArcFace embeddings against ``threshold``.
+
+    Lets a caller that already holds the selfie embedding (e.g. to reuse it
+    for duplicate search) avoid re-embedding.
+    """
+    similarity = _cosine_similarity(selfie_embedding, portrait_embedding)
     return FaceMatchOutcome(
         match_score=round(float(similarity), 4),
         verified=bool(similarity >= threshold),
