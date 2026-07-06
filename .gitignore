@@ -17,6 +17,12 @@ venv/
 *.pt
 models/
 
+# Datasets: keep the folder skeleton (.gitkeep / README), never the images
+data/**/*.png
+data/**/*.jpg
+data/**/*.jpeg
+data/**/*.bmp
+
 # Database
 *.db
 *.sqlite
