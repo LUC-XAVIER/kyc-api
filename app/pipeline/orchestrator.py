@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Protocol
 
-from app.models.enums import VerificationStatus
+from app.models.enums import DocumentType, VerificationStatus
 from app.pipeline.contracts import Decision, PipelineInput, RejectReason
 from app.pipeline.decision import decide
 from app.pipeline.stages.duplicate import FaceIndex
@@ -92,7 +92,15 @@ def run_verification(
     zones = crop_nic_zones(front)
 
     # Step 2 — OCR (and its two inline rejects, ahead of the face stages).
-    ocr = ocr_extract(zones.text_zone, data.document_type, back_image=back)
+    # A NIC reads best from the cropped text zone (drops the chip/photo
+    # clutter); a passport's MRZ spans the full page width, so it must OCR
+    # the whole front or the machine-readable zone is truncated.
+    front_region = (
+        front
+        if data.document_type is DocumentType.PASSPORT
+        else zones.text_zone
+    )
+    ocr = ocr_extract(front_region, data.document_type, back_image=back)
     if not ocr.success:
         return _rejected(RejectReason.OCR_FAILED)
     if ocr.expiry_date is not None and ocr.expiry_date < date.today():

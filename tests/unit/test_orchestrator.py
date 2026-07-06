@@ -104,6 +104,47 @@ def wire(monkeypatch):
     return _wire
 
 
+@pytest.mark.parametrize(
+    ("document_type", "id_back", "expected_region"),
+    [
+        (DocumentType.NIC, b"back", "TEXTZONE"),  # cropped text zone
+        (DocumentType.PASSPORT, None, b"FRONT"),  # full page (MRZ spans it)
+    ],
+)
+def test_ocr_region_depends_on_document_type(
+    monkeypatch, document_type, id_back, expected_region
+) -> None:
+    """A NIC OCRs the text zone; a passport OCRs the whole front page."""
+    from types import SimpleNamespace
+
+    captured = {}
+    monkeypatch.setattr(orchestrator, "preprocess_image", lambda b: b)
+    monkeypatch.setattr(
+        orchestrator,
+        "crop_nic_zones",
+        lambda img: SimpleNamespace(text_zone="TEXTZONE", photo_zone="p"),
+    )
+
+    def _capture_ocr(region, doc_type, *, back_image=None):
+        captured["region"] = region
+        return OcrResult(success=False)  # short-circuit after OCR
+
+    monkeypatch.setattr(orchestrator, "ocr_extract", _capture_ocr)
+    store = _FakeStore(DuplicateOutcome(is_duplicate=False, similarity=0.0))
+    data = PipelineInput(
+        client_id="CL-1",
+        mfi_account_id=uuid.uuid4(),
+        document_type=document_type,
+        id_front_image=b"FRONT",
+        selfie_image=b"selfie",
+        id_back_image=id_back,
+    )
+
+    orchestrator.run_verification(data, duplicate_store=store)
+
+    assert captured["region"] == expected_region
+
+
 def test_ocr_failure_rejects_before_any_face_work(wire) -> None:
     """Unreadable OCR rejects immediately; later stages never run."""
     store = wire(ocr=OcrResult(success=False))  # liveness/face -> _boom
