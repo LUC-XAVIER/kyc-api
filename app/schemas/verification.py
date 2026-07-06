@@ -1,20 +1,15 @@
-"""Request/response schemas for the verification endpoint."""
+"""Request/response schemas for the verification endpoint.
+
+The request arrives as multipart form-data (image uploads + fields), which
+FastAPI reads via ``UploadFile``/``Form`` in the route, so there is no
+request body model here — only the response.
+"""
 
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.models.enums import VerificationStatus
-
-
-class VerifyRequest(BaseModel):
-    """Inbound payload for a verification request.
-
-    Phase 2 only needs a client reference for the stub pipeline. The ID
-    document and selfie images arrive as multipart uploads in Phase 3.
-    """
-
-    client_id: str = Field(min_length=1, max_length=64)
 
 
 class VerifyResponse(BaseModel):

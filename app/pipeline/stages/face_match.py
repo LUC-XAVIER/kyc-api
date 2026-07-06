@@ -19,9 +19,10 @@ from app.pipeline.contracts import FaceMatchOutcome
 if TYPE_CHECKING:
     import numpy as np
 
-# DeepFace backend. "opencv" detection (bundled Haar) + alignment runs
-# in-process with no extra model download; enforce_detection is off so a
-# tight crop that the detector misses still falls back to the whole image.
+# The face is first localized with the shared BlazeFace detector (the same
+# one liveness uses), then DeepFace's "opencv" backend aligns within that
+# crop. enforce_detection is off, so if opencv can't re-find the face it
+# falls back to the BlazeFace crop — a real face — never the whole frame.
 _MODEL_NAME = "ArcFace"
 _DETECTOR_BACKEND = "opencv"
 
@@ -72,12 +73,19 @@ def match_embeddings(
 
 
 def represent_face(image: np.ndarray) -> np.ndarray:
-    """Embed the face in ``image`` into a 512-d ArcFace vector."""
+    """Embed the face in ``image`` into a 512-d ArcFace vector.
+
+    Localizes the face with the shared BlazeFace detector first so the
+    embedder always operates on a real face region, then runs ArcFace.
+    """
     import numpy as np
     from deepface import DeepFace
 
+    from app.pipeline.face_detect import crop_face
+
+    face = crop_face(image)
     representations = DeepFace.represent(
-        img_path=image,
+        img_path=face if face is not None else image,
         model_name=_MODEL_NAME,
         detector_backend=_DETECTOR_BACKEND,
         enforce_detection=False,

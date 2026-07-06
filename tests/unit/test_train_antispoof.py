@@ -86,10 +86,11 @@ def test_liveness_inference_with_trained_model(tmp_path: Path) -> None:
     """A trained model drives check_liveness end to end on a real face."""
     import joblib
 
+    from app.pipeline import face_detect
     from app.pipeline.stages import liveness, preprocess
     from ml import train_antispoof
 
-    if not liveness.FACE_DETECTOR_MODEL_PATH.exists():
+    if not face_detect.FACE_DETECTOR_MODEL_PATH.exists():
         pytest.skip("face-detector model not fetched")
 
     _write_toy_dataset(tmp_path)

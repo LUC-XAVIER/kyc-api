@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from app.pipeline import face_detect
 from app.pipeline.stages import liveness
 
 pytestmark = pytest.mark.skipif(
@@ -85,7 +86,7 @@ def test_load_classifier_missing_model_raises(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(
     importlib.util.find_spec("mediapipe") is None
-    or not liveness.FACE_DETECTOR_MODEL_PATH.exists(),
+    or not face_detect.FACE_DETECTOR_MODEL_PATH.exists(),
     reason="requires MediaPipe and the fetched face-detector model",
 )
 def test_check_liveness_rejects_when_no_face() -> None:
