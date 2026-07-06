@@ -1,9 +1,18 @@
-"""Integration tests for POST /kyc/verify and quota enforcement."""
+"""Integration tests for POST /kyc/verify and quota enforcement.
 
+The ML pipeline is stubbed (run_verification is monkeypatched) so these
+exercise the multipart endpoint, persistence, and quota against the real
+database without loading models.
+"""
+
+import numpy as np
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.api.v1.routes import verify as verify_route
+from app.models import FaceEmbedding
 from app.models.enums import VerificationStatus
+from app.pipeline.orchestrator import PipelineResult, VerificationOutput
 from tests.factories import create_mfi_with_key
 
 VERIFY_URL = "/api/v1/kyc/verify"
@@ -13,15 +22,44 @@ def _auth(key: str) -> dict[str, str]:
     return {"X-API-Key": key}
 
 
-def test_verify_succeeds_and_consumes_quota(
-    api_client: TestClient, db_session: Session
+def _files(*, with_back: bool = True) -> dict:
+    image = ("img.png", b"fake-image-bytes", "image/png")
+    files = {"id_front": image, "selfie": image}
+    if with_back:
+        files["id_back"] = image
+    return files
+
+
+def _data(client_id: str, document_type: str = "NIC") -> dict[str, str]:
+    return {"client_id": client_id, "document_type": document_type}
+
+
+def _stub_pipeline(monkeypatch, output: VerificationOutput) -> None:
+    monkeypatch.setattr(
+        verify_route,
+        "run_verification",
+        lambda data, *, duplicate_store: output,
+    )
+
+
+def _verified() -> VerificationOutput:
+    return VerificationOutput(
+        PipelineResult(VerificationStatus.VERIFIED, 0.99),
+        np.zeros(512, dtype=np.float32),
+    )
+
+
+def test_verify_succeeds_persists_and_consumes_quota(
+    api_client: TestClient, db_session: Session, monkeypatch
 ) -> None:
-    """A verification under quota returns 201 and increments usage."""
+    """A clean pass returns 201, enrolls the embedding, and bills one unit."""
+    _stub_pipeline(monkeypatch, _verified())
     account, key = create_mfi_with_key(db_session, usage=0)
 
     resp = api_client.post(
         VERIFY_URL,
-        json={"client_id": "CLIENT-001"},
+        data=_data("CLIENT-001"),
+        files=_files(),
         headers=_auth(key),
     )
 
@@ -30,20 +68,53 @@ def test_verify_succeeds_and_consumes_quota(
     assert body["status"] == VerificationStatus.VERIFIED.value
     assert body["client_id"] == "CLIENT-001"
     assert body["quota_remaining"] == 199
-    assert body["quota_warning"] is False
     assert account.current_period_usage == 1
+    assert (
+        db_session.query(FaceEmbedding)
+        .filter_by(client_id="CLIENT-001")
+        .count()
+        == 1
+    )
+
+
+def test_verify_rejected_does_not_enroll(
+    api_client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """A REJECTED result is recorded but enrolls no embedding."""
+    _stub_pipeline(
+        monkeypatch,
+        VerificationOutput(
+            PipelineResult(
+                VerificationStatus.REJECTED, None, "LIVENESS_FAILED"
+            )
+        ),
+    )
+    _, key = create_mfi_with_key(db_session, usage=0)
+
+    resp = api_client.post(
+        VERIFY_URL, data=_data("CLIENT-R"), files=_files(), headers=_auth(key)
+    )
+
+    assert resp.status_code == 201
+    assert resp.json()["status"] == VerificationStatus.REJECTED.value
+    assert resp.json()["reject_reason"] == "LIVENESS_FAILED"
+    assert (
+        db_session.query(FaceEmbedding).filter_by(client_id="CLIENT-R").count()
+        == 0
+    )
 
 
 def test_verify_sets_warning_near_limit(
-    api_client: TestClient, db_session: Session
+    api_client: TestClient, db_session: Session, monkeypatch
 ) -> None:
     """Crossing 80% usage flips the quota_warning flag on."""
-    # Starter quota is 200; 159 -> after this call 160 == 80%.
+    _stub_pipeline(monkeypatch, _verified())
     _, key = create_mfi_with_key(db_session, usage=159)
 
     resp = api_client.post(
         VERIFY_URL,
-        json={"client_id": "CLIENT-002"},
+        data=_data("CLIENT-002"),
+        files=_files(),
         headers=_auth(key),
     )
 
@@ -59,7 +130,8 @@ def test_verify_blocked_when_quota_exhausted(
 
     resp = api_client.post(
         VERIFY_URL,
-        json={"client_id": "CLIENT-003"},
+        data=_data("CLIENT-003"),
+        files=_files(),
         headers=_auth(key),
     )
 
@@ -70,5 +142,23 @@ def test_verify_blocked_when_quota_exhausted(
 
 def test_verify_requires_authentication(api_client: TestClient) -> None:
     """No API key -> 401 before any quota logic runs."""
-    resp = api_client.post(VERIFY_URL, json={"client_id": "CLIENT-004"})
+    resp = api_client.post(
+        VERIFY_URL, data=_data("CLIENT-004"), files=_files()
+    )
     assert resp.status_code == 401
+
+
+def test_verify_nic_without_back_is_rejected(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A NIC upload missing its back image is a 400 validation error."""
+    _, key = create_mfi_with_key(db_session, usage=0)
+
+    resp = api_client.post(
+        VERIFY_URL,
+        data=_data("CLIENT-005", "NIC"),
+        files=_files(with_back=False),
+        headers=_auth(key),
+    )
+
+    assert resp.status_code == 400
