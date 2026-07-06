@@ -50,11 +50,29 @@ class PipelineResult:
     reject_reason: str | None = None
 
 
+@dataclass(frozen=True)
+class VerificationOutput:
+    """What :func:`run_verification` returns to its caller.
+
+    The pipeline performs no persistence itself. ``embedding`` is the selfie
+    face vector to enroll, set only on a VERIFIED pass; the caller writes it
+    (and the verification record) in its own transaction.
+
+    Attributes:
+        result: The verdict, confidence, and reject reason.
+        embedding: The 512-d selfie embedding to enroll, or ``None``.
+    """
+
+    result: PipelineResult
+    embedding: np.ndarray | None = None
+
+
 class DuplicateStore(Protocol):
-    """Persistence port for duplicate-face search and enrollment.
+    """Read-only port for duplicate-face search.
 
     Backed in production by the pgvector ``FaceEmbedding`` table, scoped to
-    one MFI account.
+    one MFI account. Enrollment is the caller's job (see
+    :class:`VerificationOutput`), so the pipeline stays side-effect free.
     """
 
     def build_index(
@@ -63,24 +81,19 @@ class DuplicateStore(Protocol):
         """Return a search index of the MFI's other clients' embeddings."""
         ...
 
-    def add_embedding(
-        self, mfi_account_id: uuid.UUID, client_id: str, embedding: np.ndarray
-    ) -> None:
-        """Enroll a verified client's embedding for future searches."""
-        ...
-
 
 def run_verification(
     data: PipelineInput, *, duplicate_store: DuplicateStore
-) -> PipelineResult:
+) -> VerificationOutput:
     """Run the full verification pipeline for one client.
 
     Args:
         data: The images, document type, and tenant/client references.
-        duplicate_store: Port for duplicate search and embedding enrollment.
+        duplicate_store: Read-only port for duplicate search.
 
     Returns:
-        The pipeline's :class:`PipelineResult`.
+        A :class:`VerificationOutput` — the verdict plus the embedding to
+        enroll on success. No database writes happen here.
     """
     front = preprocess_image(data.id_front_image)
     selfie = preprocess_image(data.selfie_image)
@@ -109,13 +122,13 @@ def run_verification(
     # Step 3 — Liveness. A failure short-circuits the expensive face stages.
     liveness = check_liveness(selfie)
     if not liveness.passed:
-        return _to_result(decide(liveness))
+        return VerificationOutput(_to_result(decide(liveness)))
 
     # Step 4 — Face match. Embed the selfie once and reuse it for Step 5.
     selfie_embedding = represent_face(selfie)
     face = match_embeddings(selfie_embedding, represent_face(zones.photo_zone))
     if not face.verified:
-        return _to_result(decide(liveness, face))
+        return VerificationOutput(_to_result(decide(liveness, face)))
 
     # Step 5 — Duplicate search against the MFI's other clients.
     index = duplicate_store.build_index(
@@ -123,19 +136,23 @@ def run_verification(
     )
     duplicate = index.search(selfie_embedding)
 
-    # Step 6 — Decide; enroll the embedding only on a clean pass.
+    # Step 6 — Decide; hand back the embedding to enroll on a clean pass.
     decision = decide(liveness, face, duplicate)
-    if decision.status is VerificationStatus.VERIFIED:
-        duplicate_store.add_embedding(
-            data.mfi_account_id, data.client_id, selfie_embedding
+    result = _to_result(decision)
+    embedding = (
+        selfie_embedding
+        if decision.status is VerificationStatus.VERIFIED
+        else None
+    )
+    return VerificationOutput(result, embedding)
+
+
+def _rejected(reason: str) -> VerificationOutput:
+    """A REJECTED output carrying ``reason`` and no embedding."""
+    return VerificationOutput(
+        PipelineResult(
+            status=VerificationStatus.REJECTED, reject_reason=reason
         )
-    return _to_result(decision)
-
-
-def _rejected(reason: str) -> PipelineResult:
-    """A REJECTED result carrying ``reason``."""
-    return PipelineResult(
-        status=VerificationStatus.REJECTED, reject_reason=reason
     )
 
 
