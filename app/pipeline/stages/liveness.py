@@ -19,17 +19,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.pipeline.contracts import LivenessOutcome
+from app.pipeline.face_detect import face_present
 
 if TYPE_CHECKING:
     import numpy as np
 
 # Default trained-model location, produced by ml/train_antispoof.py.
 DEFAULT_MODEL_PATH = Path("ml/models/antispoof_lbp_svm.joblib")
-
-# MediaPipe face-detector asset (BlazeFace short-range). Fetch once from
-# https://storage.googleapis.com/mediapipe-models/face_detector/
-# blaze_face_short_range/float16/1/blaze_face_short_range.tflite
-FACE_DETECTOR_MODEL_PATH = Path("ml/models/blaze_face_short_range.tflite")
 
 # Minimum P(live) from the SVM for the selfie to pass anti-spoofing.
 LIVENESS_THRESHOLD = 0.5
@@ -64,7 +60,7 @@ def check_liveness(
         A :class:`LivenessOutcome`; ``passed`` is False if no face geometry
         is found or the spoof score falls below ``threshold``.
     """
-    if not _face_present(selfie):
+    if not face_present(selfie):
         return LivenessOutcome(passed=False, score=0.0, method=_METHOD)
 
     classifier = _load_classifier(model_path)
@@ -143,39 +139,6 @@ def _lbp_codes(gray: np.ndarray) -> np.ndarray:
         neighbor = padded[1 + dy:1 + dy + height, 1 + dx:1 + dx + width]
         codes |= ((neighbor >= gray) << bit).astype(np.uint8)
     return codes
-
-
-def _face_present(image: np.ndarray) -> bool:
-    """Whether MediaPipe detects a face (with keypoints) in ``image``."""
-    import cv2
-    import mediapipe as mp
-
-    detector = _face_detector(FACE_DETECTOR_MODEL_PATH)
-    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-    return bool(detector.detect(mp_image).detections)
-
-
-@lru_cache(maxsize=1)
-def _face_detector(model_path: Path) -> Any:
-    """Build and cache the MediaPipe BlazeFace detector.
-
-    Raises:
-        FileNotFoundError: If the detector asset has not been fetched.
-    """
-    from mediapipe.tasks import python
-    from mediapipe.tasks.python import vision
-
-    if not model_path.exists():
-        raise FileNotFoundError(
-            f"Face-detector model not found at {model_path}. See the "
-            "FACE_DETECTOR_MODEL_PATH comment for the download URL."
-        )
-    options = vision.FaceDetectorOptions(
-        base_options=python.BaseOptions(model_asset_path=str(model_path)),
-        min_detection_confidence=0.5,
-    )
-    return vision.FaceDetector.create_from_options(options)
 
 
 @lru_cache(maxsize=4)

@@ -24,10 +24,13 @@ _NIC_V2 = _IDENTIFIERS / "NIC- Version2" / "cni-front.jpg"
 
 
 def _arcface_ready() -> bool:
-    """Whether DeepFace and the ArcFace weights are available."""
+    """Whether DeepFace, ArcFace weights, and the face detector are ready."""
+    from app.pipeline import face_detect
+
     return (
         importlib.util.find_spec("deepface") is not None
         and _ARCFACE_WEIGHTS.exists()
+        and face_detect.FACE_DETECTOR_MODEL_PATH.exists()
     )
 
 
