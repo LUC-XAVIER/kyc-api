@@ -171,7 +171,7 @@ def test_verify_persists_all_stage_results(
         result=PipelineResult(VerificationStatus.PENDING, 0.85),
         ocr=OcrResult(
             success=True, full_name="JANE DOE", id_number="ID123",
-            date_of_birth=date(1990, 1, 1),
+            date_of_birth=date(1990, 1, 1), occupation="INGENIEUR",
         ),
         liveness=LivenessOutcome(passed=True, score=0.9, method="lbp-svm"),
         face_match=FaceMatchOutcome(
@@ -200,6 +200,7 @@ def test_verify_persists_all_stage_results(
         db_session.query(ExtractedData).filter_by(verification_id=vid).one()
     )
     assert extracted.full_name == "JANE DOE"
+    assert extracted.occupation == "INGENIEUR"
 
 
 def test_verify_ocr_failure_persists_only_extracted_data(

@@ -43,6 +43,7 @@ def _seed(
         ExtractedData(
             verification_id=verification.id, full_name="JANE DOE",
             id_number="ID9", date_of_birth=date(1990, 1, 1), sex=Sex.F,
+            occupation="ENGINEER",
         ),
         LivenessResult(
             verification_id=verification.id, passed=True, method="lbp-svm",
@@ -75,6 +76,7 @@ def test_detail_returns_all_stage_records(
     assert body["client_id"] == "C-1"
     assert body["extracted_data"]["full_name"] == "JANE DOE"
     assert body["extracted_data"]["sex"] == "F"
+    assert body["extracted_data"]["occupation"] == "ENGINEER"
     assert body["liveness_result"]["anti_spoof_score"] == 0.9
     assert body["face_match_result"]["verified"] is True
     assert len(body["duplicate_flags"]) == 1

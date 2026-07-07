@@ -86,6 +86,7 @@ def _persist_stage_results(
                 place_of_birth=ocr.place_of_birth,
                 expiry_date=ocr.expiry_date,
                 sex=ocr.sex,
+                occupation=ocr.occupation,
                 field_confidences=ocr.field_confidences or None,
             )
         )

@@ -55,6 +55,7 @@ class ExtractedDataSchema(BaseModel):
     place_of_birth: str | None
     expiry_date: date | None
     sex: Sex | None
+    occupation: str | None
     field_confidences: dict | None
 
 
