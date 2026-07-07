@@ -1,0 +1,11 @@
+{
+  "n_live": 389,
+  "n_spoof": 3377,
+  "threshold": 0.5,
+  "roc_auc": 0.9388,
+  "avg_precision": 0.6935,
+  "accuracy": 0.8035,
+  "precision_live": 0.3346,
+  "recall_live": 0.9126,
+  "f1_live": 0.4897
+}
