@@ -14,10 +14,18 @@ from sqlalchemy.orm import Session
 from app.api.v1.deps import get_metered_mfi
 from app.core.exceptions import ValidationError
 from app.db.session import get_db
-from app.models import FaceEmbedding, MfiAccount, Verification
+from app.models import (
+    DuplicateFlag,
+    ExtractedData,
+    FaceEmbedding,
+    FaceMatchResult,
+    LivenessResult,
+    MfiAccount,
+    Verification,
+)
 from app.models.enums import DocumentType, SubmissionMethod
 from app.pipeline.contracts import PipelineInput
-from app.pipeline.orchestrator import run_verification
+from app.pipeline.orchestrator import VerificationOutput, run_verification
 from app.schemas.verification import VerifyResponse
 from app.services import subscription
 from app.services.duplicate_store import PgVectorDuplicateStore
@@ -56,6 +64,61 @@ def build_pipeline_input(
         selfie_image=selfie,
         id_back_image=id_back,
     )
+
+
+def _persist_stage_results(
+    db: Session, verification_id: uuid.UUID, output: VerificationOutput
+) -> None:
+    """Persist the per-stage records for whichever stages ran.
+
+    Each stage that executed left an outcome on ``output``; a stage skipped
+    by the pipeline's early-exit is ``None`` and produces no row. A duplicate
+    flag is written only when a duplicate was actually hit.
+    """
+    if output.ocr is not None:
+        ocr = output.ocr
+        db.add(
+            ExtractedData(
+                verification_id=verification_id,
+                full_name=ocr.full_name,
+                id_number=ocr.id_number,
+                date_of_birth=ocr.date_of_birth,
+                place_of_birth=ocr.place_of_birth,
+                expiry_date=ocr.expiry_date,
+                sex=ocr.sex,
+                field_confidences=ocr.field_confidences or None,
+            )
+        )
+    if output.liveness is not None:
+        liveness = output.liveness
+        db.add(
+            LivenessResult(
+                verification_id=verification_id,
+                passed=liveness.passed,
+                method=liveness.method,
+                anti_spoof_score=liveness.score,
+                landmarks_detected=liveness.score > 0.0,
+            )
+        )
+    if output.face_match is not None:
+        face = output.face_match
+        db.add(
+            FaceMatchResult(
+                verification_id=verification_id,
+                match_score=face.match_score,
+                verified=face.verified,
+                threshold=face.threshold,
+            )
+        )
+    if output.duplicate is not None and output.duplicate.is_duplicate:
+        duplicate = output.duplicate
+        db.add(
+            DuplicateFlag(
+                verification_id=verification_id,
+                matched_client_id=duplicate.matched_client_id,
+                similarity_score=duplicate.similarity,
+            )
+        )
 
 
 @router.post(
@@ -102,7 +165,7 @@ def verify(
         processed_at=datetime.now(UTC),
     )
     db.add(verification)
-    db.flush()  # assign verification.id before the embedding references it
+    db.flush()  # assign verification.id before child rows reference it
     if output.embedding is not None:
         db.add(
             FaceEmbedding(
@@ -112,6 +175,7 @@ def verify(
                 model_used="ArcFace",
             )
         )
+    _persist_stage_results(db, verification.id, output)
     subscription.record_usage(db, mfi)
     db.refresh(verification)
 

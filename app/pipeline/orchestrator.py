@@ -23,7 +23,15 @@ from datetime import date
 from typing import TYPE_CHECKING, Protocol
 
 from app.models.enums import DocumentType, VerificationStatus
-from app.pipeline.contracts import Decision, PipelineInput, RejectReason
+from app.pipeline.contracts import (
+    Decision,
+    DuplicateOutcome,
+    FaceMatchOutcome,
+    LivenessOutcome,
+    OcrResult,
+    PipelineInput,
+    RejectReason,
+)
 from app.pipeline.decision import decide
 from app.pipeline.stages.duplicate import FaceIndex
 from app.pipeline.stages.face_match import match_embeddings, represent_face
@@ -56,15 +64,25 @@ class VerificationOutput:
 
     The pipeline performs no persistence itself. ``embedding`` is the selfie
     face vector to enroll, set only on a VERIFIED pass; the caller writes it
-    (and the verification record) in its own transaction.
+    (and the verification + per-stage records) in its own transaction. The
+    stage outcomes are populated for the stages that ran (``None`` for those
+    skipped by early-exit) so the caller can persist them.
 
     Attributes:
         result: The verdict, confidence, and reject reason.
         embedding: The 512-d selfie embedding to enroll, or ``None``.
+        ocr: OCR extraction, or ``None`` if preprocessing failed first.
+        liveness: Liveness outcome, or ``None`` if it never ran.
+        face_match: Face-match outcome, or ``None`` if it never ran.
+        duplicate: Duplicate outcome, or ``None`` if it never ran.
     """
 
     result: PipelineResult
     embedding: np.ndarray | None = None
+    ocr: OcrResult | None = None
+    liveness: LivenessOutcome | None = None
+    face_match: FaceMatchOutcome | None = None
+    duplicate: DuplicateOutcome | None = None
 
 
 class DuplicateStore(Protocol):
@@ -115,20 +133,27 @@ def run_verification(
     )
     ocr = ocr_extract(front_region, data.document_type, back_image=back)
     if not ocr.success:
-        return _rejected(RejectReason.OCR_FAILED)
+        return VerificationOutput(_rejected(RejectReason.OCR_FAILED), ocr=ocr)
     if ocr.expiry_date is not None and ocr.expiry_date < date.today():
-        return _rejected(RejectReason.ID_EXPIRED)
+        return VerificationOutput(_rejected(RejectReason.ID_EXPIRED), ocr=ocr)
 
     # Step 3 — Liveness. A failure short-circuits the expensive face stages.
     liveness = check_liveness(selfie)
     if not liveness.passed:
-        return VerificationOutput(_to_result(decide(liveness)))
+        return VerificationOutput(
+            _to_result(decide(liveness)), ocr=ocr, liveness=liveness
+        )
 
     # Step 4 — Face match. Embed the selfie once and reuse it for Step 5.
     selfie_embedding = represent_face(selfie)
     face = match_embeddings(selfie_embedding, represent_face(zones.photo_zone))
     if not face.verified:
-        return VerificationOutput(_to_result(decide(liveness, face)))
+        return VerificationOutput(
+            _to_result(decide(liveness, face)),
+            ocr=ocr,
+            liveness=liveness,
+            face_match=face,
+        )
 
     # Step 5 — Duplicate search against the MFI's other clients.
     index = duplicate_store.build_index(
@@ -138,21 +163,25 @@ def run_verification(
 
     # Step 6 — Decide; hand back the embedding to enroll on a clean pass.
     decision = decide(liveness, face, duplicate)
-    result = _to_result(decision)
     embedding = (
         selfie_embedding
         if decision.status is VerificationStatus.VERIFIED
         else None
     )
-    return VerificationOutput(result, embedding)
-
-
-def _rejected(reason: str) -> VerificationOutput:
-    """A REJECTED output carrying ``reason`` and no embedding."""
     return VerificationOutput(
-        PipelineResult(
-            status=VerificationStatus.REJECTED, reject_reason=reason
-        )
+        _to_result(decision),
+        embedding=embedding,
+        ocr=ocr,
+        liveness=liveness,
+        face_match=face,
+        duplicate=duplicate,
+    )
+
+
+def _rejected(reason: str) -> PipelineResult:
+    """A REJECTED result carrying ``reason``."""
+    return PipelineResult(
+        status=VerificationStatus.REJECTED, reject_reason=reason
     )
 
 
