@@ -15,7 +15,11 @@ from app.api.v1.deps import get_current_mfi
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
 from app.models import MfiAccount, Verification
-from app.models.enums import DuplicateResolution, VerificationStatus
+from app.models.enums import (
+    ActorType,
+    DuplicateResolution,
+    VerificationStatus,
+)
 from app.pipeline.contracts import RejectReason
 from app.schemas.review import (
     ReviewAction,
@@ -23,6 +27,7 @@ from app.schemas.review import (
     ReviewDecisionResponse,
     ReviewItem,
 )
+from app.services import audit
 
 router = APIRouter(prefix="/kyc/reviews", tags=["reviews"])
 
@@ -74,6 +79,15 @@ def decide_review(
     for flag in verification.duplicate_flags:
         flag.resolution = resolution
 
+    approved = payload.action is ReviewAction.APPROVE
+    audit.record(
+        db,
+        mfi_account_id=mfi.id,
+        action=audit.REVIEW_APPROVED if approved else audit.REVIEW_REJECTED,
+        actor_type=ActorType.MANAGER,
+        verification_id=verification.id,
+        details=None if approved else {"reason": verification.reject_reason},
+    )
     db.flush()
     return ReviewDecisionResponse(
         verification_id=verification.id, status=verification.status
