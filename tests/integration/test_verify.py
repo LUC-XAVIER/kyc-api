@@ -14,13 +14,14 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.routes import verify as verify_route
 from app.models import (
+    AuditLog,
     DuplicateFlag,
     ExtractedData,
     FaceEmbedding,
     FaceMatchResult,
     LivenessResult,
 )
-from app.models.enums import VerificationStatus
+from app.models.enums import ActorType, VerificationStatus
 from app.pipeline.contracts import (
     DuplicateOutcome,
     FaceMatchOutcome,
@@ -28,6 +29,7 @@ from app.pipeline.contracts import (
     OcrResult,
 )
 from app.pipeline.orchestrator import PipelineResult, VerificationOutput
+from app.services import audit
 from tests.factories import create_mfi_with_key
 
 VERIFY_URL = "/api/v1/kyc/verify"
@@ -201,6 +203,24 @@ def test_verify_persists_all_stage_results(
     )
     assert extracted.full_name == "JANE DOE"
     assert extracted.occupation == "INGENIEUR"
+
+
+def test_verify_records_audit_entry(
+    api_client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """A processed verification writes an immutable audit-log entry."""
+    _stub_pipeline(monkeypatch, _verified())
+    _, key = create_mfi_with_key(db_session, usage=0)
+
+    resp = api_client.post(
+        VERIFY_URL, data=_data("CLIENT-A"), files=_files(), headers=_auth(key)
+    )
+
+    vid = uuid.UUID(resp.json()["verification_id"])
+    entry = db_session.query(AuditLog).filter_by(verification_id=vid).one()
+    assert entry.action == audit.VERIFICATION_PROCESSED
+    assert entry.actor_type is ActorType.SYSTEM
+    assert entry.details["status"] == VerificationStatus.VERIFIED.value
 
 
 def test_verify_ocr_failure_persists_only_extracted_data(

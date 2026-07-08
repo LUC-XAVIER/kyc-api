@@ -6,12 +6,14 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.models import DuplicateFlag, Verification
+from app.models import AuditLog, DuplicateFlag, Verification
 from app.models.enums import (
+    ActorType,
     DuplicateResolution,
     SubmissionMethod,
     VerificationStatus,
 )
+from app.services import audit
 from tests.factories import create_mfi_with_key
 
 REVIEWS_URL = "/api/v1/kyc/reviews"
@@ -120,6 +122,29 @@ def test_approve_resolves_duplicate_flags(
     assert resp.status_code == 200
     db_session.refresh(flag)
     assert flag.resolution is DuplicateResolution.DISMISSED
+
+
+def test_decision_records_audit_entry(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A review decision writes an audit-log entry by a MANAGER."""
+    account, key = create_mfi_with_key(db_session, usage=0)
+    verification = _verification(db_session, account.id, "C-1")
+
+    api_client.post(
+        f"{REVIEWS_URL}/{verification.id}/decision",
+        json={"action": "reject", "reason": "BAD_DOCS"},
+        headers=_auth(key),
+    )
+
+    entry = (
+        db_session.query(AuditLog)
+        .filter_by(verification_id=verification.id)
+        .one()
+    )
+    assert entry.action == audit.REVIEW_REJECTED
+    assert entry.actor_type is ActorType.MANAGER
+    assert entry.details["reason"] == "BAD_DOCS"
 
 
 def test_unknown_verification_is_404(

@@ -23,11 +23,11 @@ from app.models import (
     MfiAccount,
     Verification,
 )
-from app.models.enums import DocumentType, SubmissionMethod
+from app.models.enums import ActorType, DocumentType, SubmissionMethod
 from app.pipeline.contracts import PipelineInput
 from app.pipeline.orchestrator import VerificationOutput, run_verification
 from app.schemas.verification import VerifyResponse
-from app.services import subscription
+from app.services import audit, subscription
 from app.services.duplicate_store import PgVectorDuplicateStore
 
 router = APIRouter(prefix="/kyc", tags=["verification"])
@@ -177,6 +177,18 @@ def verify(
             )
         )
     _persist_stage_results(db, verification.id, output)
+    audit.record(
+        db,
+        mfi_account_id=mfi.id,
+        action=audit.VERIFICATION_PROCESSED,
+        actor_type=ActorType.SYSTEM,
+        verification_id=verification.id,
+        details={
+            "status": result.status.value,
+            "reject_reason": result.reject_reason,
+            "client_id": client_id,
+        },
+    )
     subscription.record_usage(db, mfi)
     db.refresh(verification)
 
