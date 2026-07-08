@@ -11,6 +11,7 @@ from app.pipeline.decision import decide
 
 _LIVE_PASS = LivenessOutcome(passed=True, score=0.95, method="lbp-svm")
 _LIVE_FAIL = LivenessOutcome(passed=False, score=0.20, method="lbp-svm")
+_LIVE_REVIEW = LivenessOutcome(passed=False, score=0.50, method="lbp-svm")
 _FACE_PASS = FaceMatchOutcome(match_score=0.82, verified=True, threshold=0.40)
 _FACE_FAIL = FaceMatchOutcome(match_score=0.10, verified=False, threshold=0.40)
 _DUP_HIT = DuplicateOutcome(
@@ -31,6 +32,14 @@ def test_failed_liveness_without_later_stages() -> None:
     decision = decide(_LIVE_FAIL)
     assert decision.status == VerificationStatus.REJECTED
     assert decision.reject_reason == RejectReason.LIVENESS_FAILED
+
+
+def test_uncertain_liveness_goes_to_review() -> None:
+    """A liveness score in the review band becomes PENDING, not REJECTED."""
+    decision = decide(_LIVE_REVIEW, _FACE_PASS, _DUP_CLEAR)
+    assert decision.status == VerificationStatus.PENDING
+    assert decision.reject_reason == RejectReason.LIVENESS_REVIEW
+    assert decision.confidence == _LIVE_REVIEW.score
 
 
 def test_failed_face_match_rejects() -> None:

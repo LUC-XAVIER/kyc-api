@@ -178,6 +178,22 @@ def test_failed_liveness_skips_face_and_duplicate(wire) -> None:
     assert store.built_for == []  # duplicate search skipped
 
 
+def test_uncertain_liveness_goes_to_pending_review(wire) -> None:
+    """A review-band liveness score short-circuits to PENDING, no face work."""
+    store = wire(
+        ocr=OcrResult(success=True),
+        liveness=LivenessOutcome(passed=False, score=0.5, method="m"),
+        # face is None -> the face stages must not run
+    )
+
+    output = orchestrator.run_verification(_input(), duplicate_store=store)
+
+    assert output.result.status is VerificationStatus.PENDING
+    assert output.result.reject_reason == RejectReason.LIVENESS_REVIEW
+    assert store.built_for == []
+    assert output.embedding is None
+
+
 def test_face_mismatch_skips_duplicate(wire) -> None:
     """A face mismatch rejects without a duplicate search."""
     store = wire(

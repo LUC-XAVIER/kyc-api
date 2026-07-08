@@ -27,8 +27,11 @@ if TYPE_CHECKING:
 # Default trained-model location, produced by ml/train_antispoof.py.
 DEFAULT_MODEL_PATH = Path("ml/models/antispoof_lbp_svm.joblib")
 
-# Minimum P(live) from the SVM for the selfie to pass anti-spoofing.
-LIVENESS_THRESHOLD = 0.5
+# Minimum P(live) for the selfie to PASS anti-spoofing outright. Chosen
+# security-first (≈5% attack-accept rate on the LCC-FASD test set); scores
+# below this but above the decision engine's review floor go to manual
+# review rather than an outright reject. See docs/ML-PIPELINE.md §4.2.
+LIVENESS_THRESHOLD = 0.72
 
 # Canonical face size and LBP cell size feeding the fixed-length feature
 # vector: (128 / 16)**2 = 64 cells, each a 256-bin histogram -> 16384 dims.

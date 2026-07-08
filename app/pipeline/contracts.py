@@ -15,12 +15,18 @@ from app.models.enums import DocumentType, Sex, VerificationStatus
 
 
 class RejectReason:
-    """Machine-readable reject codes stored on ``Verification``."""
+    """Machine-readable outcome codes stored on ``Verification``.
+
+    Mostly reject reasons; ``LIVENESS_REVIEW`` marks a PENDING case sent to
+    a human because the liveness score fell in the uncertain review band.
+    """
 
     OCR_FAILED = "OCR_FAILED"
     ID_EXPIRED = "ID_EXPIRED"
     LIVENESS_FAILED = "LIVENESS_FAILED"
+    LIVENESS_REVIEW = "LIVENESS_REVIEW"
     FACE_MISMATCH = "FACE_MISMATCH"
+    MANUAL_REJECT = "MANUAL_REJECT"
 
 
 @dataclass(frozen=True)

@@ -41,6 +41,13 @@ class ValidationError(KycError):
     code = "VALIDATION_FAILED"
 
 
+class NotFoundError(KycError):
+    """Raised when a requested resource does not exist for the caller."""
+
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "NOT_FOUND"
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach handlers that render :class:`KycError` as JSON responses."""
 
