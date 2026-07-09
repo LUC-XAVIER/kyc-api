@@ -9,6 +9,8 @@ from fastapi import APIRouter
 from app.api.v1.routes import (
     account,
     health,
+    monitoring,
+    reports,
     reviews,
     verifications,
     verify,
@@ -20,3 +22,5 @@ api_router.include_router(account.router)
 api_router.include_router(verify.router)
 api_router.include_router(reviews.router)
 api_router.include_router(verifications.router)
+api_router.include_router(reports.router)
+api_router.include_router(monitoring.router)

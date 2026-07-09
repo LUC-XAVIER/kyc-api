@@ -17,6 +17,7 @@ from app.models.enums import ActorType
 VERIFICATION_PROCESSED = "verification.processed"
 REVIEW_APPROVED = "review.approved"
 REVIEW_REJECTED = "review.rejected"
+REPORT_GENERATED = "report.generated"
 
 
 def record(
