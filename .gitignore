@@ -11,11 +11,11 @@ venv/
 .venv/
 *.egg-info/
 
-# ML models
+# ML model weight artifacts (never the app/models ORM package)
 *.pkl
 *.h5
 *.pt
-models/
+ml/models/
 
 # Datasets: keep the folder skeleton (.gitkeep / README), never the images
 data/**/*.png
