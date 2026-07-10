@@ -202,6 +202,68 @@ def test_parse_fields_skips_speckle_for_next_line_value() -> None:
     assert ocr._value(fields, "occupation") == "ETUDIANT"
 
 
+# --- EasyOCR line grouping ------------------------------------------------
+
+
+def _box(x0: int, y0: int, x1: int, y1: int) -> list[list[int]]:
+    """A rectangular EasyOCR polygon (top-left, clockwise)."""
+    return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+
+
+def test_group_lines_orders_by_row_then_column() -> None:
+    """Boxes group into rows by vertical centre, ordered left-to-right."""
+    rows = [
+        (_box(10, 200, 30, 220), "x", 0.05),         # low conf -> dropped
+        (_box(50, 100, 140, 125), "LUC-XAVIER", 1.0),  # second row
+        (_box(90, 12, 160, 30), "SURNAME", 1.0),     # first row, right
+        (_box(10, 10, 80, 30), "NOM", 0.6),          # first row, left
+    ]
+
+    assert ocr._group_lines(rows).splitlines() == ["NOM SURNAME", "LUC-XAVIER"]
+
+
+# --- hyphen restoration (MRZ drops it, the print carries it) --------------
+
+
+def test_restore_name_punctuation_from_confirmed_visual() -> None:
+    """A visual LUC-XAVIER matching two MRZ tokens restores the hyphen."""
+    fields = {"full_name": ("LUC XAVIER FONING LACKMATA", ocr._MRZ_CONFIDENCE)}
+
+    ocr._restore_name_punctuation(fields, "PRENOMS\nLUC-XAVIER")
+
+    assert ocr._value(fields, "full_name") == "LUC-XAVIER FONING LACKMATA"
+    assert fields["full_name"][1] == ocr._MRZ_CONFIDENCE  # confidence kept
+
+
+def test_restore_name_punctuation_ignores_unconfirmed() -> None:
+    """A hyphenated token that is not two consecutive MRZ tokens is ignored."""
+    fields = {"full_name": ("LUC XAVIER FONING LACKMATA", 0.98)}
+
+    ocr._restore_name_punctuation(fields, "SOME-THING here")
+
+    assert ocr._value(fields, "full_name") == "LUC XAVIER FONING LACKMATA"
+
+
+def test_ocr_extract_restores_hyphen_end_to_end(monkeypatch) -> None:
+    """The pipeline restores the printed hyphen onto the trusted MRZ name."""
+    monkeypatch.setattr(ocr, "_ocr_text", lambda img, **kw: "LUC-XAVIER")
+    monkeypatch.setattr(
+        ocr,
+        "read_mrz_fields",
+        lambda b: {
+            "full_name": ("LUC XAVIER FONING LACKMATA", ocr._MRZ_CONFIDENCE),
+            "id_number": ("AA14700081", ocr._MRZ_CONFIDENCE),
+            "expiry_date": (date(2035, 9, 1), ocr._MRZ_CONFIDENCE),
+        },
+    )
+
+    result = ocr.ocr_extract(
+        _blank(), DocumentType.NIC, back_image=_blank(), mrz_bytes=b"raw"
+    )
+
+    assert result.full_name == "LUC-XAVIER FONING LACKMATA"
+
+
 def test_mrz_overrides_visual_field(monkeypatch) -> None:
     """A trusted MRZ value outranks the printed text for that field."""
     front = "NOM/SURNAME MISREAD\nDATE OF EXPIRY 01.01.2030"

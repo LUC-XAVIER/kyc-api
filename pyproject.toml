@@ -27,10 +27,20 @@ dependencies = [
 # ML pipeline (Phases 3 / 3b). Heavy; install when working on the pipeline.
 ml = [
     "opencv-python>=4.9",
+    # EasyOCR pulls opencv-python-headless; cap it below 5 so its cv2 build
+    # doesn't shadow (and break) our 4.x one.
+    "opencv-python-headless>=4.9,<5",
     "pillow>=10.3",
     "numpy>=1.26",
     "pytesseract>=0.3.10",
     "passporteye>=2.2",
+    # Deep OCR for the printed (visual) fields: robust on the guilloche
+    # background and preserves in-word punctuation (the name hyphen).
+    "easyocr>=1.7",
+    # EasyOCR's backend; pinned to the CPU wheels via [tool.uv] below so a
+    # sync doesn't pull the ~2 GB CUDA build.
+    "torch>=2.2",
+    "torchvision>=0.17",
     "deepface>=0.0.92",
     "tf-keras>=2.16",
     "mediapipe>=0.10",
@@ -95,3 +105,15 @@ extend-immutable-calls = [
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q"
+
+# Pull torch/torchvision from PyTorch's CPU-only index so `uv sync` installs
+# the small CPU wheels instead of the default ~2 GB CUDA build. The pipeline
+# runs on-prem CPU boxes with no GPU.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+torchvision = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

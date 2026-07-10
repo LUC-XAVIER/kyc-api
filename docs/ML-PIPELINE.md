@@ -88,12 +88,17 @@ colours.
 `app/pipeline/stages/ocr.py`
 
 **Built:** `ocr_extract` dispatches on `document_type`. Extraction combines
-(a) **bilingual FR/EN label parsing** of the visual fields (Tesseract) and
-(b) **MRZ decoding via PassportEye** (`read_mrz_fields`), which does its own
-detection, rotation, and ICAO 9303 check-digit parsing on the **raw** image
-(NIC back / passport front). Front and back results are merged by a
-confidence rank so a check-valid MRZ field (0.98) overrides the same field
-read from the printed text (0.75). `success` requires name + id + expiry.
+(a) **bilingual FR/EN label parsing** of the visual fields, read by
+**EasyOCR** (`_ocr_text` → `_reader` → `_group_lines`), and (b) **MRZ
+decoding via PassportEye** (`read_mrz_fields`), which does its own detection,
+rotation, and ICAO 9303 check-digit parsing on the **raw** image (NIC back /
+passport front). Front and back results are merged by a confidence rank so a
+check-valid MRZ field (0.98) overrides the same field read from the printed
+text (0.75). Because the MRZ replaces hyphens/apostrophes with the `<`
+filler, `_restore_name_punctuation` re-inserts a printed connector onto the
+trusted MRZ name **only** when a `WORD-WORD` visual token matches two
+consecutive MRZ tokens (so a noisy read can't corrupt the name). `success`
+requires name + id + expiry.
 
 **Alternatives weighed** (a decision was taken with the user):
 1. **MRZ-first + region crops** *(chosen)* — trust the checksummed MRZ where
@@ -158,13 +163,29 @@ fixed:
   the speckle yields nothing so the parser falls through to the real value.
   id/date/sex keep the generic cleaner. Real card now reads `LIMBE` /
   `ETUDIANT`.
-- *Still open:* the printed name's **hyphen** (`Luc-Xavier`) is lost — ICAO
-  9303 encodes hyphens/apostrophes as the `<` filler, indistinguishable from a
-  name-part separator, so the MRZ can't carry it. Recovering it needs a clean
-  visual read of the front name (currently too garbled) to restore punctuation
-  by aligning to the MRZ tokens. NIC v1 (no MRZ) still routes to review.
-  EasyOCR remains the eventual lever for the front-name/v1 visual path once
-  torch can be installed on the VM.
+- *Visual engine swapped to EasyOCR.* Tesseract only ever *coincidentally*
+  read the visual fields; on the busy guilloche it was unreliable and it
+  **dropped the printed name's hyphen** (`LUC-XAVIER` → `LUC XAVIER`). Deep
+  OCR (EasyOCR, CPU torch) reads the printed fields robustly — `LIMBE` /
+  `ETUDIANT` / `LUC-XAVIER` all at ~1.0 confidence — and preserves in-word
+  punctuation. `_ocr_text` now calls EasyOCR and `_group_lines` reassembles
+  its per-box output into label/value lines for the existing parser. The
+  `_upper_value` speckle guard is kept (still useful on EasyOCR's stray
+  low-confidence boxes).
+- *Hyphen restored, safely.* The MRZ can't carry the hyphen (ICAO 9303 encodes
+  it as the `<` filler, indistinguishable from a name-part separator), but the
+  print does. `_restore_name_punctuation` re-inserts a `WORD-WORD` connector
+  from the EasyOCR read **only** when both halves match two consecutive MRZ
+  tokens — so a noisy visual read can never corrupt the checksummed name; at
+  worst the space stays. Real card now yields `LUC-XAVIER FONING LACKMATA`.
+- *Packaging:* `easyocr>=1.7` + CPU `torch`/`torchvision` (pinned to PyTorch's
+  CPU index via `[tool.uv.sources]`, so `uv sync` pulls the small wheels, not
+  the ~2 GB CUDA build). EasyOCR also pulls `opencv-python-headless`, capped
+  `<5` so its cv2 doesn't shadow and break our 4.x build (a v5 install broke
+  the Haar-cascade crop until pinned).
+- *Still open:* NIC v1 (no MRZ) still routes to review — but EasyOCR now makes
+  its visual-only path far more viable than before; calibrating it is the next
+  candidate once real v1 cards exist.
 
 The `docs/Identifiers/` mockup caveat above stands for the sample images, but
 the pipeline is now **validated against a real card** end-to-end.

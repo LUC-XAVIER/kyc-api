@@ -1,17 +1,19 @@
 """OCR stage: extract identity fields from a document's text zones.
 
-Second pipeline step (Design doc §6.3.1). Runs Tesseract over the cropped
-text zone(s) and parses the raw text into a structured :class:`OcrResult`
-with per-field confidences.
+Second pipeline step (Design doc §6.3.1). Runs EasyOCR over the cropped
+text zone(s) and parses the recognized text into a structured
+:class:`OcrResult` with per-field confidences.
 
 Parsing branches on the document type and, for NIC cards, MERGES fields
 split across the front and back: NIC v1 keeps the expiry date and ID number
 on the back, NIC v2 the place of birth and occupation. The machine-readable
 zone (MRZ) on the NIC v2 back and on the passport is checksummed, so a
 value read from a check-digit-valid MRZ outranks the same field read from
-the visual text.
+the visual text. The MRZ drops hyphens/apostrophes (the ``<`` filler), so a
+printed connector is restored from the visual read when it is confirmed by
+the MRZ tokens (:func:`_restore_name_punctuation`).
 
-Tesseract/OpenCV are imported lazily so this module loads without the
+EasyOCR/OpenCV are imported lazily so this module loads without the
 optional ``ml`` extra.
 """
 
@@ -88,6 +90,10 @@ _UPPER_VALUE_RE = re.compile(
     r"[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ'-]{2,}(?:\s+[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ'-]+)*"
 )
 
+# A hyphenated or apostrophed name in the printed (visual) text, e.g.
+# "LUC-XAVIER" or "N'GUELE". Used to restore the connector the MRZ drops.
+_HYPHENATED_RE = re.compile(r"([A-ZÀ-ÖØ-Þ]{2,})([-'])([A-ZÀ-ÖØ-Þ]{2,})")
+
 
 def ocr_extract(
     front_text: np.ndarray,
@@ -128,11 +134,13 @@ def _extract_nic(
     id, DOB, sex, and expiry; the visual OCR supplies place of birth and
     occupation, and is the only source for the older, MRZ-less NIC v1.
     """
-    fields = _parse_fields(_ocr_text(front_text))
+    front_ocr = _ocr_text(front_text)
+    fields = _parse_fields(front_ocr)
     if back_image is not None:
         fields = _prefer(fields, _parse_fields(_ocr_text(back_image)))
     if mrz_bytes is not None:
         fields = _prefer(fields, read_mrz_fields(mrz_bytes))
+    _restore_name_punctuation(fields, front_ocr)
     return _build_result(fields)
 
 
@@ -140,53 +148,100 @@ def _extract_passport(
     page: np.ndarray, mrz_bytes: bytes | None
 ) -> OcrResult:
     """Parse a passport data page: visual fields plus the MRZ."""
-    fields = _parse_fields(_ocr_text(page))
+    page_ocr = _ocr_text(page)
+    fields = _parse_fields(page_ocr)
     if mrz_bytes is not None:
         fields = _prefer(fields, read_mrz_fields(mrz_bytes))
+    _restore_name_punctuation(fields, page_ocr)
     return _build_result(fields)
 
 
-def _ocr_text(image: np.ndarray, *, mrz: bool = False) -> str:
-    """Run Tesseract over ``image`` and return the recognized text.
+_reader_instance = None
 
-    The printed zones sit on a busy coloured guilloche background. Our own
-    binarization (a local adaptive threshold) shredded that background into
-    noise and wiped out the text; passing plain **grayscale** and letting
-    Tesseract do its own binarization reads the fields cleanly. The image is
-    still upscaled first — Tesseract wants tall glyphs. The MRZ is clean and
-    monospaced, so it takes an Otsu pass with the OCR-B charset.
+
+def _reader():
+    """Return the lazily-built, process-wide EasyOCR reader (French+English).
+
+    Building it loads the detection and recognition models (a few hundred MB,
+    downloaded once), so it is created on first use and reused thereafter.
     """
-    import cv2
-    import pytesseract
+    global _reader_instance
+    if _reader_instance is None:
+        import easyocr
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = _upscale_for_ocr(gray)
-    if mrz:
-        binary = cv2.threshold(
-            gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-        )[1]
-        whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<"
-        config = f"--psm 6 -c tessedit_char_whitelist={whitelist}"
-        return pytesseract.image_to_string(binary, lang="eng", config=config)
+        _reader_instance = easyocr.Reader(["fr", "en"], gpu=False)
+    return _reader_instance
 
-    return pytesseract.image_to_string(
-        gray, lang="fra+eng", config="--psm 6"
+
+def _ocr_text(image: np.ndarray) -> str:
+    """Read the printed text off a card zone with EasyOCR.
+
+    EasyOCR (a deep detector + recognizer) copes with the busy coloured
+    guilloche background far better than Tesseract and, crucially, preserves
+    in-word punctuation — the hyphen in ``LUC-XAVIER`` that the MRZ replaces
+    with a filler and so cannot carry. Its per-box output is regrouped into
+    text lines so the label parser can pair each label with its value.
+    """
+    rows = _reader().readtext(image, detail=1, paragraph=False)
+    return _group_lines(rows)
+
+
+def _group_lines(rows: list, *, min_confidence: float = 0.2) -> str:
+    """Reassemble EasyOCR word boxes into top-to-bottom, left-to-right lines.
+
+    Each row is ``(box, text, confidence)``. Boxes are grouped into a line
+    when their vertical centres sit within ~60% of the median glyph height,
+    then ordered left-to-right; low-confidence speckle is dropped.
+    """
+    boxes = []
+    for box, text, confidence in rows:
+        if confidence < min_confidence or not text.strip():
+            continue
+        ys = [point[1] for point in box]
+        xs = [point[0] for point in box]
+        boxes.append((sum(ys) / len(ys), max(ys) - min(ys), min(xs),
+                      text.strip()))
+    if not boxes:
+        return ""
+    boxes.sort(key=lambda item: item[0])
+    median_height = sorted(box[1] for box in boxes)[len(boxes) // 2] or 1.0
+    lines: list[list[tuple[float, str]]] = []
+    anchor: float | None = None
+    for centre, _height, left, text in boxes:
+        if anchor is None or abs(centre - anchor) > median_height * 0.6:
+            lines.append([])
+            anchor = centre
+        lines[-1].append((left, text))
+    return "\n".join(
+        " ".join(text for _left, text in sorted(line)) for line in lines
     )
 
 
-def _upscale_for_ocr(
-    gray: np.ndarray, *, target_height: int = 1000, max_scale: float = 3.0
-) -> np.ndarray:
-    """Enlarge a small crop so its text is tall enough for Tesseract."""
-    import cv2
+def _restore_name_punctuation(fields: _Fields, visual_text: str) -> None:
+    """Re-insert a hyphen/apostrophe the MRZ dropped, if the print confirms it.
 
-    height = gray.shape[0]
-    if height >= target_height:
-        return gray
-    scale = min(max_scale, target_height / height)
-    return cv2.resize(
-        gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC
-    )
+    The MRZ encodes a hyphen or apostrophe as the ``<`` filler, so PassportEye
+    returns ``LUC XAVIER`` for a printed ``LUC-XAVIER`` — indistinguishable
+    from two separate given names. The printed name (read visually) does carry
+    the connector. This restores it **only** when a ``WORD-WORD`` token in the
+    visual text matches two consecutive tokens of the (trusted) MRZ name, so a
+    noisy visual read can never corrupt the name — at worst the space stays.
+    The field's confidence is preserved; only its punctuation changes.
+    """
+    field = fields.get("full_name")
+    if field is None:
+        return
+    name, confidence = field
+    tokens = name.split()
+    for match in _HYPHENATED_RE.finditer(visual_text.upper()):
+        first, separator, second = match.groups()
+        for index in range(len(tokens) - 1):
+            if tokens[index] == first and tokens[index + 1] == second:
+                tokens[index] = f"{first}{separator}{second}"
+                tokens[index + 1] = ""
+    restored = " ".join(token for token in tokens if token)
+    if restored != name:
+        fields["full_name"] = (restored, confidence)
 
 
 def _parse_fields(text: str) -> _Fields:
