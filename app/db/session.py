@@ -23,14 +23,23 @@ SessionLocal = sessionmaker(
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Yield a request-scoped database session.
+    """Yield a request-scoped database session and own its transaction.
+
+    The session is the request's transaction boundary: it **commits** when
+    the handler returns normally and **rolls back** if it raises, then is
+    closed either way. Handlers therefore only need to ``add``/``flush``
+    their work — persistence happens here — and a failing request never
+    leaves partial writes behind.
 
     Yields:
-        An open :class:`~sqlalchemy.orm.Session` that is closed when the
-        dependent request finishes.
+        An open :class:`~sqlalchemy.orm.Session`.
     """
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
