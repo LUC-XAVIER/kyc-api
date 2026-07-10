@@ -148,10 +148,23 @@ fixed:
 - *Result:* the real NIC now extracts name, CNI number (from MRZ `optional1`),
   DOB, expiry, and sex — all checksummed — and passes (`success=True`). Dep
   added: `passporteye>=2.2` (lightweight, no torch).
-- *Still open:* `place_of_birth`/`occupation` come from the noisy visual path
-  (not required fields); NIC v1 (no MRZ) still routes to review. Both are
-  candidates for a deep OCR engine (EasyOCR) once torch can be installed on
-  the VM.
+- *Visual fields fixed by parsing, not a heavier engine.* `place_of_birth`
+  and `occupation` (absent from the MRZ) came out as garbage — but the
+  diagnostic showed Tesseract *did* read `LIMBE`/`ETUDIANT`; they sit on the
+  line **below** the label, while the label line trails into mixed-case
+  guilloche speckle (`joa id hn See`). `_value_after` was taking any non-empty
+  same-line remainder. Fix: an `_upper_value` extractor (first run of ALL-CAPS
+  words, ≥3 chars) applied to the alphabetic fields (name, place, occupation);
+  the speckle yields nothing so the parser falls through to the real value.
+  id/date/sex keep the generic cleaner. Real card now reads `LIMBE` /
+  `ETUDIANT`.
+- *Still open:* the printed name's **hyphen** (`Luc-Xavier`) is lost — ICAO
+  9303 encodes hyphens/apostrophes as the `<` filler, indistinguishable from a
+  name-part separator, so the MRZ can't carry it. Recovering it needs a clean
+  visual read of the front name (currently too garbled) to restore punctuation
+  by aligning to the MRZ tokens. NIC v1 (no MRZ) still routes to review.
+  EasyOCR remains the eventual lever for the front-name/v1 visual path once
+  torch can be installed on the VM.
 
 The `docs/Identifiers/` mockup caveat above stands for the sample images, but
 the pipeline is now **validated against a real card** end-to-end.

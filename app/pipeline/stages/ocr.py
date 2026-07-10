@@ -25,6 +25,8 @@ from app.models.enums import DocumentType, Sex
 from app.pipeline.contracts import OcrResult
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import numpy as np
 
 # Confidence assigned by source. An MRZ field is trusted more than the same
@@ -77,6 +79,14 @@ _ID_LABEL = "|".join(
 # A date printed as DD.MM.YYYY (NIC) or DD MM YYYY (passport); tolerant of
 # '/', '-' and OCR spacing between the parts.
 _DATE_RE = re.compile(r"(\d{1,2})\s*[.\s/\-]\s*(\d{1,2})\s*[.\s/\-]\s*(\d{4})")
+
+# The first run of ALL-CAPS words (≥3 chars), the shape of a printed name /
+# place / occupation. Lets us skip the mixed-case guilloche speckle that OCR
+# picks up beside a label ("joa id hn See", "NA = ee ae") and reach the real
+# uppercase value on the next line ("LIMBE", "ETUDIANT").
+_UPPER_VALUE_RE = re.compile(
+    r"[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ'-]{2,}(?:\s+[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ'-]+)*"
+)
 
 
 def ocr_extract(
@@ -184,8 +194,8 @@ def _parse_fields(text: str) -> _Fields:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     fields: _Fields = {}
 
-    surname = _value_after(lines, _SURNAME_LABEL)
-    given = _value_after(lines, _GIVEN_LABEL)
+    surname = _value_after(lines, _SURNAME_LABEL, extract=_upper_value)
+    given = _value_after(lines, _GIVEN_LABEL, extract=_upper_value)
     name = " ".join(part for part in (given, surname) if part)
     _set(fields, "full_name", name or None)
     _set(fields, "id_number", _value_after(lines, _ID_LABEL))
@@ -193,31 +203,12 @@ def _parse_fields(text: str) -> _Fields:
          _parse_date(_value_after(lines, _DOB_LABEL)))
     _set(fields, "expiry_date",
          _parse_date(_value_after(lines, _EXPIRY_LABEL)))
-    _set(fields, "place_of_birth", _value_after(lines, _POB_LABEL))
-    _set(fields, "occupation", _value_after(lines, _OCCUPATION_LABEL))
+    _set(fields, "place_of_birth",
+         _value_after(lines, _POB_LABEL, extract=_upper_value))
+    _set(fields, "occupation",
+         _value_after(lines, _OCCUPATION_LABEL, extract=_upper_value))
     _set(fields, "sex", _parse_sex(_value_after(lines, _SEX_LABEL)))
     return fields
-
-
-def _value_after(lines: list[str], label: str) -> str | None:
-    """Return the value printed after ``label``, on its line or the next.
-
-    The value may sit on the label's line or the row beneath it. Each
-    candidate is cleaned of surrounding OCR speckle; a same-line remainder
-    that cleans away to nothing (a stray mark after the label) is skipped
-    in favour of the next line, where the printed value usually sits.
-    """
-    regex = re.compile(label, re.IGNORECASE)
-    for index, line in enumerate(lines):
-        match = regex.search(line)
-        if match is None:
-            continue
-        tail = _clean_value(line[match.end():])
-        if tail:
-            return tail
-        if index + 1 < len(lines):
-            return _clean_value(lines[index + 1]) or None
-    return None
 
 
 def _clean_value(raw: str) -> str:
@@ -229,6 +220,47 @@ def _clean_value(raw: str) -> str:
     """
     match = re.search(r"[^\W_].*[^\W_]|[^\W_]", raw)
     return match.group(0).strip() if match else ""
+
+
+def _upper_value(raw: str) -> str | None:
+    """Pull the printed ALL-CAPS value out of a candidate string.
+
+    The card prints names, places, and occupations in uppercase, while the
+    guilloche background OCRs as mixed-case speckle. Returning the first run
+    of uppercase words (see :data:`_UPPER_VALUE_RE`) keeps ``'LIMBE'`` from
+    ``'LIMBE noe Per'`` and rejects ``'joa id hn See'`` outright, so the
+    caller falls through to the line that holds the real value.
+    """
+    match = _UPPER_VALUE_RE.search(raw)
+    return match.group(0).strip() if match else None
+
+
+def _value_after(
+    lines: list[str],
+    label: str,
+    *,
+    extract: Callable[[str], str | None] = _clean_value,
+) -> str | None:
+    """Return the value printed after ``label``, on its line or the next.
+
+    The value may sit on the label's line or the row beneath it. ``extract``
+    pulls the value out of a candidate string; a same-line remainder that
+    yields nothing (a stray mark after the label, or mixed-case guilloche
+    speckle) is skipped in favour of the next line, where the printed value
+    usually sits. Alphabetic fields pass :func:`_upper_value` to reject that
+    speckle; the rest use :func:`_clean_value`.
+    """
+    regex = re.compile(label, re.IGNORECASE)
+    for index, line in enumerate(lines):
+        match = regex.search(line)
+        if match is None:
+            continue
+        tail = extract(line[match.end():])
+        if tail:
+            return tail
+        if index + 1 < len(lines):
+            return extract(lines[index + 1]) or None
+    return None
 
 
 def _parse_date(raw: str | None) -> date | None:

@@ -163,6 +163,45 @@ def test_nic_without_back_is_incomplete(monkeypatch) -> None:
     assert result.expiry_date is None
 
 
+# --- uppercase value extraction (guilloche speckle rejection) -------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("LIMBE noe Per", "LIMBE"),          # value + trailing speckle
+        ("ETUDIANT ae tee Lee", "ETUDIANT"),
+        ("SANS PROFESSION", "SANS PROFESSION"),  # multi-word value
+        ("NYLIM-KOT", "NYLIM-KOT"),          # hyphenated
+        (" | joa id hn See", None),          # pure mixed-case speckle
+        ("NA = ee ae", None),                # 2-letter run is too short
+        ("", None),
+    ],
+)
+def test_upper_value(raw: str, expected: str | None) -> None:
+    """Only an ALL-CAPS run (>=3 chars) counts as a printed value."""
+    assert ocr._upper_value(raw) == expected
+
+
+# The real NIC back: the value sits on the line *below* each label, while
+# the label line trails into guilloche speckle. The parser must skip the
+# speckle and reach LIMBE / ETUDIANT.
+_REAL_NIC_BACK = """
+LIEU DE NAISSANGE/PLACE OF BIRTH | joa id hn See
++) LIMBE noe Per
+PROFESSION / OCCUPATION NA = ee ae
+ee ETUDIANT ae tee Lee
+"""
+
+
+def test_parse_fields_skips_speckle_for_next_line_value() -> None:
+    """place_of_birth / occupation come from the value line, not the noise."""
+    fields = ocr._parse_fields(_REAL_NIC_BACK)
+
+    assert ocr._value(fields, "place_of_birth") == "LIMBE"
+    assert ocr._value(fields, "occupation") == "ETUDIANT"
+
+
 def test_mrz_overrides_visual_field(monkeypatch) -> None:
     """A trusted MRZ value outranks the printed text for that field."""
     front = "NOM/SURNAME MISREAD\nDATE OF EXPIRY 01.01.2030"
