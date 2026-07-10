@@ -99,4 +99,68 @@ def test_check_liveness_rejects_when_no_face() -> None:
 
     assert outcome.passed is False
     assert outcome.score == 0.0
-    assert outcome.method == "mediapipe+lbp_svm"
+    assert outcome.method == "mediapipe+minifasnet"
+
+
+# --- FasNet path (analyze mocked so no weights/torch are needed) ----------
+
+
+class _FakeFasnet:
+    """Stand-in for FasNet.Fasnet returning a canned (is_real, confidence)."""
+
+    def __init__(self, is_real: bool, confidence: float) -> None:
+        self._result = (is_real, confidence)
+
+    def analyze(self, image, facial_area):  # noqa: ANN001, ANN201
+        return self._result
+
+
+@pytest.mark.parametrize(
+    ("is_real", "confidence", "expected"),
+    [
+        (True, 0.99, 0.99),    # genuine -> P(live) is the confidence
+        (False, 0.98, 0.02),   # spoof   -> P(live) is its complement
+    ],
+)
+def test_antispoof_score_maps_to_p_live(
+    monkeypatch, is_real: bool, confidence: float, expected: float
+) -> None:
+    """FasNet's (is_real, confidence) becomes a monotonic P(live)."""
+    import numpy as np
+
+    monkeypatch.setattr(
+        liveness, "_fasnet", lambda: _FakeFasnet(is_real, confidence)
+    )
+
+    score = liveness._antispoof_score(
+        np.zeros((10, 10, 3), dtype=np.uint8), (0, 0, 10, 10)
+    )
+
+    assert abs(score - expected) < 1e-6
+
+
+def test_check_liveness_passes_genuine(monkeypatch) -> None:
+    """A confident real score clears the threshold with the FasNet method."""
+    import numpy as np
+
+    monkeypatch.setattr(liveness, "detect_face_box", lambda img: (0, 0, 8, 8))
+    monkeypatch.setattr(liveness, "_antispoof_score", lambda img, box: 0.999)
+
+    outcome = liveness.check_liveness(np.zeros((8, 8, 3), dtype=np.uint8))
+
+    assert outcome.passed is True
+    assert outcome.score == 0.999
+    assert outcome.method == "mediapipe+minifasnet"
+
+
+def test_check_liveness_reviews_borderline(monkeypatch) -> None:
+    """A mid-band score does not pass (routes to review downstream)."""
+    import numpy as np
+
+    monkeypatch.setattr(liveness, "detect_face_box", lambda img: (0, 0, 8, 8))
+    monkeypatch.setattr(liveness, "_antispoof_score", lambda img, box: 0.45)
+
+    outcome = liveness.check_liveness(np.zeros((8, 8, 3), dtype=np.uint8))
+
+    assert outcome.passed is False
+    assert outcome.score == 0.45

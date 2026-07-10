@@ -1,15 +1,18 @@
 """Liveness stage: two-layer anti-spoofing on the selfie.
 
 Third pipeline step (Design doc §6.3.1). MediaPipe first confirms a real
-face geometry is present, then an LBP-texture SVM (Design doc §6.3.2)
-scores the selfie for print/replay spoofing. A selfie must clear both to
-pass.
+face geometry is present, then DeepFace's pretrained **FasNet** (MiniFASNet)
+deep anti-spoof CNN scores the selfie for print/replay spoofing. A selfie
+must clear both to pass.
 
-:func:`extract_lbp_features` is the feature extractor shared with the
-offline trainer (``ml/train_antispoof.py``) — importing the one
-implementation keeps training and inference in lock-step. OpenCV,
-MediaPipe, scikit-learn, and joblib are imported lazily so this module
-loads without the optional ``ml`` extra.
+This supersedes the original LBP-texture SVM (Design doc §6.3.2), which
+plateaued at ROC-AUC ~0.94 on the LCC-FASD proxy and rejected genuine users
+at a security-first threshold. The deep model separates live from spoof far
+better on real selfies; the LBP path is kept as :func:`check_liveness_lbp`
+(a documented fallback), and its :func:`extract_lbp_features` remains shared
+with the trainer ``ml/train_antispoof.py``. DeepFace/torch, OpenCV,
+MediaPipe, scikit-learn, and joblib are imported lazily so this module loads
+without the optional ``ml`` extra.
 """
 
 from __future__ import annotations
@@ -19,19 +22,24 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.pipeline.contracts import LivenessOutcome
-from app.pipeline.face_detect import face_present
+from app.pipeline.face_detect import detect_face_box, face_present
 
 if TYPE_CHECKING:
     import numpy as np
 
-# Default trained-model location, produced by ml/train_antispoof.py.
+# Default LBP fallback model location, produced by ml/train_antispoof.py.
 DEFAULT_MODEL_PATH = Path("ml/models/antispoof_lbp_svm.joblib")
 
-# Minimum P(live) for the selfie to PASS anti-spoofing outright. Chosen
-# security-first (≈5% attack-accept rate on the LCC-FASD test set); scores
-# below this but above the decision engine's review floor go to manual
-# review rather than an outright reject. See docs/ML-PIPELINE.md §4.2.
-LIVENESS_THRESHOLD = 0.72
+# Minimum P(live) for the selfie to PASS anti-spoofing outright; scores below
+# this but above the decision engine's review floor go to manual review rather
+# than an outright reject. This is FasNet's threshold — it sits above the
+# model's natural 0.5 real/spoof boundary for a security margin, and is
+# PROVISIONAL until re-tuned on real selfies. See docs/ML-PIPELINE.md §4.
+LIVENESS_THRESHOLD = 0.60
+
+# Threshold for the legacy LBP-SVM fallback (kept from its LCC-FASD tuning,
+# ≈5% attack-accept on that proxy set). See docs/ML-PIPELINE.md §4.2.
+_LBP_THRESHOLD = 0.72
 
 # Canonical face size and LBP cell size feeding the fixed-length feature
 # vector: (128 / 16)**2 = 64 cells, each a 256-bin histogram -> 16384 dims.
@@ -43,34 +51,84 @@ _LBP_OFFSETS = (
     (-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1),
 )
 
-_METHOD = "mediapipe+lbp_svm"
+_METHOD = "mediapipe+minifasnet"
+_LBP_METHOD = "mediapipe+lbp_svm"
 
 
 def check_liveness(
-    selfie: np.ndarray,
-    *,
-    model_path: Path = DEFAULT_MODEL_PATH,
-    threshold: float = LIVENESS_THRESHOLD,
+    selfie: np.ndarray, *, threshold: float = LIVENESS_THRESHOLD
 ) -> LivenessOutcome:
     """Run the two-layer liveness check on a preprocessed selfie.
 
+    MediaPipe first confirms a face is present, then DeepFace's pretrained
+    **FasNet** (MiniFASNet) deep anti-spoof CNN scores it. FasNet separates
+    genuine from print/replay far better than the legacy LBP-SVM (which is
+    kept as :func:`check_liveness_lbp`), so a real selfie clears the bar with
+    margin instead of scraping the threshold.
+
     Args:
         selfie: Preprocessed BGR selfie array.
-        model_path: Path to the trained LBP-SVM joblib model.
         threshold: Minimum P(live) for the anti-spoof layer to pass.
 
     Returns:
         A :class:`LivenessOutcome`; ``passed`` is False if no face geometry
         is found or the spoof score falls below ``threshold``.
     """
-    if not face_present(selfie):
+    box = detect_face_box(selfie)
+    if box is None:
         return LivenessOutcome(passed=False, score=0.0, method=_METHOD)
+
+    score = _antispoof_score(selfie, box)
+    return LivenessOutcome(
+        passed=score >= threshold, score=round(score, 4), method=_METHOD
+    )
+
+
+def _antispoof_score(
+    image: np.ndarray, box: tuple[int, int, int, int]
+) -> float:
+    """P(live) in ``[0, 1]`` from FasNet over the detected face ``box``.
+
+    FasNet returns ``(is_real, confidence)`` where ``confidence`` is the
+    winning class's probability. Mapping it to a monotonic P(live) — the
+    confidence when real, its complement when spoof — keeps the score
+    comparable across cases for the pass/review thresholds.
+    """
+    is_real, confidence = _fasnet().analyze(image, box)
+    return float(confidence if is_real else 1.0 - confidence)
+
+
+@lru_cache(maxsize=1)
+def _fasnet() -> Any:
+    """Build and cache DeepFace's FasNet anti-spoof model.
+
+    Weights auto-fetch to ``~/.deepface`` on first use.
+    """
+    from deepface.models.spoofing import FasNet
+
+    return FasNet.Fasnet()
+
+
+def check_liveness_lbp(
+    selfie: np.ndarray,
+    *,
+    model_path: Path = DEFAULT_MODEL_PATH,
+    threshold: float = _LBP_THRESHOLD,
+) -> LivenessOutcome:
+    """Legacy LBP-texture SVM anti-spoof, superseded by FasNet.
+
+    Kept as a documented fallback / offline baseline (see
+    docs/ML-PIPELINE.md §4); the LBP feature extractor is still shared with
+    the trainer ``ml/train_antispoof.py``.
+    """
+    if not face_present(selfie):
+        return LivenessOutcome(passed=False, score=0.0, method=_LBP_METHOD)
 
     classifier = _load_classifier(model_path)
     features = extract_lbp_features(selfie)
     score = float(classifier.predict_proba([features])[0][1])
     return LivenessOutcome(
-        passed=score >= threshold, score=round(score, 4), method=_METHOD
+        passed=score >= threshold, score=round(score, 4), method=_LBP_METHOD
     )
 
 

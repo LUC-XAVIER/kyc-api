@@ -48,3 +48,7 @@ mlartifacts/
 # OS
 .DS_Store
 Thumbs.db
+
+#personal Info (real ID images — never commit)
+docs/Identifiers/testImages/
+docs/identifiers/testImages/

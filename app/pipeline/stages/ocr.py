@@ -1,17 +1,19 @@
 """OCR stage: extract identity fields from a document's text zones.
 
-Second pipeline step (Design doc §6.3.1). Runs Tesseract over the cropped
-text zone(s) and parses the raw text into a structured :class:`OcrResult`
-with per-field confidences.
+Second pipeline step (Design doc §6.3.1). Runs EasyOCR over the cropped
+text zone(s) and parses the recognized text into a structured
+:class:`OcrResult` with per-field confidences.
 
 Parsing branches on the document type and, for NIC cards, MERGES fields
 split across the front and back: NIC v1 keeps the expiry date and ID number
 on the back, NIC v2 the place of birth and occupation. The machine-readable
 zone (MRZ) on the NIC v2 back and on the passport is checksummed, so a
 value read from a check-digit-valid MRZ outranks the same field read from
-the visual text.
+the visual text. The MRZ drops hyphens/apostrophes (the ``<`` filler), so a
+printed connector is restored from the visual read when it is confirmed by
+the MRZ tokens (:func:`_restore_name_punctuation`).
 
-Tesseract/OpenCV are imported lazily so this module loads without the
+EasyOCR/OpenCV are imported lazily so this module loads without the
 optional ``ml`` extra.
 """
 
@@ -25,12 +27,18 @@ from app.models.enums import DocumentType, Sex
 from app.pipeline.contracts import OcrResult
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import numpy as np
 
 # Confidence assigned by source. An MRZ field is trusted more than the same
 # value read from the printed text because its check digit is validated.
 _VISUAL_CONFIDENCE = 0.75
 _MRZ_CONFIDENCE = 0.98
+
+# Minimum PassportEye validity score (0-100, ~25 per passing check digit) to
+# trust an MRZ read at all; below this we fall back to the visual OCR.
+_MIN_MRZ_SCORE = 50
 
 # Fields that must all resolve for the extraction to count as a success.
 _REQUIRED_FIELDS = ("full_name", "id_number", "expiry_date")
@@ -74,8 +82,17 @@ _ID_LABEL = "|".join(
 # '/', '-' and OCR spacing between the parts.
 _DATE_RE = re.compile(r"(\d{1,2})\s*[.\s/\-]\s*(\d{1,2})\s*[.\s/\-]\s*(\d{4})")
 
-# MRZ check-digit weights, cycled over the field characters (ICAO 9303).
-_MRZ_WEIGHTS = (7, 3, 1)
+# The first run of ALL-CAPS words (≥3 chars), the shape of a printed name /
+# place / occupation. Lets us skip the mixed-case guilloche speckle that OCR
+# picks up beside a label ("joa id hn See", "NA = ee ae") and reach the real
+# uppercase value on the next line ("LIMBE", "ETUDIANT").
+_UPPER_VALUE_RE = re.compile(
+    r"[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ'-]{2,}(?:\s+[A-ZÀ-ÖØ-Þ][A-ZÀ-ÖØ-Þ'-]+)*"
+)
+
+# A hyphenated or apostrophed name in the printed (visual) text, e.g.
+# "LUC-XAVIER" or "N'GUELE". Used to restore the connector the MRZ drops.
+_HYPHENATED_RE = re.compile(r"([A-ZÀ-ÖØ-Þ]{2,})([-'])([A-ZÀ-ÖØ-Þ]{2,})")
 
 
 def ocr_extract(
@@ -83,88 +100,148 @@ def ocr_extract(
     document_type: DocumentType,
     *,
     back_image: np.ndarray | None = None,
+    mrz_bytes: bytes | None = None,
 ) -> OcrResult:
-    """Extract identity fields from a document's text zone(s).
+    """Extract identity fields from a document's text zone(s) and MRZ.
 
     Args:
         front_text: Cropped text zone of the document front
             (``NicZones.text_zone`` from :func:`crop_nic_zones`).
         document_type: Selects the field set and parsing rules.
         back_image: Preprocessed document back, required for NIC cards whose
-            fields span both sides; ``None`` for single-page passports.
+            visual fields span both sides; ``None`` for single-page passports.
+        mrz_bytes: RAW bytes of the image bearing the MRZ (the back for a NIC,
+            the front for a passport). Read by PassportEye — must be the
+            original image, not a preprocessed array.
 
     Returns:
         An :class:`OcrResult`; ``success`` is False when the mandatory
         fields could not be read with usable confidence.
     """
     if document_type is DocumentType.PASSPORT:
-        return _extract_passport(front_text)
-    return _extract_nic(front_text, back_image)
+        return _extract_passport(front_text, mrz_bytes)
+    return _extract_nic(front_text, back_image, mrz_bytes)
 
 
 def _extract_nic(
-    front_text: np.ndarray, back_image: np.ndarray | None
+    front_text: np.ndarray,
+    back_image: np.ndarray | None,
+    mrz_bytes: bytes | None,
 ) -> OcrResult:
-    """Parse a Cameroonian NIC, merging front- and back-side fields."""
-    fields = _parse_fields(_ocr_text(front_text))
+    """Parse a Cameroonian NIC: visual fields + the (checksummed) MRZ.
+
+    The MRZ (NIC v2, read from the raw back) is the trusted source for name,
+    id, DOB, sex, and expiry; the visual OCR supplies place of birth and
+    occupation, and is the only source for the older, MRZ-less NIC v1.
+    """
+    front_ocr = _ocr_text(front_text)
+    fields = _parse_fields(front_ocr)
     if back_image is not None:
         fields = _prefer(fields, _parse_fields(_ocr_text(back_image)))
-        fields = _prefer(fields, _parse_mrz(back_image))
+    if mrz_bytes is not None:
+        fields = _prefer(fields, read_mrz_fields(mrz_bytes))
+    _restore_name_punctuation(fields, front_ocr)
     return _build_result(fields)
 
 
-def _extract_passport(page: np.ndarray) -> OcrResult:
-    """Parse a passport data page: visual fields plus the bottom MRZ."""
-    fields = _parse_fields(_ocr_text(page))
-    fields = _prefer(fields, _parse_mrz(page))
+def _extract_passport(
+    page: np.ndarray, mrz_bytes: bytes | None
+) -> OcrResult:
+    """Parse a passport data page: visual fields plus the MRZ."""
+    page_ocr = _ocr_text(page)
+    fields = _parse_fields(page_ocr)
+    if mrz_bytes is not None:
+        fields = _prefer(fields, read_mrz_fields(mrz_bytes))
+    _restore_name_punctuation(fields, page_ocr)
     return _build_result(fields)
 
 
-def _ocr_text(image: np.ndarray, *, mrz: bool = False) -> str:
-    """Run Tesseract over ``image`` and return the recognized text.
+_reader_instance = None
 
-    The printed zones sit on a low-contrast guilloche background, so a
-    global (Otsu) threshold wipes out the text. Instead the text is
-    upscaled — Tesseract wants tall glyphs — then denoised and binarized
-    with a local adaptive threshold that ignores the background wash. The
-    MRZ is clean and monospaced, so it takes an Otsu pass with the OCR-B
-    charset and single-block segmentation.
+
+def _reader():
+    """Return the lazily-built, process-wide EasyOCR reader (French+English).
+
+    Building it loads the detection and recognition models (a few hundred MB,
+    downloaded once), so it is created on first use and reused thereafter.
     """
-    import cv2
-    import pytesseract
+    global _reader_instance
+    if _reader_instance is None:
+        import easyocr
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = _upscale_for_ocr(gray)
-    if mrz:
-        binary = cv2.threshold(
-            gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-        )[1]
-        whitelist = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<"
-        config = f"--psm 6 -c tessedit_char_whitelist={whitelist}"
-        return pytesseract.image_to_string(binary, lang="eng", config=config)
+        _reader_instance = easyocr.Reader(["fr", "en"], gpu=False)
+    return _reader_instance
 
-    gray = cv2.fastNlMeansDenoising(gray, h=10)
-    binary = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 15
+
+def _ocr_text(image: np.ndarray) -> str:
+    """Read the printed text off a card zone with EasyOCR.
+
+    EasyOCR (a deep detector + recognizer) copes with the busy coloured
+    guilloche background far better than Tesseract and, crucially, preserves
+    in-word punctuation — the hyphen in ``LUC-XAVIER`` that the MRZ replaces
+    with a filler and so cannot carry. Its per-box output is regrouped into
+    text lines so the label parser can pair each label with its value.
+    """
+    rows = _reader().readtext(image, detail=1, paragraph=False)
+    return _group_lines(rows)
+
+
+def _group_lines(rows: list, *, min_confidence: float = 0.2) -> str:
+    """Reassemble EasyOCR word boxes into top-to-bottom, left-to-right lines.
+
+    Each row is ``(box, text, confidence)``. Boxes are grouped into a line
+    when their vertical centres sit within ~60% of the median glyph height,
+    then ordered left-to-right; low-confidence speckle is dropped.
+    """
+    boxes = []
+    for box, text, confidence in rows:
+        if confidence < min_confidence or not text.strip():
+            continue
+        ys = [point[1] for point in box]
+        xs = [point[0] for point in box]
+        boxes.append((sum(ys) / len(ys), max(ys) - min(ys), min(xs),
+                      text.strip()))
+    if not boxes:
+        return ""
+    boxes.sort(key=lambda item: item[0])
+    median_height = sorted(box[1] for box in boxes)[len(boxes) // 2] or 1.0
+    lines: list[list[tuple[float, str]]] = []
+    anchor: float | None = None
+    for centre, _height, left, text in boxes:
+        if anchor is None or abs(centre - anchor) > median_height * 0.6:
+            lines.append([])
+            anchor = centre
+        lines[-1].append((left, text))
+    return "\n".join(
+        " ".join(text for _left, text in sorted(line)) for line in lines
     )
-    return pytesseract.image_to_string(
-        binary, lang="fra+eng", config="--psm 6"
-    )
 
 
-def _upscale_for_ocr(
-    gray: np.ndarray, *, target_height: int = 1000, max_scale: float = 3.0
-) -> np.ndarray:
-    """Enlarge a small crop so its text is tall enough for Tesseract."""
-    import cv2
+def _restore_name_punctuation(fields: _Fields, visual_text: str) -> None:
+    """Re-insert a hyphen/apostrophe the MRZ dropped, if the print confirms it.
 
-    height = gray.shape[0]
-    if height >= target_height:
-        return gray
-    scale = min(max_scale, target_height / height)
-    return cv2.resize(
-        gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC
-    )
+    The MRZ encodes a hyphen or apostrophe as the ``<`` filler, so PassportEye
+    returns ``LUC XAVIER`` for a printed ``LUC-XAVIER`` — indistinguishable
+    from two separate given names. The printed name (read visually) does carry
+    the connector. This restores it **only** when a ``WORD-WORD`` token in the
+    visual text matches two consecutive tokens of the (trusted) MRZ name, so a
+    noisy visual read can never corrupt the name — at worst the space stays.
+    The field's confidence is preserved; only its punctuation changes.
+    """
+    field = fields.get("full_name")
+    if field is None:
+        return
+    name, confidence = field
+    tokens = name.split()
+    for match in _HYPHENATED_RE.finditer(visual_text.upper()):
+        first, separator, second = match.groups()
+        for index in range(len(tokens) - 1):
+            if tokens[index] == first and tokens[index + 1] == second:
+                tokens[index] = f"{first}{separator}{second}"
+                tokens[index + 1] = ""
+    restored = " ".join(token for token in tokens if token)
+    if restored != name:
+        fields["full_name"] = (restored, confidence)
 
 
 def _parse_fields(text: str) -> _Fields:
@@ -172,8 +249,8 @@ def _parse_fields(text: str) -> _Fields:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     fields: _Fields = {}
 
-    surname = _value_after(lines, _SURNAME_LABEL)
-    given = _value_after(lines, _GIVEN_LABEL)
+    surname = _value_after(lines, _SURNAME_LABEL, extract=_upper_value)
+    given = _value_after(lines, _GIVEN_LABEL, extract=_upper_value)
     name = " ".join(part for part in (given, surname) if part)
     _set(fields, "full_name", name or None)
     _set(fields, "id_number", _value_after(lines, _ID_LABEL))
@@ -181,31 +258,12 @@ def _parse_fields(text: str) -> _Fields:
          _parse_date(_value_after(lines, _DOB_LABEL)))
     _set(fields, "expiry_date",
          _parse_date(_value_after(lines, _EXPIRY_LABEL)))
-    _set(fields, "place_of_birth", _value_after(lines, _POB_LABEL))
-    _set(fields, "occupation", _value_after(lines, _OCCUPATION_LABEL))
+    _set(fields, "place_of_birth",
+         _value_after(lines, _POB_LABEL, extract=_upper_value))
+    _set(fields, "occupation",
+         _value_after(lines, _OCCUPATION_LABEL, extract=_upper_value))
     _set(fields, "sex", _parse_sex(_value_after(lines, _SEX_LABEL)))
     return fields
-
-
-def _value_after(lines: list[str], label: str) -> str | None:
-    """Return the value printed after ``label``, on its line or the next.
-
-    The value may sit on the label's line or the row beneath it. Each
-    candidate is cleaned of surrounding OCR speckle; a same-line remainder
-    that cleans away to nothing (a stray mark after the label) is skipped
-    in favour of the next line, where the printed value usually sits.
-    """
-    regex = re.compile(label, re.IGNORECASE)
-    for index, line in enumerate(lines):
-        match = regex.search(line)
-        if match is None:
-            continue
-        tail = _clean_value(line[match.end():])
-        if tail:
-            return tail
-        if index + 1 < len(lines):
-            return _clean_value(lines[index + 1]) or None
-    return None
 
 
 def _clean_value(raw: str) -> str:
@@ -217,6 +275,47 @@ def _clean_value(raw: str) -> str:
     """
     match = re.search(r"[^\W_].*[^\W_]|[^\W_]", raw)
     return match.group(0).strip() if match else ""
+
+
+def _upper_value(raw: str) -> str | None:
+    """Pull the printed ALL-CAPS value out of a candidate string.
+
+    The card prints names, places, and occupations in uppercase, while the
+    guilloche background OCRs as mixed-case speckle. Returning the first run
+    of uppercase words (see :data:`_UPPER_VALUE_RE`) keeps ``'LIMBE'`` from
+    ``'LIMBE noe Per'`` and rejects ``'joa id hn See'`` outright, so the
+    caller falls through to the line that holds the real value.
+    """
+    match = _UPPER_VALUE_RE.search(raw)
+    return match.group(0).strip() if match else None
+
+
+def _value_after(
+    lines: list[str],
+    label: str,
+    *,
+    extract: Callable[[str], str | None] = _clean_value,
+) -> str | None:
+    """Return the value printed after ``label``, on its line or the next.
+
+    The value may sit on the label's line or the row beneath it. ``extract``
+    pulls the value out of a candidate string; a same-line remainder that
+    yields nothing (a stray mark after the label, or mixed-case guilloche
+    speckle) is skipped in favour of the next line, where the printed value
+    usually sits. Alphabetic fields pass :func:`_upper_value` to reject that
+    speckle; the rest use :func:`_clean_value`.
+    """
+    regex = re.compile(label, re.IGNORECASE)
+    for index, line in enumerate(lines):
+        match = regex.search(line)
+        if match is None:
+            continue
+        tail = extract(line[match.end():])
+        if tail:
+            return tail
+        if index + 1 < len(lines):
+            return extract(lines[index + 1]) or None
+    return None
 
 
 def _parse_date(raw: str | None) -> date | None:
@@ -245,127 +344,55 @@ def _parse_sex(raw: str | None) -> Sex | None:
     return None
 
 
-def _parse_mrz(image: np.ndarray) -> _Fields:
-    """Locate, OCR, and decode the MRZ band, ``{}`` if none is found."""
-    band = _locate_mrz(image)
-    target = band if band is not None else image
-    return _parse_mrz_lines(_ocr_text(target, mrz=True).splitlines())
+def read_mrz_fields(image_bytes: bytes) -> _Fields:
+    """Read the MRZ from RAW image bytes via PassportEye, ``{}`` if none.
 
-
-def _locate_mrz(image: np.ndarray) -> np.ndarray | None:
-    """Return a crop of the MRZ band, or ``None`` if none stands out.
-
-    The MRZ is a wide block of dense monospaced text. A blackhat + gradient
-    pass highlights the strokes, morphological closing fuses the glyphs into
-    one bar, and the widest near-full-width, high-aspect-ratio component is
-    taken as the band. Isolating it keeps the guilloche background out of
-    the character-level OCR.
+    PassportEye does its own MRZ detection, rotation, and check-digit parsing,
+    so it is handed the ORIGINAL image bytes — our preprocessing (deskew,
+    threshold) destroys its accuracy. The read is trusted only above a minimum
+    validity score; each date is used only when its own check digit passes.
+    The printed CNI/NIC number lives in the MRZ optional data, preferred over
+    the raw document number.
     """
-    import cv2
+    import io
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    height, width = gray.shape
-    line_kernel = cv2.getStructuringElement(
-        cv2.MORPH_RECT, (max(13, width // 25), 5)
-    )
-    blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, line_kernel)
-    gradient = cv2.convertScaleAbs(
-        cv2.Sobel(blackhat, cv2.CV_32F, 1, 0, ksize=-1)
-    )
-    gradient = cv2.normalize(
-        gradient, None, 0, 255, cv2.NORM_MINMAX
-    ).astype("uint8")
-    gradient = cv2.morphologyEx(gradient, cv2.MORPH_CLOSE, line_kernel)
-    band_mask = cv2.threshold(
-        gradient, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )[1]
-    block_kernel = cv2.getStructuringElement(
-        cv2.MORPH_RECT, (max(21, width // 18), max(11, height // 25))
-    )
-    band_mask = cv2.morphologyEx(band_mask, cv2.MORPH_CLOSE, block_kernel)
-    band_mask = cv2.erode(band_mask, None, iterations=2)
+    from passporteye import read_mrz
 
-    contours, _ = cv2.findContours(
-        band_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
-    best: tuple[int, int, int, int] | None = None
-    for contour in contours:
-        x, y, box_w, box_h = cv2.boundingRect(contour)
-        if box_w / box_h <= 4 or box_w / width <= 0.6:
-            continue
-        if best is None or box_w * box_h > best[2] * best[3]:
-            best = (x, y, box_w, box_h)
-    if best is None:
-        return None
+    mrz = read_mrz(io.BytesIO(image_bytes))
+    if mrz is None:
+        return {}
+    data = mrz.to_dict()
+    if int(data.get("valid_score", 0)) < _MIN_MRZ_SCORE:
+        return {}
 
-    x, y, box_w, box_h = best
-    pad = int(0.02 * height)
-    top, bottom = max(0, y - pad), min(height, y + box_h + pad)
-    return image[top:bottom, x:min(width, x + box_w)]
-
-
-def _parse_mrz_lines(lines: list[str]) -> _Fields:
-    """Decode MRZ text lines, dispatching on TD1 (NIC) vs TD3 (passport).
-
-    Format is decided by line count — three lines for a TD1 ID card, two
-    for a TD3 passport — rather than exact length, since OCR routinely
-    trims or pads the trailing ``<`` fillers. Each line is normalized to
-    its canonical width so the fixed field offsets line up.
-    """
-    mrz = [
-        line.replace(" ", "").upper()
-        for line in lines
-        if line.count("<") >= 3 and len(line.strip()) >= 20
-    ]
-    if len(mrz) >= 3:
-        return _parse_td1([_fit(line, 30) for line in mrz[:3]])
-    if len(mrz) == 2:
-        return _parse_td3([_fit(line, 44) for line in mrz[:2]])
-    return {}
-
-
-def _fit(line: str, width: int) -> str:
-    """Normalize an MRZ line to ``width`` (truncate long, pad with '<')."""
-    return line[:width].ljust(width, "<")
-
-
-def _parse_td3(lines: list[str]) -> _Fields:
-    """Decode a two-line TD3 (passport) MRZ."""
-    line1, line2 = lines
     fields: _Fields = {}
-    _set_mrz_name(fields, line1[5:])
-    _set_mrz(fields, "id_number", line2[0:9], line2[9],
-             line2[0:9].replace("<", ""))
-    _set_mrz(fields, "date_of_birth", line2[13:19], line2[19],
-             _mrz_date(line2[13:19], future=False))
-    _set(fields, "sex", _parse_sex(line2[20]), _MRZ_CONFIDENCE)
-    _set_mrz(fields, "expiry_date", line2[21:27], line2[27],
-             _mrz_date(line2[21:27], future=True))
-    return fields
-
-
-def _parse_td1(lines: list[str]) -> _Fields:
-    """Decode a three-line TD1 (NIC) MRZ."""
-    line1, line2, line3 = lines
-    fields: _Fields = {}
-    _set_mrz(fields, "id_number", line1[5:14], line1[14],
-             line1[5:14].replace("<", ""))
-    _set_mrz(fields, "date_of_birth", line2[0:6], line2[6],
-             _mrz_date(line2[0:6], future=False))
-    _set(fields, "sex", _parse_sex(line2[7]), _MRZ_CONFIDENCE)
-    _set_mrz(fields, "expiry_date", line2[8:14], line2[14],
-             _mrz_date(line2[8:14], future=True))
-    _set_mrz_name(fields, line3)
-    return fields
-
-
-def _set_mrz_name(fields: _Fields, block: str) -> None:
-    """Split an MRZ ``SURNAME<<GIVEN`` block and store ``full_name``."""
-    surname, _, given = block.partition("<<")
-    surname = surname.replace("<", " ").strip()
-    given = given.replace("<", " ").strip()
-    name = " ".join(part for part in (given, surname) if part)
+    name = " ".join(
+        part.strip()
+        for part in (data.get("names"), data.get("surname"))
+        if part and part.strip()
+    )
     _set(fields, "full_name", name or None, _MRZ_CONFIDENCE)
+
+    cni = (data.get("optional1") or "").replace("<", "").strip()
+    number = (data.get("number") or "").replace("<", "").strip()
+    _set(fields, "id_number", cni or number or None, _MRZ_CONFIDENCE)
+
+    if data.get("valid_date_of_birth"):
+        _set(
+            fields,
+            "date_of_birth",
+            _mrz_date(data.get("date_of_birth", ""), future=False),
+            _MRZ_CONFIDENCE,
+        )
+    if data.get("valid_expiration_date"):
+        _set(
+            fields,
+            "expiry_date",
+            _mrz_date(data.get("expiration_date", ""), future=True),
+            _MRZ_CONFIDENCE,
+        )
+    _set(fields, "sex", _parse_sex(data.get("sex")), _MRZ_CONFIDENCE)
+    return fields
 
 
 def _mrz_date(raw: str, *, future: bool) -> date | None:
@@ -386,37 +413,6 @@ def _mrz_date(raw: str, *, future: bool) -> date | None:
         return date(century + year, month, day)
     except ValueError:
         return None
-
-
-def _mrz_check_digit(field: str) -> int:
-    """Compute the ICAO 9303 check digit over ``field``."""
-    total = 0
-    for position, char in enumerate(field):
-        if char.isdigit():
-            value = int(char)
-        elif char.isalpha():
-            value = ord(char) - 55  # 'A' -> 10 … 'Z' -> 35
-        else:
-            value = 0  # filler '<'
-        total += value * _MRZ_WEIGHTS[position % 3]
-    return total % 10
-
-
-def _mrz_valid(field: str, check: str) -> bool:
-    """Return whether ``check`` is the valid check digit for ``field``."""
-    return check.isdigit() and _mrz_check_digit(field) == int(check)
-
-
-def _set_mrz(
-    fields: _Fields, key: str, raw_field: str, check: str, value: Any
-) -> None:
-    """Store an MRZ ``value`` only when the field's check digit validates.
-
-    ``raw_field`` is the fixed-width MRZ substring the check digit covers
-    (fillers included); ``value`` is the cleaned/parsed value to store.
-    """
-    if value and _mrz_valid(raw_field, check):
-        _set(fields, key, value, _MRZ_CONFIDENCE)
 
 
 def _set(

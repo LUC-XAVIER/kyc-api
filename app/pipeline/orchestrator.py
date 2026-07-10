@@ -131,7 +131,19 @@ def run_verification(
         if data.document_type is DocumentType.PASSPORT
         else zones.text_zone
     )
-    ocr = ocr_extract(front_region, data.document_type, back_image=back)
+    # PassportEye reads the MRZ from the RAW image (the back for a NIC, the
+    # front for a passport) — preprocessing would wreck its accuracy.
+    mrz_bytes = (
+        data.id_front_image
+        if data.document_type is DocumentType.PASSPORT
+        else data.id_back_image
+    )
+    ocr = ocr_extract(
+        front_region,
+        data.document_type,
+        back_image=back,
+        mrz_bytes=mrz_bytes,
+    )
     if not ocr.success:
         return VerificationOutput(_rejected(RejectReason.OCR_FAILED), ocr=ocr)
     if ocr.expiry_date is not None and ocr.expiry_date < date.today():

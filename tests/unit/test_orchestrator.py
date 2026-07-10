@@ -121,7 +121,7 @@ def test_ocr_region_depends_on_document_type(
         lambda img: SimpleNamespace(text_zone="TEXTZONE", photo_zone="p"),
     )
 
-    def _capture_ocr(region, doc_type, *, back_image=None):
+    def _capture_ocr(region, doc_type, *, back_image=None, mrz_bytes=None):
         captured["region"] = region
         return OcrResult(success=False)  # short-circuit after OCR
 
