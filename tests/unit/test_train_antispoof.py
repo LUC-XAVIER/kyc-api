@@ -83,7 +83,7 @@ def test_evaluate_reports_test_metrics(tmp_path: Path) -> None:
     reason="requires MediaPipe, the face model, and the reference image",
 )
 def test_liveness_inference_with_trained_model(tmp_path: Path) -> None:
-    """A trained model drives check_liveness end to end on a real face."""
+    """A trained model drives the LBP fallback end to end on a real face."""
     import joblib
 
     from app.pipeline import face_detect
@@ -104,7 +104,7 @@ def test_liveness_inference_with_trained_model(tmp_path: Path) -> None:
     front = preprocess.preprocess_image(_NIC_FRONT.read_bytes())
     portrait = preprocess.crop_nic_zones(front).photo_zone
 
-    outcome = liveness.check_liveness(portrait, model_path=model_path)
+    outcome = liveness.check_liveness_lbp(portrait, model_path=model_path)
 
     assert isinstance(outcome.passed, bool)
     assert 0.0 <= outcome.score <= 1.0

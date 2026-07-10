@@ -196,8 +196,13 @@ the pipeline is now **validated against a real card** end-to-end.
 
 `app/pipeline/stages/liveness.py`, trainer `ml/train_antispoof.py`
 
-Two layers: **MediaPipe BlazeFace** confirms a real face is present, then an
-**LBP-texture SVM** scores the selfie for print/replay spoofing (§6.3.2).
+Two layers: **MediaPipe BlazeFace** confirms a real face is present, then a
+deep anti-spoof CNN scores the selfie for print/replay spoofing (§6.3.2).
+
+> **Update — the scorer is now DeepFace's pretrained FasNet (MiniFASNet), not
+> the LBP-SVM.** §4.1–4.2 below document the original LBP model and its
+> tuning; §4.3 covers the upgrade and why. The LBP path is kept as a
+> documented fallback (`check_liveness_lbp`).
 
 **Built:**
 - `extract_lbp_features` — 8-neighbour LBP over a 128px face, 16px cells,
@@ -307,6 +312,50 @@ cropped face. Train and serve are consistent (both whole-image), and LCC-FASD
 images are already face-centred, so this is a **robustness** item — best
 validated with real production selfies in staging (now cheap, since
 `face_detect.crop_face` exists).
+
+### 4.3 Upgrade to a deep model (FasNet)
+
+**Trigger.** The first real selfie through the pipeline scored **0.7189** and
+was sent to review (pass threshold 0.72) — a *genuine* user rejected. Not a
+fluke: at the security-first operating point (§4.2) the LBP model rejects
+**~34% of genuine users**, and its ROC-AUC ~0.94 curve is the ceiling. §4.2
+already called it: a materially better point *"needs a stronger model … not
+just a threshold move."*
+
+**Change.** The layer-2 scorer is now **DeepFace's pretrained `FasNet`**
+(MiniFASNet, a deep anti-spoof CNN). It ships with the `deepface` dependency
+we already use for face matching and runs on the **CPU torch** added for
+EasyOCR — so **no new dependency**, weights are ~3.7 MB, inference is a few
+tens of ms. MediaPipe layer 1 is unchanged. `check_liveness` calls
+`detect_face_box` → `FasNet.analyze`, mapping its `(is_real, confidence)` to a
+monotonic **P(live)** = `confidence if is_real else 1 − confidence`.
+
+**Result on the real selfie:** FasNet scores **0.999 (is_real=True)** where the
+LBP-SVM scored 0.7189 — it now passes with margin.
+
+| | LBP-SVM | FasNet |
+|---|---|---|
+| Real selfie P(live) | 0.7189 (→ review) | **0.999 (→ pass)** |
+| Model | 16 384-d LBP → PCA → RBF-SVM | pretrained MiniFASNet CNN |
+| Trained on | LCC-FASD (webcam proxy) | CelebA-Spoof-scale (pretrained) |
+
+**Threshold.** `LIVENESS_THRESHOLD = 0.60` — above FasNet's natural 0.5
+real/spoof boundary for a security margin, **provisional** until re-tuned on
+real selfies (the decision engine's 0.30 review floor is unchanged). FasNet's
+strong separation means the review band is rarely hit, so fewer genuine users
+land in manual review.
+
+**Deliberate deviation from the design/analysis docs.** Those specify a
+*locally trained* liveness model. We prioritise **accuracy** and adopt a
+proven pretrained model rather than train a bespoke net on a weak proxy
+dataset (LCC-FASD), which would overfit and likely underperform on
+Cameroonian phone selfies. Training/fine-tuning our own only becomes
+worthwhile once real spoof/live samples are collected in staging — at which
+point **fine-tuning FasNet** beats training from scratch.
+
+**Still open.** The 0.60 threshold and the APCER/BPCER trade are unverified
+without real spoof samples; validate in staging with genuine print/replay
+attempts. The LBP-SVM + trainer remain in the tree as a fallback/baseline.
 
 ---
 
@@ -424,10 +473,12 @@ A high-effort review of the merged pipeline produced four findings:
 
 - **NIC v1 visual OCR** — deferred; needs real cards to calibrate (mockups
   are unusable). Route low-confidence extractions to manual review.
-- **Liveness threshold** — the 0.5 default is too permissive on the imbalanced
-  set; tune on an ROC operating point (ideally with real selfies).
-- **Liveness LBP on face crop (#2)** — retrain on face crops; validate against
-  real selfies.
+- **Liveness threshold** — layer 2 is now FasNet (§4.3); its `0.60` pass
+  threshold is provisional and needs an APCER/BPCER re-tune on real selfies
+  (print/replay attempts) in staging.
+- **Liveness LBP fallback** — the LBP-SVM + trainer are retained as a
+  documented baseline (`check_liveness_lbp`); the face-crop retrain (#2) only
+  matters if we ever fall back to it.
 - **Model assets** are provisioned outside git and must be present at deploy:
   - `ml/models/antispoof_lbp_svm.joblib` — `python ml/train_antispoof.py …`
   - `ml/models/blaze_face_short_range.tflite` — MediaPipe BlazeFace
