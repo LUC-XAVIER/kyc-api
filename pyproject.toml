@@ -30,6 +30,7 @@ ml = [
     "pillow>=10.3",
     "numpy>=1.26",
     "pytesseract>=0.3.10",
+    "passporteye>=2.2",
     "deepface>=0.0.92",
     "tf-keras>=2.16",
     "mediapipe>=0.10",

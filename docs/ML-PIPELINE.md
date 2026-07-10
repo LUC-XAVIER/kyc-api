@@ -88,9 +88,10 @@ colours.
 `app/pipeline/stages/ocr.py`
 
 **Built:** `ocr_extract` dispatches on `document_type`. Extraction combines
-(a) **bilingual FR/EN label parsing** of the visual fields and (b) **MRZ
-decoding** (ICAO 9303 TD1 for the NIC, TD3 for the passport) with
-**check-digit validation**. Front and back results are merged by a
+(a) **bilingual FR/EN label parsing** of the visual fields (Tesseract) and
+(b) **MRZ decoding via PassportEye** (`read_mrz_fields`), which does its own
+detection, rotation, and ICAO 9303 check-digit parsing on the **raw** image
+(NIC back / passport front). Front and back results are merged by a
 confidence rank so a check-valid MRZ field (0.98) overrides the same field
 read from the printed text (0.75). `success` requires name + id + expiry.
 
@@ -128,6 +129,32 @@ read from the printed text (0.75). `success` requires name + id + expiry.
 **Audit fix #1:** passports were being fed only the cropped `text_zone`,
 truncating the full-width bottom MRZ → the orchestrator now OCRs the **full
 front page** for passports (NIC keeps the text-zone crop).
+
+**Real-card rework (`feat/ocr-improvements`):** the first real Cameroon NIC
+run rejected with `OCR_FAILED` on visibly clean images. `scripts/ocr_debug.py`
+(new diagnostic dumping every intermediate) located two root causes, both now
+fixed:
+- *Adaptive threshold shredded the card.* The guilloche/emblem background was
+  binarized into noise, so Tesseract returned garbage. → Dropped denoise +
+  adaptive threshold; feed **upscaled grayscale** and let Tesseract binarize
+  internally. Visual text is now legible.
+- *The hand-rolled MRZ path failed on the real card.* The NIC v2 MRZ runs
+  **vertically** at low contrast; `_locate_mrz` never found it. → Replaced the
+  entire hand-rolled MRZ stack (`_locate_mrz`, `_parse_td1/td3`, check-digit
+  code) with **PassportEye**, which detects + rotates + check-digit-parses the
+  raw image. It must see the **raw bytes** — feeding our preprocessed array
+  dropped `valid_score` from 100 to 2 — so the orchestrator threads
+  `mrz_bytes` (raw `id_back_image`/`id_front_image`) straight through.
+- *Result:* the real NIC now extracts name, CNI number (from MRZ `optional1`),
+  DOB, expiry, and sex — all checksummed — and passes (`success=True`). Dep
+  added: `passporteye>=2.2` (lightweight, no torch).
+- *Still open:* `place_of_birth`/`occupation` come from the noisy visual path
+  (not required fields); NIC v1 (no MRZ) still routes to review. Both are
+  candidates for a deep OCR engine (EasyOCR) once torch can be installed on
+  the VM.
+
+The `docs/Identifiers/` mockup caveat above stands for the sample images, but
+the pipeline is now **validated against a real card** end-to-end.
 
 ---
 
