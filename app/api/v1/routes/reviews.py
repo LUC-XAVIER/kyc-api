@@ -11,12 +11,11 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_mfi
+from app.api.v1.deps import Principal, require_manager_principal
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
-from app.models import MfiAccount, Verification
+from app.models import Verification
 from app.models.enums import (
-    ActorType,
     DuplicateResolution,
     VerificationStatus,
 )
@@ -34,13 +33,16 @@ router = APIRouter(prefix="/kyc/reviews", tags=["reviews"])
 
 @router.get("", response_model=list[ReviewItem])
 def list_pending_reviews(
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
 ) -> list[Verification]:
     """List the MFI's PENDING verifications, oldest first."""
     return (
         db.query(Verification)
-        .filter_by(mfi_account_id=mfi.id, status=VerificationStatus.PENDING)
+        .filter_by(
+            mfi_account_id=principal.mfi_account.id,
+            status=VerificationStatus.PENDING,
+        )
         .order_by(Verification.created_at)
         .all()
     )
@@ -52,13 +54,15 @@ def list_pending_reviews(
 def decide_review(
     verification_id: uuid.UUID,
     payload: ReviewDecisionRequest,
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
 ) -> ReviewDecisionResponse:
     """Approve or reject a PENDING verification owned by the caller's MFI."""
     verification = (
         db.query(Verification)
-        .filter_by(id=verification_id, mfi_account_id=mfi.id)
+        .filter_by(
+            id=verification_id, mfi_account_id=principal.mfi_account.id
+        )
         .one_or_none()
     )
     if verification is None:
@@ -82,9 +86,10 @@ def decide_review(
     approved = payload.action is ReviewAction.APPROVE
     audit.record(
         db,
-        mfi_account_id=mfi.id,
+        mfi_account_id=principal.mfi_account.id,
         action=audit.REVIEW_APPROVED if approved else audit.REVIEW_REJECTED,
-        actor_type=ActorType.MANAGER,
+        actor_type=principal.actor_type,
+        actor_id=principal.actor_id,
         verification_id=verification.id,
         details=None if approved else {"reason": verification.reject_reason},
     )

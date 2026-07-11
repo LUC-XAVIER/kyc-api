@@ -7,8 +7,7 @@ and billing actions land here in later Phase-2 steps.
 
 from fastapi import APIRouter, Depends
 
-from app.api.v1.deps import get_current_mfi
-from app.models import MfiAccount
+from app.api.v1.deps import Principal, get_principal
 from app.schemas.account import AccountSummary
 
 router = APIRouter(prefix="/account", tags=["account"])
@@ -16,9 +15,14 @@ router = APIRouter(prefix="/account", tags=["account"])
 
 @router.get("", response_model=AccountSummary)
 def read_account(
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(get_principal),
 ) -> AccountSummary:
-    """Return the authenticated MFI's account and quota summary."""
+    """Return the authenticated MFI's account and quota summary.
+
+    Available to any authenticated caller — a machine (API key) or a
+    dashboard agent — so the subscription view works from the dashboard.
+    """
+    mfi = principal.mfi_account
     plan = mfi.plan
     return AccountSummary(
         id=mfi.id,

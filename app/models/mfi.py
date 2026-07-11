@@ -7,7 +7,7 @@ from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
-from app.models.enums import AgentStatus, MfiStatus, PlanName
+from app.models.enums import AgentRole, AgentStatus, MfiStatus, PlanName
 
 
 class SubscriptionPlan(UUIDMixin, Base):
@@ -74,6 +74,14 @@ class Agent(UUIDMixin, TimestampMixin, Base):
     )
     full_name: Mapped[str] = mapped_column(String(255))
     branch: Mapped[str | None] = mapped_column(String(255))
+    # Login credentials for the management dashboard. Nullable so agents
+    # provisioned before dashboard access exist without a password; both
+    # are required to authenticate (enforced at the login endpoint).
+    email: Mapped[str | None] = mapped_column(String(255), unique=True)
+    hashed_password: Mapped[str | None] = mapped_column(String(255))
+    role: Mapped[AgentRole] = mapped_column(
+        Enum(AgentRole, name="agent_role"), default=AgentRole.AGENT
+    )
     status: Mapped[AgentStatus] = mapped_column(
         Enum(AgentStatus, name="agent_status"), default=AgentStatus.ACTIVE
     )

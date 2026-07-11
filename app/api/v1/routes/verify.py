@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_metered_mfi
+from app.api.v1.deps import Principal, get_metered_principal
 from app.core.exceptions import ValidationError
 from app.db.session import get_db
 from app.models import (
@@ -20,10 +20,9 @@ from app.models import (
     FaceEmbedding,
     FaceMatchResult,
     LivenessResult,
-    MfiAccount,
     Verification,
 )
-from app.models.enums import ActorType, DocumentType, SubmissionMethod
+from app.models.enums import DocumentType, SubmissionMethod
 from app.pipeline.contracts import PipelineInput
 from app.pipeline.orchestrator import VerificationOutput, run_verification
 from app.schemas.verification import VerifyResponse
@@ -133,16 +132,18 @@ def verify(
     id_front: UploadFile = File(...),
     selfie: UploadFile = File(...),
     id_back: UploadFile | None = File(None),
-    mfi: MfiAccount = Depends(get_metered_mfi),
+    principal: Principal = Depends(get_metered_principal),
     db: Session = Depends(get_db),
 ) -> VerifyResponse:
-    """Run a verification for the authenticated MFI and record it.
+    """Run a verification for the authenticated caller and record it.
 
     Takes the ID images and selfie as multipart uploads. Quota is checked
     before the pipeline runs (via the dependency); the verification record,
     the enrolled embedding (on a clean pass), and one unit of usage are then
-    persisted in the same transaction.
+    persisted in the same transaction. A dashboard submission is attributed
+    to the acting agent; a machine (API-key) call is recorded as such.
     """
+    mfi = principal.mfi_account
     pipeline_input = build_pipeline_input(
         client_id=client_id,
         mfi_account_id=mfi.id,
@@ -159,7 +160,12 @@ def verify(
     verification = Verification(
         client_id=client_id,
         mfi_account_id=mfi.id,
-        submission_method=SubmissionMethod.API,
+        agent_id=principal.agent.id if principal.agent else None,
+        submission_method=(
+            SubmissionMethod.DASHBOARD
+            if principal.agent
+            else SubmissionMethod.API
+        ),
         status=result.status,
         confidence_score=result.confidence,
         reject_reason=result.reject_reason,
@@ -181,7 +187,8 @@ def verify(
         db,
         mfi_account_id=mfi.id,
         action=audit.VERIFICATION_PROCESSED,
-        actor_type=ActorType.SYSTEM,
+        actor_type=principal.actor_type,
+        actor_id=principal.actor_id,
         verification_id=verification.id,
         details={
             "status": result.status.value,

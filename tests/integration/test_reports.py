@@ -1,14 +1,16 @@
 """Integration tests for compliance report generation."""
 
+import uuid
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.security import create_access_token
 from app.models import AuditLog, ComplianceReport, Verification
-from app.models.enums import SubmissionMethod, VerificationStatus
+from app.models.enums import AgentRole, SubmissionMethod, VerificationStatus
 from app.services import audit
-from tests.factories import create_mfi_with_key
+from tests.factories import create_agent, create_mfi_with_key
 
 REPORTS_URL = "/api/v1/kyc/reports"
 IN_PERIOD = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
@@ -67,10 +69,17 @@ def test_generate_snapshots_status_breakdown(
     assert body["status_breakdown"] == {
         "VERIFIED": 2, "REJECTED": 1, "PENDING": 1
     }
-    assert db_session.query(ComplianceReport).count() == 1
+    assert (
+        db_session.query(ComplianceReport)
+        .filter_by(mfi_account_id=account.id)
+        .count()
+        == 1
+    )
     assert (
         db_session.query(AuditLog)
-        .filter_by(action=audit.REPORT_GENERATED)
+        .filter_by(
+            mfi_account_id=account.id, action=audit.REPORT_GENERATED
+        )
         .count()
         == 1
     )
@@ -147,3 +156,69 @@ def test_cannot_fetch_another_mfis_report(
 def test_requires_authentication(api_client: TestClient) -> None:
     """Reports are not accessible without an API key."""
     assert api_client.get(REPORTS_URL).status_code == 401
+
+
+# --- PDF download --------------------------------------------------------
+
+
+def _bearer(db: Session, mfi, *, role: AgentRole, email: str):
+    """Create an agent with ``role`` and return its bearer headers."""
+    agent = create_agent(db, mfi, email=email, role=role)
+    token = create_access_token(subject=str(agent.id), role=role.value)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _generate(api_client: TestClient, headers: dict[str, str]) -> str:
+    resp = api_client.post(
+        REPORTS_URL,
+        json={"period_start": "2026-06-01", "period_end": "2026-06-30"},
+        headers=headers,
+    )
+    return resp.json()["id"]
+
+
+def test_download_report_pdf(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """The PDF endpoint streams a downloadable PDF for the report."""
+    account, key = create_mfi_with_key(db_session, usage=0)
+    agent = create_agent(db_session, account, branch="Mvog-Ada")
+    _seed(db_session, account.id, VerificationStatus.VERIFIED)
+    db_session.query(Verification).update({"agent_id": agent.id})
+    report_id = _generate(api_client, _auth(key))
+
+    resp = api_client.get(
+        f"{REPORTS_URL}/{report_id}/pdf", headers=_auth(key)
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert "attachment" in resp.headers["content-disposition"]
+    assert resp.content[:5] == b"%PDF-"
+
+
+def test_download_unknown_report_is_404(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Downloading a non-existent report is a 404."""
+    _, key = create_mfi_with_key(db_session, usage=0)
+    resp = api_client.get(
+        f"{REPORTS_URL}/{uuid.uuid4()}/pdf", headers=_auth(key)
+    )
+    assert resp.status_code == 404
+
+
+def test_download_requires_manager(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A plain agent cannot download compliance PDFs (403)."""
+    account, key = create_mfi_with_key(db_session, usage=0)
+    report_id = _generate(api_client, _auth(key))
+    headers = _bearer(
+        db_session, account, role=AgentRole.AGENT, email="agent@mfi.cm"
+    )
+
+    resp = api_client.get(
+        f"{REPORTS_URL}/{report_id}/pdf", headers=headers
+    )
+    assert resp.status_code == 403

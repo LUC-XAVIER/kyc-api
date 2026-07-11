@@ -4,9 +4,9 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from app.core.security import generate_api_key
-from app.models import ApiKey, MfiAccount, SubscriptionPlan
-from app.models.enums import PlanName
+from app.core.security import generate_api_key, hash_password
+from app.models import Agent, ApiKey, MfiAccount, SubscriptionPlan
+from app.models.enums import AgentRole, PlanName
 
 
 def create_mfi_with_key(
@@ -52,3 +52,40 @@ def create_mfi_with_key(
     )
     db.flush()
     return account, key.full_key
+
+
+def create_agent(
+    db: Session,
+    mfi: MfiAccount,
+    *,
+    email: str = "agent@example.com",
+    password: str = "password123",
+    role: AgentRole = AgentRole.AGENT,
+    full_name: str = "Test Agent",
+    branch: str = "Central",
+) -> Agent:
+    """Create a login-capable agent under ``mfi``.
+
+    Args:
+        db: An open session (caller owns rollback/cleanup).
+        mfi: The owning account the agent belongs to.
+        email: Login email (unique).
+        password: Plaintext password; stored hashed.
+        role: The agent's dashboard role.
+        full_name: Display name.
+        branch: Branch label.
+
+    Returns:
+        The flushed :class:`~app.models.mfi.Agent`.
+    """
+    agent = Agent(
+        mfi_account_id=mfi.id,
+        full_name=full_name,
+        branch=branch,
+        email=email,
+        hashed_password=hash_password(password),
+        role=role,
+    )
+    db.add(agent)
+    db.flush()
+    return agent
