@@ -21,6 +21,9 @@ dependencies = [
     "pyjwt>=2.8",
     "bcrypt>=4.1",
     "python-multipart>=0.0.9",
+    # Server-side compliance-report PDF rendering (the dashboard only
+    # downloads the result via the API).
+    "reportlab>=4.2",
 ]
 
 [project.optional-dependencies]
@@ -53,7 +56,6 @@ ml = [
 dashboard = [
     "streamlit>=1.36",
     "plotly>=5.22",
-    "reportlab>=4.2",
     "httpx>=0.27",
 ]
 # Tooling and tests.

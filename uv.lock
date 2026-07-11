@@ -1223,6 +1223,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyjwt" },
     { name = "python-multipart" },
+    { name = "reportlab" },
     { name = "sqlalchemy" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1231,7 +1232,6 @@ dependencies = [
 dashboard = [
     { name = "httpx" },
     { name = "plotly" },
-    { name = "reportlab" },
     { name = "streamlit" },
 ]
 dev = [
@@ -1291,7 +1291,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
     { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "reportlab", marker = "extra == 'dashboard'", specifier = ">=4.2" },
+    { name = "reportlab", specifier = ">=4.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "scikit-learn", marker = "extra == 'ml'", specifier = ">=1.5" },
     { name = "sqlalchemy", specifier = ">=2.0" },

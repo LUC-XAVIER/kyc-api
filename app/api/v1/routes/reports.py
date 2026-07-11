@@ -8,6 +8,7 @@ the action. Reports can then be listed and fetched.
 import uuid
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import Principal, require_manager_principal
@@ -15,7 +16,7 @@ from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
 from app.models import ComplianceReport
 from app.schemas.report import ReportRequest, ReportSummary
-from app.services import audit, reporting
+from app.services import audit, report_pdf, reporting
 
 router = APIRouter(prefix="/kyc/reports", tags=["reports"])
 
@@ -83,3 +84,35 @@ def get_report(
     if report is None:
         raise NotFoundError("Report not found.")
     return report
+
+
+@router.get("/{report_id}/pdf")
+def download_report_pdf(
+    report_id: uuid.UUID,
+    principal: Principal = Depends(require_manager_principal),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """Stream a COBAC-ready PDF of one of the MFI's compliance reports."""
+    report = (
+        db.query(ComplianceReport)
+        .filter_by(id=report_id, mfi_account_id=principal.mfi_account.id)
+        .one_or_none()
+    )
+    if report is None:
+        raise NotFoundError("Report not found.")
+
+    pdf = report_pdf.render_report_pdf(
+        report,
+        reporting.report_rows(db, report),
+        mfi_name=principal.mfi_account.name,
+    )
+    filename = (
+        f"kyc-compliance-{report.period_start}-{report.period_end}.pdf"
+    )
+    return StreamingResponse(
+        iter([pdf]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )
