@@ -6,16 +6,23 @@ manager can see *why* a case landed where it did before acting on it.
 """
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_mfi
-from app.core.exceptions import NotFoundError
+from app.api.v1.deps import (
+    Principal,
+    get_current_mfi,
+    require_manager_principal,
+)
+from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
 from app.models import MfiAccount, Verification
 from app.models.enums import VerificationStatus
+from app.schemas.stats import VerificationStats
 from app.schemas.verification import VerificationDetail, VerificationSummary
+from app.services import stats
 
 router = APIRouter(prefix="/kyc/verifications", tags=["verifications"])
 
@@ -31,6 +38,30 @@ def list_verifications(
     if status is not None:
         query = query.filter_by(status=status)
     return query.order_by(Verification.created_at.desc()).all()
+
+
+@router.get("/stats", response_model=VerificationStats)
+def verification_stats(
+    start: date = Query(...),
+    end: date = Query(...),
+    branch: str | None = Query(default=None),
+    principal: Principal = Depends(require_manager_principal),
+    db: Session = Depends(get_db),
+) -> VerificationStats:
+    """Return aggregated verification statistics for the dashboard.
+
+    Managers only. Counts are scoped to the caller's MFI and the inclusive
+    ``[start, end]`` date range, optionally narrowed to one branch.
+    """
+    if start > end:
+        raise ValidationError("start must be on or before end.")
+    return stats.compute_verification_stats(
+        db,
+        mfi_account_id=principal.mfi_account.id,
+        period_start=start,
+        period_end=end,
+        branch=branch,
+    )
 
 
 @router.get("/{verification_id}", response_model=VerificationDetail)

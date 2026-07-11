@@ -1,11 +1,12 @@
 """Integration tests for verification history and detail."""
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.security import create_access_token
 from app.models import (
     DuplicateFlag,
     ExtractedData,
@@ -13,14 +14,56 @@ from app.models import (
     LivenessResult,
     Verification,
 )
-from app.models.enums import Sex, SubmissionMethod, VerificationStatus
-from tests.factories import create_mfi_with_key
+from app.models.enums import (
+    AgentRole,
+    Sex,
+    SubmissionMethod,
+    VerificationStatus,
+)
+from tests.factories import create_agent, create_mfi_with_key
 
 BASE = "/api/v1/kyc/verifications"
+STATS_URL = f"{BASE}/stats"
 
 
 def _auth(key: str) -> dict[str, str]:
     return {"X-API-Key": key}
+
+
+def _bearer(db: Session, mfi, *, role: AgentRole, email: str):
+    """Create an agent with ``role`` and return its bearer headers."""
+    agent = create_agent(db, mfi, email=email, role=role)
+    token = create_access_token(subject=str(agent.id), role=role.value)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _seed_stat(
+    db: Session,
+    mfi_id,
+    *,
+    status: VerificationStatus,
+    when: datetime,
+    agent_id=None,
+    proc_seconds: int | None = None,
+) -> Verification:
+    """Seed one verification at a fixed time, agent, and processing span."""
+    verification = Verification(
+        client_id="C",
+        mfi_account_id=mfi_id,
+        agent_id=agent_id,
+        submission_method=SubmissionMethod.API,
+        status=status,
+        confidence_score=0.8,
+        created_at=when,
+        processed_at=(
+            when + timedelta(seconds=proc_seconds)
+            if proc_seconds is not None
+            else None
+        ),
+    )
+    db.add(verification)
+    db.flush()
+    return verification
 
 
 def _seed(
@@ -125,3 +168,114 @@ def test_detail_of_another_mfi_is_404(
 def test_requires_authentication(api_client: TestClient) -> None:
     """The history is not accessible without an API key."""
     assert api_client.get(BASE).status_code == 401
+
+
+# --- Statistics endpoint -------------------------------------------------
+
+_DAY = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+_PERIOD = {"start": "2026-06-01", "end": "2026-06-30"}
+
+
+def _seed_stats_fixture(db: Session, account) -> None:
+    """Seed a known mix across two branches, one row outside the period."""
+    ada = create_agent(db, account, email="ada@mfi.cm", branch="Mvog-Ada")
+    biy = create_agent(db, account, email="biy@mfi.cm", branch="Biyem-Assi")
+    # In period: 2 VERIFIED + 1 REJECTED on Mvog-Ada; 1 PENDING + 1 APPROVED
+    # on Biyem-Assi. Only the two VERIFIED carry a processing span (4s, 6s).
+    _seed_stat(db, account.id, status=VerificationStatus.VERIFIED,
+               when=_DAY, agent_id=ada.id, proc_seconds=4)
+    _seed_stat(db, account.id, status=VerificationStatus.VERIFIED,
+               when=_DAY, agent_id=ada.id, proc_seconds=6)
+    _seed_stat(db, account.id, status=VerificationStatus.REJECTED,
+               when=_DAY, agent_id=ada.id)
+    _seed_stat(db, account.id, status=VerificationStatus.PENDING,
+               when=_DAY, agent_id=biy.id)
+    _seed_stat(db, account.id, status=VerificationStatus.APPROVED,
+               when=_DAY, agent_id=biy.id)
+    # Outside the period -> must be excluded entirely.
+    _seed_stat(db, account.id, status=VerificationStatus.VERIFIED,
+               when=datetime(2026, 5, 20, 12, 0, tzinfo=UTC), agent_id=ada.id)
+
+
+def test_stats_aggregate_period_status_branch_and_time(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Stats total, band, per-day, by-branch, and avg time by the period."""
+    account, _ = create_mfi_with_key(db_session, usage=0)
+    headers = _bearer(
+        db_session, account, role=AgentRole.MANAGER, email="mgr@mfi.cm"
+    )
+    _seed_stats_fixture(db_session, account)
+
+    resp = api_client.get(STATS_URL, params=_PERIOD, headers=headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 5
+    assert body["verified"] == 3  # VERIFIED + APPROVED
+    assert body["pending"] == 1
+    assert body["rejected"] == 1
+    assert body["by_status"] == {
+        "VERIFIED": 2, "APPROVED": 1, "PENDING": 1, "REJECTED": 1
+    }
+    assert body["per_day"] == [
+        {"date": "2026-06-15", "verified": 3, "pending": 1, "rejected": 1}
+    ]
+    assert body["by_branch"] == [
+        {"branch": "Mvog-Ada", "count": 3},
+        {"branch": "Biyem-Assi", "count": 2},
+    ]
+    assert body["avg_processing_seconds"] == 5.0
+
+
+def test_stats_branch_filter(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A branch filter restricts every aggregate to that branch."""
+    account, _ = create_mfi_with_key(db_session, usage=0)
+    headers = _bearer(
+        db_session, account, role=AgentRole.MANAGER, email="mgr@mfi.cm"
+    )
+    _seed_stats_fixture(db_session, account)
+
+    resp = api_client.get(
+        STATS_URL,
+        params={**_PERIOD, "branch": "Mvog-Ada"},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+    assert body["verified"] == 2
+    assert body["rejected"] == 1
+    assert body["pending"] == 0
+    assert body["by_branch"] == [{"branch": "Mvog-Ada", "count": 3}]
+
+
+def test_stats_requires_manager(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A plain agent cannot read org-wide statistics (403)."""
+    account, _ = create_mfi_with_key(db_session, usage=0)
+    headers = _bearer(
+        db_session, account, role=AgentRole.AGENT, email="agent@mfi.cm"
+    )
+    resp = api_client.get(STATS_URL, params=_PERIOD, headers=headers)
+    assert resp.status_code == 403
+
+
+def test_stats_rejects_inverted_range(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A start date after the end date is a 400."""
+    account, _ = create_mfi_with_key(db_session, usage=0)
+    headers = _bearer(
+        db_session, account, role=AgentRole.MANAGER, email="mgr@mfi.cm"
+    )
+    resp = api_client.get(
+        STATS_URL,
+        params={"start": "2026-06-30", "end": "2026-06-01"},
+        headers=headers,
+    )
+    assert resp.status_code == 400
