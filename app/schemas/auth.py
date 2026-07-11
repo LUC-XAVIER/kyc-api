@@ -28,3 +28,15 @@ class TokenResponse(BaseModel):
     agent_id: uuid.UUID
     full_name: str
     mfi_account_id: uuid.UUID
+
+
+class AgentProfile(BaseModel):
+    """The signed-in agent's own profile (``GET /auth/me``)."""
+
+    agent_id: uuid.UUID
+    full_name: str
+    email: str | None
+    role: AgentRole
+    branch: str | None
+    mfi_account_id: uuid.UUID
+    mfi_name: str

@@ -17,6 +17,11 @@ from tests.factories import create_agent, create_mfi_with_key
 
 ACCOUNT_URL = "/api/v1/account"
 LOGIN_URL = "/api/v1/auth/login"
+ME_URL = "/api/v1/auth/me"
+
+
+def _bearer_headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _bearer(token: str) -> HTTPAuthorizationCredentials:
@@ -191,3 +196,49 @@ def test_require_manager_forbids_plain_agent(
     agent = create_agent(db_session, mfi, role=AgentRole.AGENT)
     with pytest.raises(AuthorizationError):
         require_manager(agent=agent)
+
+
+# --- Dashboard account access (bearer) + profile ------------------------
+
+
+def test_account_is_readable_via_bearer_token(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A signed-in agent can read the subscription summary."""
+    mfi, _ = create_mfi_with_key(db_session, name="CamFinance")
+    agent = create_agent(db_session, mfi, email="mgr@mfi.cm")
+    token = create_access_token(subject=str(agent.id), role="AGENT")
+
+    resp = api_client.get(ACCOUNT_URL, headers=_bearer_headers(token))
+
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "CamFinance"
+    assert resp.json()["plan_name"] == "STARTER"
+
+
+def test_me_returns_the_signed_in_profile(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """GET /auth/me echoes the token's agent identity and role."""
+    mfi, _ = create_mfi_with_key(db_session, name="CamFinance")
+    agent = create_agent(
+        db_session, mfi, email="jeanne@mfi.cm", role=AgentRole.AGENT,
+        full_name="Jeanne Mbarga", branch="Mvog-Ada",
+    )
+    token = create_access_token(subject=str(agent.id), role="AGENT")
+
+    resp = api_client.get(ME_URL, headers=_bearer_headers(token))
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["full_name"] == "Jeanne Mbarga"
+    assert body["email"] == "jeanne@mfi.cm"
+    assert body["role"] == "AGENT"
+    assert body["branch"] == "Mvog-Ada"
+    assert body["mfi_account_id"] == str(mfi.id)
+    assert body["mfi_name"] == "CamFinance"
+
+
+def test_me_requires_a_token(api_client: TestClient) -> None:
+    """The profile endpoint is not reachable without a bearer token."""
+    assert api_client.get(ME_URL).status_code == 401

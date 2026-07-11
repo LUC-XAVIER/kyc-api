@@ -9,12 +9,13 @@ used by MFIs' own software.
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.api.v1.deps import get_current_agent
 from app.core.exceptions import AuthenticationError
 from app.core.security import create_access_token, verify_password
 from app.db.session import get_db
 from app.models import Agent
 from app.models.enums import AgentStatus
-from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.auth import AgentProfile, LoginRequest, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -63,4 +64,22 @@ def login(
         agent_id=agent.id,
         full_name=agent.full_name,
         mfi_account_id=agent.mfi_account_id,
+    )
+
+
+@router.get("/me", response_model=AgentProfile)
+def read_me(agent: Agent = Depends(get_current_agent)) -> AgentProfile:
+    """Return the signed-in agent's own profile.
+
+    Lets the dashboard confirm a stored token is still valid and refresh
+    the agent's identity/role without re-decoding the JWT itself.
+    """
+    return AgentProfile(
+        agent_id=agent.id,
+        full_name=agent.full_name,
+        email=agent.email,
+        role=agent.role,
+        branch=agent.branch,
+        mfi_account_id=agent.mfi_account_id,
+        mfi_name=agent.mfi_account.name,
     )
