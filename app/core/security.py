@@ -8,10 +8,15 @@ the digest so a database leak alone does not reveal usable keys.
 
 """
 
+import base64
 import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+
+import bcrypt
+import jwt
 
 from app.core.config import settings
 
@@ -83,3 +88,94 @@ def verify_api_key(full_key: str, stored_hash: str) -> bool:
 def extract_prefix(full_key: str) -> str:
     """Return the stored/display prefix slice of a full key."""
     return full_key[:PREFIX_DISPLAY_LEN]
+
+
+# --- Dashboard staff passwords (bcrypt) ---------------------------------
+# bcrypt only consumes the first 72 bytes of its input, so a long password
+# would be silently truncated (or rejected outright by bcrypt >= 4.1). We
+# SHA-256 pre-hash to a fixed 44-byte token first, so every password is
+# hashed in full and uniformly, regardless of length.
+
+
+def _prepare_password(password: str) -> bytes:
+    """Return a fixed-length, bcrypt-safe token for ``password``."""
+    digest = hashlib.sha256(password.encode()).digest()
+    return base64.b64encode(digest)
+
+
+def hash_password(password: str) -> str:
+    """Return a salted bcrypt hash of ``password`` for storage.
+
+    Args:
+        password: The plaintext password chosen by the staff member.
+
+    Returns:
+        The bcrypt hash string, safe to persist in ``agents.hashed_password``.
+    """
+    hashed = bcrypt.hashpw(_prepare_password(password), bcrypt.gensalt())
+    return hashed.decode()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Constant-time check that ``password`` matches a stored bcrypt hash.
+
+    Args:
+        password: The candidate password presented at login.
+        hashed: The bcrypt hash previously stored for the account.
+
+    Returns:
+        ``True`` iff the password is authentic. A malformed stored hash
+        yields ``False`` rather than raising.
+    """
+    try:
+        return bcrypt.checkpw(_prepare_password(password), hashed.encode())
+    except ValueError:
+        return False
+
+
+# --- Dashboard session tokens (JWT) -------------------------------------
+
+
+def create_access_token(
+    *, subject: str, role: str, expires_delta: timedelta | None = None
+) -> str:
+    """Mint a signed JWT for an authenticated dashboard session.
+
+    Args:
+        subject: The account identifier to place in the ``sub`` claim
+            (the agent's UUID as a string).
+        role: The account's :class:`~app.models.enums.AgentRole` value,
+            carried in a ``role`` claim so the UI/RBAC can branch on it.
+        expires_delta: Optional lifetime override; defaults to
+            ``settings.access_token_expire_minutes``.
+
+    Returns:
+        The encoded, signed JWT string.
+    """
+    now = datetime.now(UTC)
+    expire = now + (
+        expires_delta
+        or timedelta(minutes=settings.access_token_expire_minutes)
+    )
+    payload = {"sub": subject, "role": role, "iat": now, "exp": expire}
+    return jwt.encode(
+        payload, settings.secret_key, algorithm=settings.jwt_algorithm
+    )
+
+
+def decode_access_token(token: str) -> dict:
+    """Decode and validate a dashboard session JWT.
+
+    Args:
+        token: The encoded JWT presented on a request.
+
+    Returns:
+        The decoded claims (``sub``, ``role``, ``iat``, ``exp``).
+
+    Raises:
+        jwt.InvalidTokenError: If the token is malformed, tampered, or
+            expired (callers translate this into a 401).
+    """
+    return jwt.decode(
+        token, settings.secret_key, algorithms=[settings.jwt_algorithm]
+    )
