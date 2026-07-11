@@ -22,6 +22,20 @@ class AgentStatus(enum.StrEnum):
     DISABLED = "DISABLED"
 
 
+class AgentRole(enum.StrEnum):
+    """Dashboard role of an MFI staff account (Design ActorType).
+
+    Drives which dashboard surface the account sees and what it may do:
+    an ``AGENT`` submits verifications; a ``MANAGER`` also reviews the
+    pending queue and generates compliance reports. ``ADMIN`` is reserved
+    for Openxtech platform staff.
+    """
+
+    AGENT = "AGENT"
+    MANAGER = "MANAGER"
+    ADMIN = "ADMIN"
+
+
 class PlanName(enum.StrEnum):
     """The four subscription tiers (Design doc §6.2)."""
 
