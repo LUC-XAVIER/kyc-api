@@ -1,11 +1,19 @@
-"""Reusable API dependencies: authentication and tenant resolution.
+"""Reusable API dependencies: authentication, tenancy, and roles.
 
-``get_current_mfi`` is the entry gate for every protected endpoint. It
-turns an ``X-API-Key`` header into the owning :class:`MfiAccount`, so route
-handlers receive an already-authenticated tenant and never touch raw keys.
+Two credentials authenticate a caller:
+
+* an ``X-API-Key`` header — the MFI's own software (machine integration);
+* an ``Authorization: Bearer <jwt>`` token — a human agent/manager signed
+  into the dashboard.
+
+:func:`get_principal` accepts either and yields a :class:`Principal` that
+carries the tenant, the acting agent (if any), and whether the caller has
+manager-level authority. An API key is trusted as full tenant access; a
+bearer token carries the agent's specific role.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import jwt
@@ -18,7 +26,7 @@ from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import decode_access_token, hash_api_key
 from app.db.session import get_db
 from app.models import Agent, ApiKey, MfiAccount
-from app.models.enums import AgentRole, AgentStatus
+from app.models.enums import ActorType, AgentRole, AgentStatus
 from app.services import subscription
 
 API_KEY_HEADER_NAME = "X-API-Key"
@@ -30,17 +38,49 @@ _api_key_header = APIKeyHeader(name=API_KEY_HEADER_NAME, auto_error=False)
 # used by MFIs' own software.
 _bearer = HTTPBearer(auto_error=False)
 
+_MANAGER_ROLES = (AgentRole.MANAGER, AgentRole.ADMIN)
+# Maps an agent's role to the audit-log actor type; a machine (API-key)
+# caller has no agent and is recorded as SYSTEM.
+_ROLE_TO_ACTOR = {
+    AgentRole.AGENT: ActorType.AGENT,
+    AgentRole.MANAGER: ActorType.MANAGER,
+    AgentRole.ADMIN: ActorType.ADMIN,
+}
+
+
+def _mfi_from_key(api_key: str, db: Session) -> MfiAccount:
+    """Resolve an active API key to its MFI, touching ``last_used_at``."""
+    record = (
+        db.query(ApiKey)
+        .filter_by(hashed_key=hash_api_key(api_key), is_active=True)
+        .one_or_none()
+    )
+    if record is None:
+        raise AuthenticationError("Invalid or inactive API key.")
+    record.last_used_at = datetime.now(UTC)
+    db.commit()
+    return record.mfi_account
+
+
+def _agent_from_token(token: str, db: Session) -> Agent:
+    """Validate a session JWT and return its active agent."""
+    try:
+        claims = decode_access_token(token)
+        agent_id = uuid.UUID(claims["sub"])
+    except (jwt.InvalidTokenError, KeyError, ValueError):
+        raise AuthenticationError("Invalid or expired token.") from None
+
+    agent = db.get(Agent, agent_id)
+    if agent is None or agent.status != AgentStatus.ACTIVE:
+        raise AuthenticationError("Unknown or disabled account.")
+    return agent
+
 
 def get_current_mfi(
     api_key: str | None = Security(_api_key_header),
     db: Session = Depends(get_db),
 ) -> MfiAccount:
     """Authenticate by API key and return the owning MFI account.
-
-    The key is looked up by its HMAC digest (deterministic and uniquely
-    indexed), so the lookup itself is the verification. Missing, unknown,
-    or deactivated keys are rejected. The matched key's ``last_used_at`` is
-    refreshed as a side effect.
 
     Args:
         api_key: Value of the ``X-API-Key`` request header, if present.
@@ -54,35 +94,14 @@ def get_current_mfi(
     """
     if not api_key:
         raise AuthenticationError("Missing API key.")
-
-    record = (
-        db.query(ApiKey)
-        .filter_by(hashed_key=hash_api_key(api_key), is_active=True)
-        .one_or_none()
-    )
-    if record is None:
-        raise AuthenticationError("Invalid or inactive API key.")
-
-    record.last_used_at = datetime.now(UTC)
-    db.commit()
-    return record.mfi_account
+    return _mfi_from_key(api_key, db)
 
 
 def get_metered_mfi(
     mfi: MfiAccount = Depends(get_current_mfi),
     db: Session = Depends(get_db),
 ) -> MfiAccount:
-    """Authenticate, roll the billing period, and enforce the quota.
-
-    Use this in place of :func:`get_current_mfi` on metered endpoints: it
-    blocks (402) when the account has exhausted its monthly quota.
-
-    Args:
-        mfi: The authenticated account (from :func:`get_current_mfi`).
-        db: Request-scoped database session.
-
-    Returns:
-        The authenticated, quota-cleared :class:`MfiAccount`.
+    """Authenticate by API key, roll the billing period, enforce quota.
 
     Raises:
         QuotaExceededError: If the account is over its plan limit.
@@ -98,11 +117,6 @@ def get_current_agent(
 ) -> Agent:
     """Authenticate a dashboard session token and return the agent.
 
-    Reads the ``Authorization: Bearer <jwt>`` header, validates the token,
-    and loads the referenced :class:`~app.models.mfi.Agent`. A missing,
-    malformed, or expired token — or a subject that no longer maps to an
-    active account — is rejected.
-
     Args:
         credentials: The parsed bearer credentials, if present.
         db: Request-scoped database session.
@@ -116,36 +130,106 @@ def get_current_agent(
     """
     if credentials is None or not credentials.credentials:
         raise AuthenticationError("Missing bearer token.")
-
-    try:
-        claims = decode_access_token(credentials.credentials)
-        agent_id = uuid.UUID(claims["sub"])
-    except (jwt.InvalidTokenError, KeyError, ValueError):
-        raise AuthenticationError("Invalid or expired token.") from None
-
-    agent = db.get(Agent, agent_id)
-    if agent is None or agent.status != AgentStatus.ACTIVE:
-        raise AuthenticationError("Unknown or disabled account.")
-    return agent
+    return _agent_from_token(credentials.credentials, db)
 
 
 def require_manager(
     agent: Agent = Depends(get_current_agent),
 ) -> Agent:
-    """Authorize a manager-only action, returning the acting agent.
-
-    Use in place of :func:`get_current_agent` on endpoints reserved for
-    managers (review queue, report generation). Plain agents are refused.
-
-    Args:
-        agent: The authenticated agent (from :func:`get_current_agent`).
-
-    Returns:
-        The acting :class:`Agent`, guaranteed to hold a manager-level role.
+    """Authorize a manager-only, bearer-authenticated action.
 
     Raises:
         AuthorizationError: If the agent's role is below ``MANAGER``.
     """
-    if agent.role not in (AgentRole.MANAGER, AgentRole.ADMIN):
+    if agent.role not in _MANAGER_ROLES:
         raise AuthorizationError("This action requires a manager role.")
     return agent
+
+
+@dataclass
+class Principal:
+    """The authenticated caller behind a request.
+
+    Attributes:
+        mfi_account: The owning tenant, used for row-level scoping.
+        agent: The human agent, when the caller signed in via the
+            dashboard; ``None`` for a machine (API-key) caller.
+        is_manager: Whether the caller may perform manager-only actions
+            (any API-key caller, or an agent with a manager-level role).
+    """
+
+    mfi_account: MfiAccount
+    agent: Agent | None
+    is_manager: bool
+
+    @property
+    def actor_type(self) -> ActorType:
+        """The audit actor type for this caller."""
+        if self.agent is None:
+            return ActorType.SYSTEM
+        return _ROLE_TO_ACTOR[self.agent.role]
+
+    @property
+    def actor_id(self) -> str | None:
+        """The acting agent's id as a string, or ``None`` for a machine."""
+        return str(self.agent.id) if self.agent else None
+
+
+def get_principal(
+    api_key: str | None = Security(_api_key_header),
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Authenticate via bearer token or API key into a :class:`Principal`.
+
+    A dashboard bearer token takes precedence when both are present. The
+    API key is trusted as full tenant access (``is_manager=True``); a
+    bearer token carries the agent's own role.
+
+    Raises:
+        AuthenticationError: If neither credential is present or valid.
+    """
+    if credentials is not None and credentials.credentials:
+        agent = _agent_from_token(credentials.credentials, db)
+        return Principal(
+            mfi_account=agent.mfi_account,
+            agent=agent,
+            is_manager=agent.role in _MANAGER_ROLES,
+        )
+    if api_key:
+        return Principal(
+            mfi_account=_mfi_from_key(api_key, db),
+            agent=None,
+            is_manager=True,
+        )
+    raise AuthenticationError("Missing credentials.")
+
+
+def get_metered_principal(
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> Principal:
+    """Authenticate any caller, roll the billing period, enforce quota.
+
+    Raises:
+        QuotaExceededError: If the account is over its plan limit.
+    """
+    subscription.roll_period_if_needed(db, principal.mfi_account)
+    subscription.enforce_quota(principal.mfi_account)
+    return principal
+
+
+def require_manager_principal(
+    principal: Principal = Depends(get_principal),
+) -> Principal:
+    """Authorize a manager-level action by any authenticated caller.
+
+    Accepts an API-key caller (machine, full access) or a manager/admin
+    agent; a plain agent is refused.
+
+    Raises:
+        AuthorizationError: If the caller lacks manager authority.
+    """
+    if not principal.is_manager:
+        raise AuthorizationError("This action requires a manager role.")
+    return principal

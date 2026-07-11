@@ -10,11 +10,10 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_mfi
+from app.api.v1.deps import Principal, require_manager_principal
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
-from app.models import ComplianceReport, MfiAccount
-from app.models.enums import ActorType
+from app.models import ComplianceReport
 from app.schemas.report import ReportRequest, ReportSummary
 from app.services import audit, reporting
 
@@ -26,7 +25,7 @@ router = APIRouter(prefix="/kyc/reports", tags=["reports"])
 )
 def generate_report(
     payload: ReportRequest,
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
 ) -> ComplianceReport:
     """Generate a compliance report for the given period."""
@@ -36,15 +35,16 @@ def generate_report(
         )
     report = reporting.generate_report(
         db,
-        mfi_account_id=mfi.id,
+        mfi_account_id=principal.mfi_account.id,
         period_start=payload.period_start,
         period_end=payload.period_end,
     )
     audit.record(
         db,
-        mfi_account_id=mfi.id,
+        mfi_account_id=principal.mfi_account.id,
         action=audit.REPORT_GENERATED,
-        actor_type=ActorType.MANAGER,
+        actor_type=principal.actor_type,
+        actor_id=principal.actor_id,
         details={
             "period_start": str(report.period_start),
             "period_end": str(report.period_end),
@@ -56,13 +56,13 @@ def generate_report(
 
 @router.get("", response_model=list[ReportSummary])
 def list_reports(
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
 ) -> list[ComplianceReport]:
     """List the MFI's generated reports, newest first."""
     return (
         db.query(ComplianceReport)
-        .filter_by(mfi_account_id=mfi.id)
+        .filter_by(mfi_account_id=principal.mfi_account.id)
         .order_by(ComplianceReport.generated_at.desc())
         .all()
     )
@@ -71,13 +71,13 @@ def list_reports(
 @router.get("/{report_id}", response_model=ReportSummary)
 def get_report(
     report_id: uuid.UUID,
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
 ) -> ComplianceReport:
     """Fetch one of the MFI's compliance reports."""
     report = (
         db.query(ComplianceReport)
-        .filter_by(id=report_id, mfi_account_id=mfi.id)
+        .filter_by(id=report_id, mfi_account_id=principal.mfi_account.id)
         .one_or_none()
     )
     if report is None:

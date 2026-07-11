@@ -6,21 +6,30 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.security import create_access_token
 from app.models import AuditLog, DuplicateFlag, Verification
 from app.models.enums import (
     ActorType,
+    AgentRole,
     DuplicateResolution,
     SubmissionMethod,
     VerificationStatus,
 )
 from app.services import audit
-from tests.factories import create_mfi_with_key
+from tests.factories import create_agent, create_mfi_with_key
 
 REVIEWS_URL = "/api/v1/kyc/reviews"
 
 
 def _auth(key: str) -> dict[str, str]:
     return {"X-API-Key": key}
+
+
+def _bearer(db: Session, mfi, *, role: AgentRole, email: str):
+    """Create an agent with ``role`` and return (bearer headers, agent)."""
+    agent = create_agent(db, mfi, email=email, role=role)
+    token = create_access_token(subject=str(agent.id), role=role.value)
+    return {"Authorization": f"Bearer {token}"}, agent
 
 
 def _verification(
@@ -127,14 +136,17 @@ def test_approve_resolves_duplicate_flags(
 def test_decision_records_audit_entry(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """A review decision writes an audit-log entry by a MANAGER."""
-    account, key = create_mfi_with_key(db_session, usage=0)
+    """A review decision is attributed to the acting manager."""
+    account, _ = create_mfi_with_key(db_session, usage=0)
+    headers, manager = _bearer(
+        db_session, account, role=AgentRole.MANAGER, email="mgr@mfi.cm"
+    )
     verification = _verification(db_session, account.id, "C-1")
 
     api_client.post(
         f"{REVIEWS_URL}/{verification.id}/decision",
         json={"action": "reject", "reason": "BAD_DOCS"},
-        headers=_auth(key),
+        headers=headers,
     )
 
     entry = (
@@ -144,7 +156,30 @@ def test_decision_records_audit_entry(
     )
     assert entry.action == audit.REVIEW_REJECTED
     assert entry.actor_type is ActorType.MANAGER
+    assert entry.actor_id == str(manager.id)
     assert entry.details["reason"] == "BAD_DOCS"
+
+
+def test_plain_agent_is_forbidden_from_reviewing(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A non-manager agent cannot decide reviews (403)."""
+    account, _ = create_mfi_with_key(db_session, usage=0)
+    headers, _ = _bearer(
+        db_session, account, role=AgentRole.AGENT, email="agent@mfi.cm"
+    )
+    verification = _verification(db_session, account.id, "C-2")
+
+    resp = api_client.post(
+        f"{REVIEWS_URL}/{verification.id}/decision",
+        json={"action": "approve"},
+        headers=headers,
+    )
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "AUTHORIZATION_FAILED"
+    db_session.refresh(verification)
+    assert verification.status is VerificationStatus.PENDING
 
 
 def test_unknown_verification_is_404(
