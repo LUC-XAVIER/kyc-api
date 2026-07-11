@@ -67,10 +67,17 @@ def test_generate_snapshots_status_breakdown(
     assert body["status_breakdown"] == {
         "VERIFIED": 2, "REJECTED": 1, "PENDING": 1
     }
-    assert db_session.query(ComplianceReport).count() == 1
+    assert (
+        db_session.query(ComplianceReport)
+        .filter_by(mfi_account_id=account.id)
+        .count()
+        == 1
+    )
     assert (
         db_session.query(AuditLog)
-        .filter_by(action=audit.REPORT_GENERATED)
+        .filter_by(
+            mfi_account_id=account.id, action=audit.REPORT_GENERATED
+        )
         .count()
         == 1
     )
