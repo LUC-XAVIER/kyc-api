@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from app.api.v1.routes import (
     account,
+    auth,
     health,
     monitoring,
     reports,
@@ -18,6 +19,7 @@ from app.api.v1.routes import (
 
 api_router = APIRouter()
 api_router.include_router(health.router)
+api_router.include_router(auth.router)
 api_router.include_router(account.router)
 api_router.include_router(verify.router)
 api_router.include_router(reviews.router)

@@ -34,6 +34,13 @@ class AuthenticationError(KycError):
     code = "AUTHENTICATION_FAILED"
 
 
+class AuthorizationError(KycError):
+    """Raised when an authenticated caller lacks the required role."""
+
+    status_code = status.HTTP_403_FORBIDDEN
+    code = "AUTHORIZATION_FAILED"
+
+
 class ValidationError(KycError):
     """Raised when an inbound verification request is malformed."""
 
