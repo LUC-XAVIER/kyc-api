@@ -45,8 +45,11 @@ class Settings(BaseSettings):
     faiss_index_path: str = "faiss_index/index.faiss"
     antispoof_model_path: str = "models/antispoof_svm.pkl"
 
-    # --- CORS (dashboard origin) ---
-    cors_origins: list[str] = ["http://localhost:8501"]
+    # --- CORS (Angular dashboard dev-server origin) ---
+    cors_origins: list[str] = [
+        "http://localhost:4200",
+        "http://127.0.0.1:4200",
+    ]
 
     # --- Subscription enforcement (Design doc §6.2) ---
     quota_warning_ratio: float = 0.80
