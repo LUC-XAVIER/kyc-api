@@ -53,6 +53,17 @@
           <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export CSV</button>
         </div>
       }
+      @if (page() === 'agents') {
+        <div class="topbar__actions">
+          <input class="input" placeholder="Search agent" [value]="agentSearch()" (input)="agentSearch.set($any($event.target).value)" />
+          <button class="ox-btn ox-btn--primary" [disabled]="atAgentLimit()" (click)="openAddAgent()">+ Add agent</button>
+        </div>
+      }
+      @if (page() === 'apikeys') {
+        <div class="topbar__actions">
+          <button class="ox-btn ox-btn--primary" (click)="generateKey()">+ Generate new key</button>
+        </div>
+      }
     </header>
 
     <div class="content">
@@ -192,13 +203,242 @@
         </div>
       }
 
-      <!-- PLACEHOLDER (next slice) -->
-      @if (page() === 'reports' || page() === 'agents' || page() === 'apikeys' || page() === 'settings') {
-        <div class="ox-card coming-soon">
-          <div class="coming-soon__title">{{ title()[0] }}</div>
-          <p>This screen is being wired up in the next slice.</p>
+      <!-- REPORTS -->
+      @if (page() === 'reports') {
+        <div class="split">
+          <div class="ox-card report-form">
+            <div class="report-form__title">Report parameters</div>
+            <label class="input-label">Start date</label>
+            <input class="input input--block" type="date" [value]="reportStart()" (input)="reportStart.set($any($event.target).value)" />
+            <label class="input-label">End date</label>
+            <input class="input input--block" type="date" [value]="reportEnd()" (input)="reportEnd.set($any($event.target).value)" />
+            <label class="input-label">Branch</label>
+            <select class="input input--block" [value]="reportBranch()" (change)="reportBranch.set($any($event.target).value)">
+              <option>All branches</option>
+              @for (b of branches; track b.name) { <option>{{ b.name }}</option> }
+            </select>
+            <label class="input-label">Status filter</label>
+            <select class="input input--block" [value]="reportStatus()" (change)="reportStatus.set($any($event.target).value)">
+              <option>All statuses</option>
+              <option>Verified</option><option>Pending</option><option>Rejected</option><option>Approved</option>
+            </select>
+            <button class="ox-btn ox-btn--primary btn-block" [disabled]="reportGenerating()" (click)="generateReport()">
+              {{ reportGenerating() ? 'Generating…' : 'Generate report' }}
+            </button>
+            @if (reportGenerated()) {
+              <div class="ok-msg">✓ Report generated successfully</div>
+            }
+            <button class="ox-btn ox-btn--outline btn-block" [disabled]="!reportGenerated()" (click)="downloadReport()">Download PDF</button>
+          </div>
+
+          <div class="report-preview">
+            <div class="preview-label">Preview</div>
+            <div class="ox-card report-doc">
+              <div class="report-doc__head">
+                <div class="report-doc__brand"><div class="report-doc__logo">X</div><b>OPENXTECH</b></div>
+                <div class="report-doc__meta">Generated: 17 Jun 2026, 14:32<br />Report ID: RPT-2026-0617-003</div>
+              </div>
+              <div class="report-doc__title">KYC Compliance Report</div>
+              <div class="report-doc__sub">CamFinance Microfinance · Period: {{ reportStart() }} – {{ reportEnd() }} · {{ reportBranch() }}</div>
+              <div class="report-kpis">
+                <div class="report-kpi"><div class="report-kpi__n">1,284</div><div class="report-kpi__l">Total verifications</div></div>
+                <div class="report-kpi"><div class="report-kpi__n">1,174</div><div class="report-kpi__l">Verified</div></div>
+                <div class="report-kpi"><div class="report-kpi__n">74</div><div class="report-kpi__l">Pending</div></div>
+                <div class="report-kpi"><div class="report-kpi__n">36</div><div class="report-kpi__l">Rejected</div></div>
+              </div>
+              <div class="report-table__head"><div>CLIENT ID</div><div>DATE</div><div>BRANCH</div><div>STATUS</div></div>
+              @for (r of reportRows; track r.id) {
+                <div class="report-table__row"><div>{{ r.id }}</div><div>{{ r.date }}</div><div>{{ r.branch }}</div><div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div></div>
+              }
+              <div class="report-doc__foot"><span>Confidential — for COBAC audit purposes only</span><span>Page 1 of 24</span></div>
+            </div>
+          </div>
         </div>
+      }
+
+      <!-- AGENTS -->
+      @if (page() === 'agents') {
+        <div class="split">
+          <div class="ox-card table">
+            <div class="table__head table__row--agents"><div>AGENT</div><div>BRANCH</div><div>SUBMISSIONS</div><div>LAST ACTIVE</div><div>STATUS</div></div>
+            @for (a of agentList(); track a.agentId) {
+              <div class="table__row table__row--agents" [class.is-selected]="a.agentId === activeAgentId()" (click)="selectAgent(a.agentId)">
+                <div class="cell-client"><div class="avatar avatar--grey">{{ a.initials }}</div><span class="cell-client__id">{{ a.name }}</span></div>
+                <div class="cell-muted">{{ a.branch }}</div>
+                <div>{{ a.submissions }}</div>
+                <div class="cell-muted">{{ a.lastActive }}</div>
+                <div><span [class]="badgeClass(a.status)">● {{ a.status }}</span></div>
+              </div>
+            } @empty {
+              <div class="table__empty">No agents match your search.</div>
+            }
+          </div>
+
+          @if (activeAgent(); as a) {
+            <aside class="ox-card detail">
+              <div class="detail__row">
+                <div><div class="detail__id">{{ a.name }}</div><div class="detail__sub">{{ a.agentId }} · {{ a.branch }} branch</div></div>
+                <div class="toggle" [class.is-on]="a.active" (click)="toggleAgentActive()"><div class="toggle__knob"></div></div>
+              </div>
+              <div class="mini-stats">
+                <div class="mini-stat"><div class="mini-stat__n">{{ a.submissions }}</div><div class="mini-stat__l">Submissions</div></div>
+                <div class="mini-stat"><div class="mini-stat__n">{{ a.rate }}</div><div class="mini-stat__l">Verified rate</div></div>
+                <div class="mini-stat"><div class="mini-stat__n">{{ a.avgTime }}</div><div class="mini-stat__l">Avg. time</div></div>
+              </div>
+              <div class="kv"><span>Email</span><b>{{ a.email }}</b></div>
+              <div class="kv"><span>Branch</span><b>{{ a.branch }}</b></div>
+              <div class="kv kv--last"><span>Added</span><b>{{ a.added }}</b></div>
+              <div class="review-actions">
+                <button class="ox-btn ox-btn--outline" (click)="openEditAgent()">Edit</button>
+                <button class="ox-btn btn-reject" (click)="toggleAgentActive()">{{ a.active ? 'Disable' : 'Enable' }}</button>
+              </div>
+            </aside>
+          }
+        </div>
+        <div class="plan-note"><b>Plan limit:</b> Your Growth plan allows up to {{ planMaxAgents }} agent accounts. You are currently using {{ agentCount() }}.</div>
+      }
+
+      <!-- API KEYS -->
+      @if (page() === 'apikeys') {
+        <div class="info-banner">ℹ API keys let your internal software call <b>POST /kyc/verify</b> programmatically. Keep them secret — never expose them in client-side code or public repositories.</div>
+        @for (k of keys(); track k.id) {
+          <div class="ox-card key-card">
+            @if (k.fullKey) {
+              <div class="ok-msg key-reveal">New key — copy it now, it won't be shown again: <code>{{ k.fullKey }}</code></div>
+            }
+            <div class="key-card__head">
+              <div><div class="key-card__name">{{ k.name }}</div><div class="key-card__meta">Created {{ k.created }} · Last used {{ k.lastUsed }}</div></div>
+              <span class="ox-badge ox-badge--active">● Active</span>
+            </div>
+            <div class="key-value">
+              <code>{{ k.masked }}</code>
+              <button class="copy-btn" (click)="copyKey(k.id)">{{ k.copied ? 'Copied!' : 'Copy' }}</button>
+            </div>
+            <div class="key-stats">
+              <div><div class="key-stats__l">RATE LIMIT</div><div class="key-stats__v">{{ k.rateLimit }}</div></div>
+              <div><div class="key-stats__l">REQUESTS TODAY</div><div class="key-stats__v">{{ k.reqToday }}</div></div>
+              <div><div class="key-stats__l">THIS MONTH</div><div class="key-stats__v">{{ k.thisMonth }}</div></div>
+              <div><div class="key-stats__l">EXPIRES</div><div class="key-stats__v">{{ k.expires }}</div></div>
+            </div>
+            <div class="quota-bar"><div class="quota-bar__fill" [class.warn]="k.quotaPct > 50" [style.width.%]="k.quotaPct"></div></div>
+            <div class="review-actions">
+              <button class="ox-btn ox-btn--outline" (click)="rotateKey(k.id)">Rotate key</button>
+              <button class="ox-btn btn-reject" (click)="revokeKey(k.id)">Revoke</button>
+            </div>
+          </div>
+        }
+      }
+
+      <!-- SETTINGS -->
+      @if (page() === 'settings') {
+        <div class="split">
+          <div class="ox-card settings-tabs">
+            @for (t of settingsTabs; track t) {
+              <button class="settings-tab" [class.is-active]="settingsTab() === t" (click)="setSettingsTab(t)">{{ t }}</button>
+            }
+          </div>
+          <div class="settings-content">
+            @switch (settingsTab()) {
+              @case ('Subscription') {
+                <div class="plan-banner">
+                  <div class="plan-banner__row">
+                    <div><div class="plan-banner__name">Growth plan</div><div class="plan-banner__desc">1,000 verifications / month · 5 branches · 15 agents</div></div>
+                    <button class="ox-btn plan-banner__btn" (click)="goPricing()">Upgrade plan</button>
+                  </div>
+                  <div class="plan-banner__track"><div class="plan-banner__fill" [style.width.%]="84.7"></div></div>
+                  <div class="plan-banner__meta">847 / 1,000 verifications used this cycle · Renews 1 Jul 2026</div>
+                </div>
+              }
+              @case ('MFI profile') {
+                <div class="ox-card card--pad">
+                  <div class="section-label">MFI PROFILE</div>
+                  <label class="input-label">Institution name</label>
+                  <input class="input input--block" [value]="mfiName()" (input)="mfiName.set($any($event.target).value)" />
+                  <label class="input-label">Contact email</label>
+                  <input class="input input--block" [value]="contactEmail()" (input)="contactEmail.set($any($event.target).value)" />
+                  <label class="input-label">Phone number</label>
+                  <input class="input input--block" [value]="phone()" (input)="phone.set($any($event.target).value)" />
+                  <div class="pw-actions">
+                    <button class="ox-btn ox-btn--primary" (click)="saveSettings()">Save changes</button>
+                    @if (settingsSaved()) { <span class="saved-msg">✓ Saved</span> }
+                  </div>
+                </div>
+              }
+              @case ('Notifications') {
+                <div class="ox-card card--pad">
+                  <div class="section-label">NOTIFICATIONS</div>
+                  @for (n of notifDefs; track n.key) {
+                    <div class="notif-row">
+                      <div><div class="notif-row__title">{{ n.title }}</div><div class="notif-row__desc">{{ n.desc }}</div></div>
+                      <div class="toggle" [class.is-on]="notifs()[n.key]" (click)="toggleNotif(n.key)"><div class="toggle__knob"></div></div>
+                    </div>
+                  }
+                </div>
+              }
+              @case ('Security') {
+                <div class="ox-card card--pad">
+                  <div class="section-label">SECURITY</div>
+                  <p class="muted-p">Change your account password from the Profile screen. Two-factor authentication is coming soon.</p>
+                  <button class="ox-btn ox-btn--outline">Manage password</button>
+                </div>
+              }
+              @case ('Danger zone') {
+                <div class="ox-card card--pad danger">
+                  <div class="section-label section-label--danger">DANGER ZONE</div>
+                  <p class="muted-p">Deactivating the MFI account revokes all API keys and disables every agent. This cannot be undone.</p>
+                  <button class="ox-btn btn-reject">Deactivate account</button>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <!-- PRICING -->
+      @if (page() === 'pricing') {
+        <div class="pricing-head">
+          <div class="pricing-head__eyebrow">KYC API FOR MICROFINANCE INSTITUTIONS</div>
+          <div class="pricing-head__title">Subscription plans</div>
+          <div class="pricing-head__sub">Choose the verification volume that matches your institution's size and growth</div>
+        </div>
+        <div class="plans">
+          @for (p of plans; track p.name) {
+            <div class="plan-card" [class.plan-card--popular]="p.popular">
+              @if (p.popular) { <div class="plan-card__badge">Most popular</div> }
+              <div class="plan-card__name">{{ p.name }}</div>
+              <div class="plan-card__tag">{{ p.tagline }}</div>
+              <div class="plan-card__price">{{ p.price }}<span>{{ p.period }}</span></div>
+              <div class="plan-card__vol">{{ p.volume }}</div>
+              <button class="ox-btn plan-card__btn" [class.ox-btn--primary]="p.popular" [class.ox-btn--outline-red]="!p.popular">
+                {{ p.name === 'Enterprise' ? 'Contact sales' : 'Choose ' + p.name }}
+              </button>
+              <div class="plan-card__features">
+                @for (f of p.features; track f) { <div class="feature">✓ {{ f }}</div> }
+              </div>
+            </div>
+          }
+        </div>
+        <div class="pricing-back"><button class="link-btn" (click)="backToSettings()">← Back to Settings</button></div>
       }
     </div>
   </main>
+
+  <!-- ADD / EDIT AGENT MODAL -->
+  @if (agentModalOpen()) {
+    <div class="modal-overlay" (click)="closeAgentModal()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal__title">{{ agentForm().editingId ? 'Edit agent' : 'Add agent' }}</div>
+        <label class="input-label">Full name</label>
+        <input class="input input--block" [value]="agentForm().name" (input)="setAgentField('name', $any($event.target).value)" />
+        <label class="input-label">Email</label>
+        <input class="input input--block" type="email" [value]="agentForm().email" (input)="setAgentField('email', $any($event.target).value)" />
+        <label class="input-label">Branch</label>
+        <input class="input input--block" [value]="agentForm().branch" (input)="setAgentField('branch', $any($event.target).value)" />
+        <div class="modal__actions">
+          <button class="ox-btn ox-btn--outline" (click)="closeAgentModal()">Cancel</button>
+          <button class="ox-btn ox-btn--primary" (click)="saveAgent()">{{ agentForm().editingId ? 'Save' : 'Add agent' }}</button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

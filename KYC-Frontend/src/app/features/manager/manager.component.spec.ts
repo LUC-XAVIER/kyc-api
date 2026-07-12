@@ -56,4 +56,39 @@ describe('ManagerComponent', () => {
     spyOn(URL, 'revokeObjectURL');
     expect(() => component.exportHistoryCsv()).not.toThrow();
   });
+
+  it('adds an agent through the modal', () => {
+    const before = component.agentCount();
+    component.openAddAgent();
+    component.setAgentField('name', 'Test User');
+    component.setAgentField('email', 't@x.cm');
+    component.saveAgent();
+    expect(component.agentCount()).toBe(before + 1);
+    expect(component.agentModalOpen()).toBeFalse();
+  });
+
+  it('generates an API key revealed once, then revokes it', () => {
+    const before = component.keys().length;
+    component.generateKey();
+    expect(component.keys().length).toBe(before + 1);
+    const created = component.keys()[0];
+    expect(created.fullKey).toBeTruthy();
+    component.revokeKey(created.id);
+    expect(component.keys().some((k) => k.id === created.id)).toBeFalse();
+  });
+
+  it('switches settings tabs and navigates to/from pricing', () => {
+    component.setSettingsTab('Notifications');
+    expect(component.settingsTab()).toBe('Notifications');
+    component.goPricing();
+    expect(component.page()).toBe('pricing');
+    component.backToSettings();
+    expect(component.page()).toBe('settings');
+  });
+
+  it('toggles a notification preference', () => {
+    const before = component.notifs()['weekly'];
+    component.toggleNotif('weekly');
+    expect(component.notifs()['weekly']).toBe(!before);
+  });
 });
