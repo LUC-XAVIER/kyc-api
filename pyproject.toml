@@ -52,12 +52,6 @@ ml = [
     "mlflow>=2.13",
     "evidently>=0.4",
 ]
-# Streamlit dashboard (Phase 4), a separate process that calls the API.
-dashboard = [
-    "streamlit>=1.36",
-    "plotly>=5.22",
-    "httpx>=0.27",
-]
 # Tooling and tests.
 dev = [
     "pytest>=8.2",
