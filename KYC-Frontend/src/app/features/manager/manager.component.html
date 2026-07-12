@@ -1,0 +1,204 @@
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">X</div>
+      <div class="sidebar__brandname">Openxtech</div>
+    </div>
+
+    <div class="sidebar__section">OVERVIEW</div>
+    <button class="nav-item" [class.is-active]="page() === 'dashboard'" (click)="setPage('dashboard')">Dashboard</button>
+    <button class="nav-item" [class.is-active]="page() === 'review'" (click)="setPage('review')">Review queue</button>
+    <button class="nav-item" [class.is-active]="page() === 'history'" (click)="setPage('history')">History</button>
+    <button class="nav-item" [class.is-active]="page() === 'reports'" (click)="setPage('reports')">Reports</button>
+
+    <div class="sidebar__section sidebar__section--spaced">ACCOUNT</div>
+    <button class="nav-item" [class.is-active]="page() === 'agents'" (click)="setPage('agents')">Agents</button>
+    <button class="nav-item" [class.is-active]="page() === 'apikeys'" (click)="setPage('apikeys')">API keys</button>
+    <button class="nav-item" [class.is-active]="page() === 'settings'" (click)="setPage('settings')">Settings</button>
+
+    <div class="sidebar__spacer"></div>
+
+    <div class="sidebar__user">
+      <div class="avatar avatar--purple">EN</div>
+      <div>
+        <div class="sidebar__username">Eric Ngono</div>
+        <div class="sidebar__usermeta">Manager · CamFinance</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="topbar__title">{{ title()[0] }}</div>
+        <div class="topbar__subtitle">{{ title()[1] }}</div>
+      </div>
+
+      @if (page() === 'dashboard') {
+        <div class="topbar__actions">
+          <div class="pill-static">📅 Jun 1 – Jun 17, 2026</div>
+          <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export</button>
+        </div>
+      }
+      @if (page() === 'review') {
+        <div class="topbar__actions">
+          <input class="input" placeholder="Search client ID or name" [value]="reviewSearch()" (input)="reviewSearch.set($any($event.target).value)" />
+        </div>
+      }
+      @if (page() === 'history') {
+        <div class="topbar__actions">
+          <input class="input" placeholder="Search client ID or name" [value]="historySearch()" (input)="onHistorySearch($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export CSV</button>
+        </div>
+      }
+    </header>
+
+    <div class="content">
+      <!-- DASHBOARD -->
+      @if (page() === 'dashboard') {
+        <div class="kpi-grid">
+          <div class="ox-card kpi"><div class="kpi__label">TOTAL VERIFICATIONS</div><div class="kpi__value">1,284</div><div class="kpi__delta up">↑ 12% vs last period</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">VERIFIED</div><div class="kpi__value">91.4%</div><div class="kpi__delta up">↑ 2.1 pts</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">PENDING REVIEW</div><div class="kpi__value">5.8%</div><div class="kpi__delta warn">↑ 0.6 pts</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">AVG. PROCESSING TIME</div><div class="kpi__value">4.6s</div><div class="kpi__delta up">↓ 0.4s faster</div></div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="ox-card chart-card">
+            <div class="chart-card__title">Verifications per day</div>
+            <div class="chart-card__sub">Last 14 days, by status</div>
+            <div class="bars">
+              @for (d of dayBars(); track d.label) {
+                <div class="bars__col">
+                  <div class="bars__stack">
+                    <div class="seg seg--v" [style.height.%]="d.v"></div>
+                    <div class="seg seg--p" [style.height.%]="d.p"></div>
+                    <div class="seg seg--r" [style.height.%]="d.r"></div>
+                  </div>
+                  <div class="bars__label">{{ d.label }}</div>
+                </div>
+              }
+            </div>
+            <div class="legend">
+              <span><i class="dot dot--v"></i> Verified</span>
+              <span><i class="dot dot--p"></i> Pending</span>
+              <span><i class="dot dot--r"></i> Rejected</span>
+            </div>
+          </div>
+
+          <div class="ox-card chart-card">
+            <div class="chart-card__title">Status breakdown</div>
+            <div class="chart-card__sub">Selected period</div>
+            <div class="donut" [style.background]="donutBg"><div class="donut__hole"></div></div>
+            <div class="kv"><span><i class="dot dot--v"></i> Verified</span><b>91.4%</b></div>
+            <div class="kv"><span><i class="dot dot--p"></i> Pending</span><b>5.8%</b></div>
+            <div class="kv kv--last"><span><i class="dot dot--r"></i> Rejected</span><b>2.8%</b></div>
+          </div>
+        </div>
+
+        <div class="ox-card chart-card">
+          <div class="chart-card__title">Verifications by branch</div>
+          <div class="chart-card__sub">Selected period</div>
+          @for (b of branches; track b.name) {
+            <div class="branch-row">
+              <div class="branch-row__name">{{ b.name }}</div>
+              <div class="branch-row__track"><div class="branch-row__fill" [style.width.%]="b.pct"></div></div>
+              <div class="branch-row__value">{{ b.value }}</div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- REVIEW QUEUE -->
+      @if (page() === 'review') {
+        <div class="filter-tabs">
+          <button class="filter-tab" [class.is-active]="reviewReason() === 'all'" (click)="setReviewReason('all')">All <span class="count-pill">{{ queueCount() }}</span></button>
+          <button class="filter-tab" [class.is-active]="reviewReason() === 'Duplicate'" (click)="setReviewReason('Duplicate')">Duplicate flagged</button>
+          <button class="filter-tab" [class.is-active]="reviewReason() === 'Low confidence'" (click)="setReviewReason('Low confidence')">Low confidence</button>
+        </div>
+
+        <div class="split">
+          <div class="ox-card table">
+            <div class="table__head table__row--review"><div>CLIENT</div><div>REASON</div><div>SCORE</div><div>SUBMITTED</div></div>
+            @for (c of queueCases(); track c.id) {
+              <div class="table__row table__row--review" [class.is-selected]="c.id === activeCaseId()" (click)="selectCase(c.id)">
+                <div class="cell-client"><div class="avatar avatar--grey">{{ c.initials }}</div><span class="cell-client__id">{{ c.name }}</span></div>
+                <div><span class="ox-badge ox-badge--pending">● {{ c.reason }}</span></div>
+                <div class="cell-strong">{{ c.score }}</div>
+                <div class="cell-muted">{{ c.submitted }}</div>
+              </div>
+            } @empty {
+              <div class="table__empty">All caught up — no cases pending review.</div>
+            }
+          </div>
+
+          @if (activeCase(); as c) {
+            <aside class="ox-card detail">
+              <div class="detail__id">{{ c.name }}</div>
+              <div class="detail__sub">Client {{ c.client }} · Agent {{ c.agent }}</div>
+              <div class="detail__thumbs">
+                <div class="thumb">📷<span>Selfie capture</span></div>
+                <div class="thumb">📄<span>NIC photo</span></div>
+              </div>
+              <div class="kv"><span>Face match score</span><b class="text-green">{{ c.faceMatch }}</b></div>
+              <div class="kv"><span>Liveness check</span><b>Passed</b></div>
+              <div class="kv"><span>OCR confidence</span><b>{{ c.ocr }}</b></div>
+              <div class="kv kv--last"><span>Duplicate similarity</span><b class="text-red">{{ c.dupSim }}</b></div>
+              @if (c.dupWarning) {
+                <div class="warn-box">⚠ {{ c.dupWarning }}</div>
+              }
+              <div class="review-actions">
+                <button class="ox-btn btn-approve" (click)="resolveCase()">Approve</button>
+                <button class="ox-btn btn-reject" (click)="resolveCase()">Reject</button>
+              </div>
+            </aside>
+          }
+        </div>
+      }
+
+      <!-- HISTORY -->
+      @if (page() === 'history') {
+        <div class="history-tabbar">
+          <div class="filter-tabs">
+            @for (s of historyStatuses; track s) {
+              <button class="filter-tab" [class.is-active]="historyStatus() === s" (click)="setHistoryStatus(s)">{{ s }}</button>
+            }
+          </div>
+          <div class="history-count">{{ historyFiltered().length }} records</div>
+        </div>
+
+        <div class="ox-card table">
+          <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div></div>
+          @for (r of historyPaged(); track r.id) {
+            <div class="table__row table__row--history">
+              <div class="cell-link">{{ r.id }}</div><div>{{ r.name }}</div><div class="cell-muted">{{ r.date }}</div><div class="cell-muted">{{ r.branch }}</div><div class="cell-muted">{{ r.agent }}</div>
+              <div><span class="chip">{{ r.channel }}</span></div>
+              <div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div>
+              <div class="cell-strong">{{ r.score }}</div>
+            </div>
+          } @empty {
+            <div class="table__empty">No records match this filter.</div>
+          }
+        </div>
+
+        <div class="pager">
+          <button class="pager__btn" [disabled]="historyPage() === 1" (click)="goToPage(historyPage() - 1)">‹</button>
+          @for (p of historyPages(); track p) {
+            <button class="pager__btn" [class.is-active]="p === historyPage()" (click)="goToPage(p)">{{ p }}</button>
+          }
+          <button class="pager__btn" [disabled]="historyPage() === historyPageCount()" (click)="goToPage(historyPage() + 1)">›</button>
+        </div>
+      }
+
+      <!-- PLACEHOLDER (next slice) -->
+      @if (page() === 'reports' || page() === 'agents' || page() === 'apikeys' || page() === 'settings') {
+        <div class="ox-card coming-soon">
+          <div class="coming-soon__title">{{ title()[0] }}</div>
+          <p>This screen is being wired up in the next slice.</p>
+        </div>
+      }
+    </div>
+  </main>
+</div>
