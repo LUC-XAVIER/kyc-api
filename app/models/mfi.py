@@ -74,10 +74,12 @@ class Agent(UUIDMixin, TimestampMixin, Base):
     )
     full_name: Mapped[str] = mapped_column(String(255))
     branch: Mapped[str | None] = mapped_column(String(255))
-    # Login credentials for the management dashboard. Nullable so agents
-    # provisioned before dashboard access exist without a password; both
-    # are required to authenticate (enforced at the login endpoint).
+    # Login identity. Managers sign in with their email, agents with their
+    # phone number; both are unique and nullable so an account carries only
+    # the identifier its role uses. ``hashed_password`` stores the bcrypt
+    # hash of the 6-8 char PIN (the shared credential for both roles).
     email: Mapped[str | None] = mapped_column(String(255), unique=True)
+    phone: Mapped[str | None] = mapped_column(String(32), unique=True)
     hashed_password: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[AgentRole] = mapped_column(
         Enum(AgentRole, name="agent_role"), default=AgentRole.AGENT

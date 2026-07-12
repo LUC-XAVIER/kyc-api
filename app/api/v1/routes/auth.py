@@ -7,6 +7,7 @@ used by MFIs' own software.
 """
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_current_agent
@@ -27,10 +28,10 @@ def login(
 ) -> TokenResponse:
     """Authenticate a staff member and issue a session token.
 
-    Verifies the email/password pair against the agent record and, on
-    success, mints a JWT carrying the agent's id and role. Unknown emails,
-    wrong passwords, and disabled accounts all return the same generic
-    error so the endpoint cannot be used to enumerate accounts.
+    Looks the account up by email or phone, verifies the PIN, and mints a
+    JWT carrying the agent's id and role. Unknown identifiers, wrong PINs,
+    and disabled accounts all return the same generic error so the endpoint
+    cannot be used to enumerate accounts.
 
     Args:
         payload: The submitted email and password.
@@ -44,16 +45,23 @@ def login(
             is disabled.
     """
     agent = (
-        db.query(Agent).filter_by(email=payload.email).one_or_none()
+        db.query(Agent)
+        .filter(
+            or_(
+                Agent.email == payload.identifier,
+                Agent.phone == payload.identifier,
+            )
+        )
+        .one_or_none()
     )
     if (
         agent is None
         or not agent.hashed_password
-        or not verify_password(payload.password, agent.hashed_password)
+        or not verify_password(payload.pin, agent.hashed_password)
     ):
-        raise AuthenticationError("Invalid email or password.")
+        raise AuthenticationError("Invalid credentials.")
     if agent.status != AgentStatus.ACTIVE:
-        raise AuthenticationError("Invalid email or password.")
+        raise AuthenticationError("Invalid credentials.")
 
     token = create_access_token(
         subject=str(agent.id), role=agent.role.value
@@ -78,6 +86,7 @@ def read_me(agent: Agent = Depends(get_current_agent)) -> AgentProfile:
         agent_id=agent.id,
         full_name=agent.full_name,
         email=agent.email,
+        phone=agent.phone,
         role=agent.role,
         branch=agent.branch,
         mfi_account_id=agent.mfi_account_id,

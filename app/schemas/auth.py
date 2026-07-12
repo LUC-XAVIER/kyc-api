@@ -8,10 +8,14 @@ from app.models.enums import AgentRole
 
 
 class LoginRequest(BaseModel):
-    """Credentials posted by a staff member at the dashboard login."""
+    """Credentials posted at the dashboard login.
 
-    email: str
-    password: str
+    ``identifier`` is the manager's email or the agent's phone number;
+    ``pin`` is the 6-8 character PIN shared by both roles.
+    """
+
+    identifier: str
+    pin: str
 
 
 class TokenResponse(BaseModel):
@@ -36,6 +40,7 @@ class AgentProfile(BaseModel):
     agent_id: uuid.UUID
     full_name: str
     email: str | None
+    phone: str | None
     role: AgentRole
     branch: str | None
     mfi_account_id: uuid.UUID

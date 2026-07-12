@@ -60,26 +60,26 @@ def test_valid_key_returns_account_summary(
     assert body["current_period_usage"] == 0
 
 
-# --- Dashboard staff login (email/password -> JWT) ----------------------
+# --- Dashboard login (email or phone + PIN -> JWT) ----------------------
 
 
-def test_login_success_returns_token_and_identity(
+def test_manager_logs_in_by_email(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """Valid credentials return a bearer token carrying id and role."""
+    """A manager signs in with email + PIN and gets an identity token."""
     mfi, _ = create_mfi_with_key(db_session)
     agent = create_agent(
         db_session,
         mfi,
         email="manager@mfi.cm",
-        password="s3cret-pass",
+        pin="483920",
         role=AgentRole.MANAGER,
         full_name="Eric Ngono",
     )
 
     resp = api_client.post(
         LOGIN_URL,
-        json={"email": "manager@mfi.cm", "password": "s3cret-pass"},
+        json={"identifier": "manager@mfi.cm", "pin": "483920"},
     )
 
     assert resp.status_code == 200
@@ -94,27 +94,42 @@ def test_login_success_returns_token_and_identity(
     assert claims["role"] == "MANAGER"
 
 
-def test_login_wrong_password_is_unauthorized(
+def test_agent_logs_in_by_phone(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """A wrong password returns the generic 401 envelope."""
+    """An agent signs in with their phone number + PIN."""
     mfi, _ = create_mfi_with_key(db_session)
-    create_agent(db_session, mfi, email="a@mfi.cm", password="right")
+    create_agent(db_session, mfi, phone="699112233", pin="778899")
 
     resp = api_client.post(
-        LOGIN_URL, json={"email": "a@mfi.cm", "password": "wrong"}
+        LOGIN_URL, json={"identifier": "699112233", "pin": "778899"}
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["role"] == "AGENT"
+
+
+def test_login_wrong_pin_is_unauthorized(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A wrong PIN returns the generic 401 envelope."""
+    mfi, _ = create_mfi_with_key(db_session)
+    create_agent(db_session, mfi, phone="699000111", pin="123456")
+
+    resp = api_client.post(
+        LOGIN_URL, json={"identifier": "699000111", "pin": "000000"}
     )
 
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "AUTHENTICATION_FAILED"
 
 
-def test_login_unknown_email_is_unauthorized(
+def test_login_unknown_identifier_is_unauthorized(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """An unknown email returns the same generic 401 (no enumeration)."""
+    """An unknown identifier returns the same generic 401 (no enum)."""
     resp = api_client.post(
-        LOGIN_URL, json={"email": "nobody@mfi.cm", "password": "x"}
+        LOGIN_URL, json={"identifier": "nobody@mfi.cm", "pin": "123456"}
     )
     assert resp.status_code == 401
 
@@ -122,14 +137,14 @@ def test_login_unknown_email_is_unauthorized(
 def test_login_disabled_account_is_unauthorized(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """A disabled agent cannot log in even with the right password."""
+    """A disabled agent cannot log in even with the right PIN."""
     mfi, _ = create_mfi_with_key(db_session)
-    agent = create_agent(db_session, mfi, email="d@mfi.cm", password="pw")
+    agent = create_agent(db_session, mfi, phone="699222333", pin="123456")
     agent.status = AgentStatus.DISABLED
     db_session.flush()
 
     resp = api_client.post(
-        LOGIN_URL, json={"email": "d@mfi.cm", "password": "pw"}
+        LOGIN_URL, json={"identifier": "699222333", "pin": "123456"}
     )
     assert resp.status_code == 401
 

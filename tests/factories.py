@@ -1,5 +1,6 @@
 """Helpers to seed test data into a (rolled-back) database session."""
 
+import itertools
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -7,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.security import generate_api_key, hash_password
 from app.models import Agent, ApiKey, MfiAccount, SubscriptionPlan
 from app.models.enums import AgentRole, PlanName
+
+_IDENT_SEQ = itertools.count(1)
 
 
 def create_mfi_with_key(
@@ -58,19 +61,24 @@ def create_agent(
     db: Session,
     mfi: MfiAccount,
     *,
-    email: str = "agent@example.com",
-    password: str = "password123",
+    email: str | None = None,
+    phone: str | None = None,
+    pin: str = "123456",
     role: AgentRole = AgentRole.AGENT,
     full_name: str = "Test Agent",
     branch: str = "Central",
 ) -> Agent:
     """Create a login-capable agent under ``mfi``.
 
+    Managers sign in by email, agents by phone; if neither is given a
+    unique one is generated for the role so callers can seed many agents.
+
     Args:
         db: An open session (caller owns rollback/cleanup).
         mfi: The owning account the agent belongs to.
-        email: Login email (unique).
-        password: Plaintext password; stored hashed.
+        email: Manager login email (unique).
+        phone: Agent login phone (unique).
+        pin: Plaintext PIN; stored hashed.
         role: The agent's dashboard role.
         full_name: Display name.
         branch: Branch label.
@@ -78,12 +86,19 @@ def create_agent(
     Returns:
         The flushed :class:`~app.models.mfi.Agent`.
     """
+    if email is None and phone is None:
+        seq = next(_IDENT_SEQ)
+        if role in (AgentRole.MANAGER, AgentRole.ADMIN):
+            email = f"staff{seq}@example.com"
+        else:
+            phone = f"6{seq:08d}"
     agent = Agent(
         mfi_account_id=mfi.id,
         full_name=full_name,
         branch=branch,
         email=email,
-        hashed_password=hash_password(password),
+        phone=phone,
+        hashed_password=hash_password(pin),
         role=role,
     )
     db.add(agent)
