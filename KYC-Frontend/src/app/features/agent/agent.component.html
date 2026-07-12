@@ -1,0 +1,291 @@
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">X</div>
+      <div class="sidebar__brandname">Openxtech</div>
+    </div>
+
+    <div class="sidebar__section">VERIFICATION</div>
+    <button
+      class="nav-item"
+      [class.is-active]="page() === 'new'"
+      (click)="setPage('new')"
+    >
+      New Verification
+    </button>
+    <button
+      class="nav-item"
+      [class.is-active]="page() === 'submissions'"
+      (click)="setPage('submissions')"
+    >
+      My Submissions
+    </button>
+
+    <div class="sidebar__section sidebar__section--spaced">ACCOUNT</div>
+    <button
+      class="nav-item"
+      [class.is-active]="page() === 'profile'"
+      (click)="setPage('profile')"
+    >
+      Profile
+    </button>
+
+    <div class="sidebar__spacer"></div>
+
+    <div class="sidebar__user">
+      <div class="avatar avatar--purple">JM</div>
+      <div>
+        <div class="sidebar__username">Jeanne Mbarga</div>
+        <div class="sidebar__usermeta">Agent · CamFinance Yaoundé</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div>
+        <div class="topbar__title">{{ title()[0] }}</div>
+        <div class="topbar__subtitle">{{ title()[1] }}</div>
+      </div>
+
+      @if (page() === 'submissions') {
+        <div class="topbar__actions">
+          <input
+            class="input"
+            placeholder="Search client ID or name"
+            [value]="search()"
+            (input)="search.set($any($event.target).value)"
+          />
+          <div class="pill-static">📅 Jun 1 – Jun 17, 2026</div>
+        </div>
+      }
+    </header>
+
+    <div class="content">
+      <!-- NEW VERIFICATION -->
+      @if (page() === 'new') {
+        <section class="ox-card card--form">
+          <div class="section-label">CLIENT INFORMATION</div>
+          <div class="field-row">
+            <div class="field">
+              <label>Client ID <span class="req">*</span></label>
+              <div class="field__value">CLT-00482</div>
+            </div>
+            <div class="field">
+              <label>Agent ID</label>
+              <div class="field__value field__value--muted">
+                AGT-014 (auto-filled)
+              </div>
+            </div>
+          </div>
+          <hr class="divider" />
+
+          <div class="section-label">CAPTURE DOCUMENTS</div>
+          <div class="doc-grid">
+            @for (doc of docKeys; track doc) {
+              <div
+                class="doc-box"
+                [class.doc-box--captured]="isCaptured(doc)"
+                (click)="toggleDoc(doc)"
+              >
+                <div class="doc-box__icon">
+                  {{ isCaptured(doc) ? '✓' : '📷' }}
+                </div>
+                <div class="doc-box__title">{{ docLabel(doc) }}</div>
+                <div class="doc-box__btn">
+                  {{ isCaptured(doc) ? 'Retake photo' : 'Open camera' }}
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="note">
+            ℹ Camera capture only — file upload is disabled to ensure live,
+            on-the-spot identity capture.
+          </div>
+
+          <div class="form-actions">
+            <button class="ox-btn ox-btn--outline" (click)="resetForm()">
+              Cancel
+            </button>
+            <button
+              class="ox-btn ox-btn--primary"
+              [disabled]="!allCaptured() || verifying()"
+              (click)="verify()"
+            >
+              {{ verifying() ? 'Verifying…' : 'Verify identity' }}
+            </button>
+          </div>
+        </section>
+
+        @if (verified()) {
+          <section class="result-banner">
+            <div class="result-banner__icon">✓</div>
+            <div>
+              <div class="result-banner__title">VERIFIED — confidence 96%</div>
+              <div class="result-banner__meta">
+                FOTSO Jean-Pierre · ID 118-220-441 · processed in 4.2s · no
+                duplicate found
+              </div>
+            </div>
+          </section>
+        }
+      }
+
+      <!-- MY SUBMISSIONS -->
+      @if (page() === 'submissions') {
+        <div class="filter-tabs">
+          <button
+            class="filter-tab"
+            [class.is-active]="filter() === 'all'"
+            (click)="setFilter('all')"
+          >
+            All ({{ counts().all }})
+          </button>
+          <button
+            class="filter-tab"
+            [class.is-active]="filter() === 'Verified'"
+            (click)="setFilter('Verified')"
+          >
+            Verified ({{ counts().Verified }})
+          </button>
+          <button
+            class="filter-tab"
+            [class.is-active]="filter() === 'Pending'"
+            (click)="setFilter('Pending')"
+          >
+            Pending ({{ counts().Pending }})
+          </button>
+          <button
+            class="filter-tab"
+            [class.is-active]="filter() === 'Rejected'"
+            (click)="setFilter('Rejected')"
+          >
+            Rejected ({{ counts().Rejected }})
+          </button>
+        </div>
+
+        <div class="split">
+          <div class="ox-card table">
+            <div class="table__head table__row--sub">
+              <div>CLIENT</div>
+              <div>DATE</div>
+              <div>STATUS</div>
+              <div>SCORE</div>
+            </div>
+            @for (s of filtered(); track s.id) {
+              <div
+                class="table__row table__row--sub"
+                [class.is-selected]="s.id === selectedId()"
+                (click)="selectedId.set(s.id)"
+              >
+                <div class="cell-client">
+                  <div class="avatar avatar--grey">{{ s.initials }}</div>
+                  <span class="cell-client__id">{{ s.id }}</span>
+                </div>
+                <div class="cell-muted">{{ s.date }}</div>
+                <div>
+                  <span [class]="badgeClass(s.status)">● {{ s.status }}</span>
+                </div>
+                <div class="cell-strong">{{ s.score }}</div>
+              </div>
+            } @empty {
+              <div class="table__empty">No submissions match this filter.</div>
+            }
+          </div>
+
+          @if (selected(); as sel) {
+            <aside class="ox-card detail">
+              <div class="detail__head">
+                <div class="detail__id">{{ sel.id }}</div>
+                <span [class]="badgeClass(sel.status)">● {{ sel.status }}</span>
+              </div>
+              <div class="detail__sub">Submitted {{ sel.date }}</div>
+              <div class="detail__thumbs">
+                <div class="thumb">📷<span>ID front</span></div>
+                <div class="thumb">📷<span>ID back</span></div>
+                <div class="thumb">👤<span>Selfie</span></div>
+              </div>
+              <div class="kv"><span>Client name (OCR)</span><b>{{ sel.name }}</b></div>
+              <div class="kv">
+                <span>Face match score</span
+                ><b class="text-green">{{ sel.faceMatch }}</b>
+              </div>
+              <div class="kv"><span>Liveness check</span><b>Passed</b></div>
+              <div class="kv kv--last">
+                <span>Processing time</span><b>{{ sel.time }}</b>
+              </div>
+            </aside>
+          }
+        </div>
+      }
+
+      <!-- PROFILE -->
+      @if (page() === 'profile') {
+        <div class="split">
+          <div class="ox-card profile-card">
+            <div class="avatar avatar--purple avatar--lg">JM</div>
+            <div class="profile-card__name">Jeanne Mbarga</div>
+            <div class="profile-card__role">Field Agent</div>
+            <span class="ox-badge ox-badge--active">Active</span>
+            <div class="stat-grid">
+              <div class="stat"><div class="stat__n">142</div><div class="stat__l">Total submissions</div></div>
+              <div class="stat"><div class="stat__n">94%</div><div class="stat__l">Verified rate</div></div>
+              <div class="stat"><div class="stat__n">4.3s</div><div class="stat__l">Avg. processing</div></div>
+              <div class="stat"><div class="stat__n">3</div><div class="stat__l">Pending review</div></div>
+            </div>
+          </div>
+
+          <div class="profile-right">
+            <div class="ox-card card--pad">
+              <div class="section-label">ACCOUNT INFORMATION</div>
+              <div class="kv"><span>Full name</span><b>Jeanne Mbarga</b></div>
+              <div class="kv"><span>Agent ID</span><b>AGT-014</b></div>
+              <div class="kv"><span>Email</span><b>j.mbarga&#64;camfinance.cm</b></div>
+              <div class="kv"><span>Branch</span><b>Mvog-Ada, Yaoundé</b></div>
+              <div class="kv kv--last"><span>MFI account</span><b>CamFinance Microfinance</b></div>
+            </div>
+
+            <div class="ox-card card--pad">
+              <div class="section-label">SECURITY</div>
+              <label class="input-label">Current password</label>
+              <input
+                class="input input--block"
+                type="password"
+                [value]="curPw()"
+                (input)="curPw.set($any($event.target).value)"
+              />
+              <label class="input-label">New password</label>
+              <input
+                class="input input--block"
+                type="password"
+                placeholder="Enter new password"
+                [value]="newPw()"
+                (input)="newPw.set($any($event.target).value)"
+              />
+              <label class="input-label">Confirm new password</label>
+              <input
+                class="input input--block"
+                type="password"
+                placeholder="Confirm new password"
+                [value]="confirmPw()"
+                (input)="confirmPw.set($any($event.target).value)"
+              />
+              <div class="pw-actions">
+                <button class="ox-btn ox-btn--primary" (click)="updatePassword()">
+                  Update password
+                </button>
+                @if (pwSaved()) {
+                  <span class="saved-msg">✓ Password updated</span>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </main>
+</div>
