@@ -34,11 +34,12 @@
     <div class="sidebar__spacer"></div>
 
     <div class="sidebar__user">
-      <div class="avatar avatar--purple">JM</div>
-      <div>
-        <div class="sidebar__username">Jeanne Mbarga</div>
+      <div class="avatar avatar--purple">{{ userInitials() }}</div>
+      <div class="sidebar__userinfo">
+        <div class="sidebar__username">{{ user()?.full_name || 'Agent' }}</div>
         <div class="sidebar__usermeta">Agent · CamFinance Yaoundé</div>
       </div>
+      <button class="logout-btn" title="Log out" (click)="logout()">⎋</button>
     </div>
   </aside>
 

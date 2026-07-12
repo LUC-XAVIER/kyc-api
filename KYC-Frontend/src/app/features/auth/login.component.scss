@@ -1,0 +1,148 @@
+.login {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* ---- Brand panel ---- */
+.login__brand {
+  flex: 1;
+  background: var(--ox-navy);
+  color: #fff;
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+
+  &__logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: var(--ox-red);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+  }
+}
+.brand-copy {
+  h1 {
+    font-size: 40px;
+    margin: 0 0 12px;
+  }
+  p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+    max-width: 420px;
+  }
+}
+.brand-foot {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ---- Form panel ---- */
+.login__main {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background: var(--ox-bg);
+}
+.actor-switch {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ox-muted);
+  b {
+    color: var(--ox-red);
+  }
+}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: #fff;
+  border: 1px solid var(--ox-border);
+  border-radius: 14px;
+  padding: 32px;
+
+  &__brand {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+  &__title {
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+  &__sub {
+    font-size: 13px;
+    color: var(--ox-muted);
+    margin: 0 0 24px;
+    line-height: 1.5;
+  }
+}
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.field {
+  width: 100%;
+  border: 1px solid var(--ox-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  margin-bottom: 16px;
+  &:focus {
+    border-color: var(--ox-red);
+  }
+}
+.login-error {
+  background: var(--ox-reject-soft);
+  color: var(--ox-reject-text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.login-submit {
+  width: 100%;
+  padding: 12px;
+}
+
+/* ---- Responsive: stack, drop the brand panel ---- */
+@media (max-width: 800px) {
+  .login__brand {
+    display: none;
+  }
+  .login-card__brand {
+    display: flex;
+  }
+  .actor-switch {
+    top: 16px;
+    right: 16px;
+  }
+}

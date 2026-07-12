@@ -1,4 +1,6 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+
+import { AuthService } from '../../core/auth.service';
 
 type ManagerPage =
   | 'dashboard'
@@ -173,6 +175,24 @@ const SETTINGS_TABS: SettingsTab[] = [
   styleUrl: './manager.component.scss',
 })
 export class ManagerComponent {
+  private readonly auth = inject(AuthService);
+  readonly user = this.auth.principal;
+  readonly userInitials = computed(() => {
+    const name = this.user()?.full_name ?? '';
+    return (
+      name
+        .split(/\s+/)
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'M'
+    );
+  });
+
+  logout(): void {
+    this.auth.logout();
+  }
+
   readonly page = signal<ManagerPage>('dashboard');
 
   // Review queue

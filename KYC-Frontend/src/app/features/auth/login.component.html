@@ -1,0 +1,73 @@
+<div class="login">
+  <!-- Brand panel (hidden on small screens) -->
+  <div class="login__brand">
+    <div class="brand-mark">
+      <div class="brand-mark__logo">X</div>
+      <span>Openxtech</span>
+    </div>
+    <div class="brand-copy">
+      <h1>KYC-API</h1>
+      <p>Automated biometric identity verification for Cameroonian
+        microfinance institutions.</p>
+    </div>
+    <div class="brand-foot">COBAC-compliant · Face match · Liveness · OCR</div>
+  </div>
+
+  <!-- Form panel -->
+  <div class="login__main">
+    <button type="button" class="actor-switch" (click)="toggleActor()">
+      @if (actor() === 'manager') {
+        Are you an agent? <b>Sign in here →</b>
+      } @else {
+        <b>← Manager sign in</b>
+      }
+    </button>
+
+    <form class="login-card" (submit)="$event.preventDefault(); submit()">
+      <div class="login-card__brand">
+        <div class="brand-mark__logo">X</div><span>Openxtech</span>
+      </div>
+
+      <h2 class="login-card__title">
+        {{ actor() === 'manager' ? 'Manager sign in' : 'Agent sign in' }}
+      </h2>
+      <p class="login-card__sub">
+        {{ actor() === 'manager'
+          ? 'Access the review queue, reports, and account settings.'
+          : 'Sign in to submit and track KYC verifications.' }}
+      </p>
+
+      <label class="field-label">Email</label>
+      <input
+        class="field"
+        type="email"
+        autocomplete="username"
+        placeholder="you@mfi.cm"
+        [value]="email()"
+        (input)="email.set($any($event.target).value)"
+      />
+
+      <label class="field-label">Password</label>
+      <input
+        class="field"
+        type="password"
+        autocomplete="current-password"
+        placeholder="••••••••"
+        [value]="password()"
+        (input)="password.set($any($event.target).value)"
+      />
+
+      @if (error()) {
+        <div class="login-error">{{ error() }}</div>
+      }
+
+      <button
+        type="submit"
+        class="ox-btn ox-btn--primary login-submit"
+        [disabled]="loading()"
+      >
+        {{ loading() ? 'Signing in…' : 'Sign in' }}
+      </button>
+    </form>
+  </div>
+</div>

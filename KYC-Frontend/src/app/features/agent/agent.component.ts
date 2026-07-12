@@ -1,4 +1,6 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+
+import { AuthService } from '../../core/auth.service';
 
 type AgentPage = 'new' | 'submissions' | 'profile';
 type SubStatus = 'Verified' | 'Pending' | 'Rejected';
@@ -37,6 +39,24 @@ const SUBMISSIONS: Submission[] = [
   styleUrl: './agent.component.scss',
 })
 export class AgentComponent {
+  private readonly auth = inject(AuthService);
+  readonly user = this.auth.principal;
+  readonly userInitials = computed(() => {
+    const name = this.user()?.full_name ?? '';
+    return (
+      name
+        .split(/\s+/)
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'A'
+    );
+  });
+
+  logout(): void {
+    this.auth.logout();
+  }
+
   readonly docKeys: DocKey[] = ['front', 'back', 'selfie'];
 
   readonly page = signal<AgentPage>('new');

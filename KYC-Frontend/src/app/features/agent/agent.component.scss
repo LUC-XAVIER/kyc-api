@@ -538,3 +538,40 @@
   font-size: 13px;
   font-weight: 600;
 }
+
+/* ---- User footer + logout ---- */
+.sidebar__userinfo { flex: 1; min-width: 0; }
+.logout-btn { background: transparent; border: none; color: rgba(255, 255, 255, 0.5); font-size: 16px; cursor: pointer; padding: 4px 8px; &:hover { color: #fff; } }
+
+/* ---- Responsive (mobile-first agent, per request) ---- */
+@media (max-width: 860px) {
+  .layout { flex-direction: column; }
+  .sidebar {
+    width: 100%; flex-direction: row; align-items: center; height: auto;
+    padding: 8px 12px; gap: 4px; overflow-x: auto;
+  }
+  .sidebar__brand { padding: 0 6px 0 0; }
+  .sidebar__section, .sidebar__spacer { display: none; }
+  .nav-item {
+    width: auto; white-space: nowrap; padding: 8px 12px; border-left: none;
+    border-bottom: 2px solid transparent;
+    &.is-active { background: transparent; border-left: none; border-bottom-color: var(--ox-red); }
+  }
+  .sidebar__user { border-top: none; padding: 0 0 0 6px; margin-left: auto; }
+  .sidebar__userinfo { display: none; }
+
+  .topbar { flex-wrap: wrap; gap: 12px; padding: 16px 18px; }
+  .topbar__actions { width: 100%; }
+  .topbar__actions .input { flex: 1; min-width: 0; }
+  .content { padding: 18px; }
+
+  .split { flex-direction: column; }
+  .detail, .profile-card { width: 100%; }
+  .field-row { flex-direction: column; gap: 14px; }
+  .card--form { padding: 20px; }
+  .doc-grid { flex-direction: column; }
+
+  .table { overflow-x: auto; }
+  .table__head, .table__row--sub { min-width: 460px; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+}

@@ -1,15 +1,10 @@
 import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { RouterOutlet } from '@angular/router';
 
-/**
- * Root shell. For now it carries the demo role switcher (Agent / Manager)
- * from the design; once the backend auth lands, the active role will come
- * from the signed-in session instead.
- */
+/** Root shell — routing only; the active role comes from the login session. */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.scss',
+  imports: [RouterOutlet],
+  template: '<router-outlet />',
 })
 export class AppComponent {}

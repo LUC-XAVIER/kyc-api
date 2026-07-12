@@ -20,11 +20,12 @@
     <div class="sidebar__spacer"></div>
 
     <div class="sidebar__user">
-      <div class="avatar avatar--purple">EN</div>
-      <div>
-        <div class="sidebar__username">Eric Ngono</div>
+      <div class="avatar avatar--purple">{{ userInitials() }}</div>
+      <div class="sidebar__userinfo">
+        <div class="sidebar__username">{{ user()?.full_name || 'Manager' }}</div>
         <div class="sidebar__usermeta">Manager · CamFinance</div>
       </div>
+      <button class="logout-btn" title="Log out" (click)="logout()">⎋</button>
     </div>
   </aside>
 

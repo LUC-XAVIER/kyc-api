@@ -14,13 +14,4 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     expect(fixture.componentInstance).toBeTruthy();
   });
-
-  it('renders the role switcher', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('.role-bar')?.textContent).toContain(
-      'Viewing as',
-    );
-  });
 });

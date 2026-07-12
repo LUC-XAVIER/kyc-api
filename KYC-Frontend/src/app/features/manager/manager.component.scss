@@ -238,3 +238,44 @@
 /* ---- Modal ---- */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .modal { background: #fff; border-radius: 12px; padding: 26px; width: 380px; max-width: 90vw; &__title { font-weight: 700; font-size: 17px; margin-bottom: 18px; } &__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; } }
+
+/* ---- User footer + logout ---- */
+.sidebar__userinfo { flex: 1; min-width: 0; }
+.logout-btn { background: transparent; border: none; color: rgba(255, 255, 255, 0.5); font-size: 16px; cursor: pointer; padding: 4px 8px; &:hover { color: #fff; } }
+
+/* ---- Responsive ---- */
+@media (max-width: 1024px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .chart-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 860px) {
+  .layout { flex-direction: column; }
+  .sidebar {
+    width: 100%; flex-direction: row; align-items: center; height: auto;
+    padding: 8px 12px; gap: 4px; overflow-x: auto;
+  }
+  .sidebar__brand { padding: 0 6px 0 0; }
+  .sidebar__section, .sidebar__spacer { display: none; }
+  .nav-item {
+    width: auto; white-space: nowrap; padding: 8px 12px; border-left: none;
+    border-bottom: 2px solid transparent;
+    &.is-active { background: transparent; border-left: none; border-bottom-color: var(--ox-red); }
+  }
+  .sidebar__user { border-top: none; padding: 0 0 0 6px; margin-left: auto; }
+  .sidebar__userinfo { display: none; }
+
+  .topbar { flex-wrap: wrap; gap: 12px; padding: 16px 18px; }
+  .topbar__actions { width: 100%; }
+  .topbar__actions .input { flex: 1; min-width: 0; }
+  .content { padding: 18px; }
+
+  .kpi-grid { grid-template-columns: 1fr; }
+  .split { flex-direction: column; }
+  .detail, .report-form, .settings-tabs { width: 100%; }
+  .settings-tabs { flex-direction: row; overflow-x: auto; }
+  .report-kpis { grid-template-columns: 1fr 1fr; }
+
+  .table { overflow-x: auto; }
+  .table__head, .table__row--review, .table__row--history, .table__row--agents { min-width: 640px; }
+  .table__row--history, .table__head { min-width: 760px; }
+}
