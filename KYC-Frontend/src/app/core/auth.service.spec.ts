@@ -43,9 +43,12 @@ describe('AuthService', () => {
   });
 
   it('stores the principal and token on login', () => {
-    service.login('m@mfi.cm', 'pw').subscribe();
+    service.login('m@mfi.cm', '123456').subscribe();
     const req = http.expectOne((r) => r.url.endsWith('/auth/login'));
-    expect(req.request.body).toEqual({ email: 'm@mfi.cm', password: 'pw' });
+    expect(req.request.body).toEqual({
+      identifier: 'm@mfi.cm',
+      pin: '123456',
+    });
     req.flush(PRINCIPAL);
 
     expect(service.isAuthenticated()).toBeTrue();

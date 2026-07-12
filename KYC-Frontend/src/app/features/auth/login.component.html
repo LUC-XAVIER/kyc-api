@@ -37,24 +37,27 @@
           : 'Sign in to submit and track KYC verifications.' }}
       </p>
 
-      <label class="field-label">Email</label>
+      <label class="field-label">
+        {{ actor() === 'manager' ? 'Email' : 'Phone number' }}
+      </label>
       <input
         class="field"
-        type="email"
+        [type]="actor() === 'manager' ? 'email' : 'tel'"
         autocomplete="username"
-        placeholder="you@mfi.cm"
-        [value]="email()"
-        (input)="email.set($any($event.target).value)"
+        [placeholder]="actor() === 'manager' ? 'you@mfi.cm' : '6 99 00 11 22'"
+        [value]="identifier()"
+        (input)="identifier.set($any($event.target).value)"
       />
 
-      <label class="field-label">Password</label>
+      <label class="field-label">PIN</label>
       <input
         class="field"
         type="password"
+        inputmode="numeric"
         autocomplete="current-password"
-        placeholder="••••••••"
-        [value]="password()"
-        (input)="password.set($any($event.target).value)"
+        placeholder="••••••"
+        [value]="pin()"
+        (input)="pin.set($any($event.target).value)"
       />
 
       @if (error()) {

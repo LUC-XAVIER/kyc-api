@@ -40,9 +40,9 @@ export class AuthService {
     return this._principal()?.access_token ?? null;
   }
 
-  login(email: string, password: string): Observable<Principal> {
+  login(identifier: string, pin: string): Observable<Principal> {
     return this.http
-      .post<Principal>(`${API_URL}/auth/login`, { email, password })
+      .post<Principal>(`${API_URL}/auth/login`, { identifier, pin })
       .pipe(
         tap((principal) => {
           this._principal.set(principal);

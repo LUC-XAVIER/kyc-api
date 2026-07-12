@@ -33,29 +33,29 @@ describe('LoginComponent', () => {
     expect(component.actor()).toBe('agent');
   });
 
-  it('requires an email and password before calling login', () => {
+  it('requires an identifier and PIN before calling login', () => {
     component.submit();
     expect(component.error()).toContain('Enter your');
     expect(auth.login).not.toHaveBeenCalled();
   });
 
-  it('submits the entered credentials', () => {
-    component.email.set('m@mfi.cm');
-    component.password.set('pw');
+  it('submits the entered identifier and PIN', () => {
+    component.identifier.set('m@mfi.cm');
+    component.pin.set('123456');
     component.submit();
-    expect(auth.login).toHaveBeenCalledWith('m@mfi.cm', 'pw');
+    expect(auth.login).toHaveBeenCalledWith('m@mfi.cm', '123456');
   });
 
   it('surfaces the API error message on failure', () => {
     auth.login.and.returnValue(
       throwError(() => ({
-        error: { error: { message: 'Invalid email or password.' } },
+        error: { error: { message: 'Invalid credentials.' } },
       })),
     );
-    component.email.set('m@mfi.cm');
-    component.password.set('bad');
+    component.identifier.set('m@mfi.cm');
+    component.pin.set('000000');
     component.submit();
-    expect(component.error()).toContain('Invalid email');
+    expect(component.error()).toContain('Invalid credentials');
     expect(component.loading()).toBeFalse();
   });
 });

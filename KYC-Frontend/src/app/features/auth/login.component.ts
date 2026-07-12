@@ -21,8 +21,8 @@ export class LoginComponent {
   private readonly router = inject(Router);
 
   readonly actor = signal<Actor>('manager');
-  readonly email = signal('');
-  readonly password = signal('');
+  readonly identifier = signal('');
+  readonly pin = signal('');
   readonly error = signal('');
   readonly loading = signal(false);
 
@@ -34,20 +34,22 @@ export class LoginComponent {
 
   toggleActor(): void {
     this.actor.update((a) => (a === 'manager' ? 'agent' : 'manager'));
+    this.identifier.set('');
     this.error.set('');
   }
 
   submit(): void {
     if (this.loading()) return;
-    const email = this.email().trim();
-    const password = this.password();
-    if (!email || !password) {
-      this.error.set('Enter your email and password.');
+    const identifier = this.identifier().trim();
+    const pin = this.pin();
+    if (!identifier || !pin) {
+      const id = this.actor() === 'manager' ? 'email' : 'phone number';
+      this.error.set(`Enter your ${id} and PIN.`);
       return;
     }
     this.loading.set(true);
     this.error.set('');
-    this.auth.login(email, password).subscribe({
+    this.auth.login(identifier, pin).subscribe({
       next: () => this.router.navigateByUrl(this.auth.homeRoute()),
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
