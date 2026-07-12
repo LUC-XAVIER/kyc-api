@@ -1,0 +1,108 @@
+/* KYC-API dashboard — global Openxtech theme.
+   Palette taken from the design mockups (design-reference/). */
+
+:root {
+  /* Brand */
+  --ox-red: #c0392b;
+  --ox-red-soft: #fdece9;
+  --ox-navy: #17181d;
+  --ox-navy-2: #24252b;
+  --ox-purple: #3f2d68;
+
+  /* Status */
+  --ox-green: #1ea672;
+  --ox-green-text: #178a5c;
+  --ox-green-soft: #e6f7ef;
+  --ox-orange: #e2933a;
+  --ox-orange-text: #b3720b;
+  --ox-orange-soft: #fdf1e0;
+  --ox-reject-text: #c0392b;
+  --ox-reject-soft: #fde8e6;
+
+  /* Neutrals */
+  --ox-bg: #f5f6f8;
+  --ox-surface: #ffffff;
+  --ox-border: #e6e7eb;
+  --ox-line: #f0f1f3;
+  --ox-text: #17181d;
+  --ox-muted: #6b7280;
+
+  --ox-radius: 10px;
+  --ox-radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ox-bg);
+  color: var(--ox-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Shared building blocks reused across feature components */
+.ox-card {
+  background: var(--ox-surface);
+  border: 1px solid var(--ox-border);
+  border-radius: var(--ox-radius);
+}
+
+.ox-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+
+  &--verified,
+  &--approved,
+  &--active {
+    background: var(--ox-green-soft);
+    color: var(--ox-green-text);
+  }
+  &--pending,
+  &--inactive {
+    background: var(--ox-orange-soft);
+    color: var(--ox-orange-text);
+  }
+  &--rejected,
+  &--disabled {
+    background: var(--ox-reject-soft);
+    color: var(--ox-reject-text);
+  }
+}
+
+.ox-btn {
+  border: none;
+  border-radius: var(--ox-radius-sm);
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+
+  &--primary {
+    background: var(--ox-red);
+    color: #fff;
+  }
+  &--outline {
+    background: #fff;
+    border: 1px solid var(--ox-border);
+    color: var(--ox-text);
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}

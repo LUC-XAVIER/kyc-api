@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet data-dc-atomics>
+<style>
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+</style>
+</helmet>
+
+<div style="height:100vh; width:100%; display:flex; flex-direction:column; overflow:hidden;">
+
+  <!-- ROLE SWITCHER BAR -->
+  <div style="flex:none; height:44px; background:#0e0e12; display:flex; align-items:center; justify-content:center; gap:10px; border-bottom:1px solid rgba(255,255,255,.08);">
+    <span style="color:rgba(255,255,255,.4); font-size:12px; margin-right:6px;">Viewing as:</span>
+    <div onClick="{{ goAgent }}" style="{{ agentBtnStyle }}">Agent &mdash; Jeanne Mbarga</div>
+    <div onClick="{{ goManager }}" style="{{ managerBtnStyle }}">MFI Manager &mdash; Eric Ngono</div>
+  </div>
+
+  <!-- ROLE APP -->
+  <div style="flex:1; min-height:0;">
+    <sc-if value="{{ isAgent }}" hint-placeholder-val="{{ true }}">
+      <dc-import name="Agent" hint-size="100%,100%" style="display:block; width:100%; height:100%;"></dc-import>
+    </sc-if>
+    <sc-if value="{{ isManager }}" hint-placeholder-val="{{ false }}">
+      <dc-import name="MFI-Manager" hint-size="100%,100%" style="display:block; width:100%; height:100%;"></dc-import>
+    </sc-if>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+class Component extends DCLogic {
+  state = { role: 'agent' };
+
+  renderVals() {
+    const active = 'padding:7px 16px; border-radius:20px; font-size:12.5px; font-weight:600; cursor:pointer; background:#c0392b; color:#fff;';
+    const inactive = 'padding:7px 16px; border-radius:20px; font-size:12.5px; font-weight:600; cursor:pointer; background:rgba(255,255,255,.08); color:rgba(255,255,255,.65);';
+    return {
+      isAgent: this.state.role === 'agent',
+      isManager: this.state.role === 'manager',
+      goAgent: () => this.setState({ role: 'agent' }),
+      goManager: () => this.setState({ role: 'manager' }),
+      agentBtnStyle: this.state.role === 'agent' ? active : inactive,
+      managerBtnStyle: this.state.role === 'manager' ? active : inactive
+    };
+  }
+}
+
+</script>
+</body>
+</html>
