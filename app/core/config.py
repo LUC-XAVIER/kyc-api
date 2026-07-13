@@ -54,6 +54,20 @@ class Settings(BaseSettings):
     # --- Subscription enforcement (Design doc §6.2) ---
     quota_warning_ratio: float = 0.80
 
+    # --- Onboarding / email ---
+    # Where the dashboard lives, for the links we email (signup, PIN reset).
+    dashboard_url: str = "http://localhost:4200"
+    signup_token_ttl_hours: int = 48
+    reset_token_ttl_hours: int = 2
+    # When email is disabled (dev), links are logged and returned by the
+    # API instead of sent. Set email_enabled=true + SMTP creds for real mail.
+    email_enabled: bool = False
+    email_from: str = "KYC-API <no-reply@kyc-api.local>"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

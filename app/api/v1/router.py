@@ -13,6 +13,7 @@ from app.api.v1.routes import (
     auth,
     health,
     monitoring,
+    onboarding,
     reports,
     reviews,
     verifications,
@@ -22,6 +23,7 @@ from app.api.v1.routes import (
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
+api_router.include_router(onboarding.router)
 api_router.include_router(account.router)
 api_router.include_router(agents.router)
 api_router.include_router(api_keys.router)
