@@ -41,7 +41,7 @@ def test_create_list_and_login_roundtrip(
     assert body["role"] == "AGENT"
     assert body["status"] == "ACTIVE"
     assert body["phone"] == "699100200"
-    assert "pin" not in body and "hashed_password" not in body
+    assert "pin" not in body and "hashed_pin" not in body
 
     listing = api_client.get(AGENTS_URL, headers=_auth(key))
     assert [a["phone"] for a in listing.json()] == ["699100200"]

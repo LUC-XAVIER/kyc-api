@@ -133,7 +133,7 @@ def complete_onboarding(
         full_name=payload.full_name,
         email=invite.email,
         phone=payload.phone,
-        hashed_password=hash_password(payload.pin),
+        hashed_pin=hash_password(payload.pin),
         role=AgentRole.MANAGER,
         status=AgentStatus.ACTIVE,
     )

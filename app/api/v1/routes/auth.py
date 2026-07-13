@@ -77,8 +77,8 @@ def login(
     )
     if (
         agent is None
-        or not agent.hashed_password
-        or not verify_password(payload.pin, agent.hashed_password)
+        or not agent.hashed_pin
+        or not verify_password(payload.pin, agent.hashed_pin)
     ):
         raise AuthenticationError("Invalid credentials.")
     if agent.status != AgentStatus.ACTIVE:
@@ -182,7 +182,7 @@ def reset_pin(
     if agent is None:
         raise NotFoundError("Account not found.")
 
-    agent.hashed_password = hash_password(payload.pin)
+    agent.hashed_pin = hash_password(payload.pin)
     reset.used_at = datetime.now(UTC)
     db.flush()
     return {"status": "reset"}

@@ -53,7 +53,7 @@ def main() -> None:
             db.add(agent)
         agent.email = args.email
         agent.full_name = args.name
-        agent.hashed_password = hash_password(args.pin)
+        agent.hashed_pin = hash_password(args.pin)
         agent.role = AgentRole.MANAGER
         agent.status = AgentStatus.ACTIVE
 

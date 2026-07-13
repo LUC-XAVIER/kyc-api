@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.models.enums import AgentRole, AgentStatus
 
-# PIN is the shared 6-8 character credential (see Agent.hashed_password).
+# PIN is the shared 6-8 character credential (see Agent.hashed_pin).
 Pin = Field(min_length=6, max_length=8)
 
 

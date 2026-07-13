@@ -125,7 +125,7 @@ def hash_password(password: str) -> str:
         password: The plaintext password chosen by the staff member.
 
     Returns:
-        The bcrypt hash string, safe to persist in ``agents.hashed_password``.
+        The bcrypt hash string, safe to persist in ``agents.hashed_pin``.
     """
     hashed = bcrypt.hashpw(_prepare_password(password), bcrypt.gensalt())
     return hashed.decode()

@@ -98,7 +98,7 @@ def create_agent(
         branch=branch,
         email=email,
         phone=phone,
-        hashed_password=hash_password(pin),
+        hashed_pin=hash_password(pin),
         role=role,
     )
     db.add(agent)

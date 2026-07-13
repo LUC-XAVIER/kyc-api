@@ -85,7 +85,7 @@ def create_agent(
         mfi_account_id=mfi.id,
         full_name=payload.full_name,
         phone=payload.phone,
-        hashed_password=hash_password(payload.pin),
+        hashed_pin=hash_password(payload.pin),
         branch=payload.branch,
         role=AgentRole.AGENT,
     )
@@ -122,6 +122,6 @@ def reset_agent_pin(
 ) -> Agent:
     """Re-initialise an agent's PIN (for an agent who forgot theirs)."""
     agent = _owned_agent(db, agent_id, principal)
-    agent.hashed_password = hash_password(payload.pin)
+    agent.hashed_pin = hash_password(payload.pin)
     db.flush()
     return agent

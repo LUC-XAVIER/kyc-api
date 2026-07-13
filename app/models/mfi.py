@@ -76,11 +76,11 @@ class Agent(UUIDMixin, TimestampMixin, Base):
     branch: Mapped[str | None] = mapped_column(String(255))
     # Login identity. Managers sign in with their email, agents with their
     # phone number; both are unique and nullable so an account carries only
-    # the identifier its role uses. ``hashed_password`` stores the bcrypt
-    # hash of the 6-8 char PIN (the shared credential for both roles).
+    # the identifier its role uses. ``hashed_pin`` stores the bcrypt hash of
+    # the 6-8 char PIN (the shared credential for both roles).
     email: Mapped[str | None] = mapped_column(String(255), unique=True)
     phone: Mapped[str | None] = mapped_column(String(32), unique=True)
-    hashed_password: Mapped[str | None] = mapped_column(String(255))
+    hashed_pin: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[AgentRole] = mapped_column(
         Enum(AgentRole, name="agent_role"), default=AgentRole.AGENT
     )
