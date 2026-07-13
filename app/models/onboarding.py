@@ -1,4 +1,4 @@
-"""Self-service onboarding — pending manager signup invites."""
+"""Email-token flows: manager signup invites and PIN resets."""
 
 from datetime import datetime
 
@@ -25,5 +25,24 @@ class SignupInvite(UUIDMixin, TimestampMixin, Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+
+
+class PinReset(UUIDMixin, TimestampMixin, Base):
+    """A manager PIN-reset request created by ``/auth/forgot-pin``.
+
+    The manager receives an emailed link carrying the raw token; only its
+    digest is stored. ``/auth/reset-pin`` consumes it to set a new PIN.
+    """
+
+    __tablename__ = "pin_resets"
+
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    token_hash: Mapped[str] = mapped_column(
+        String(64), unique=True, index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )

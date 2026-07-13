@@ -59,3 +59,16 @@ def send_signup_invite(to: str, token: str) -> None:
         f"Finish setting up your account here:\n{link}\n\n"
         f"This link expires in {settings.signup_token_ttl_hours} hours.",
     )
+
+
+def send_pin_reset(to: str, token: str) -> None:
+    """Email a manager the link to reset their PIN."""
+    link = reset_link(token)
+    send_email(
+        to,
+        "Reset your KYC-API PIN",
+        "We received a request to reset your PIN.\n\n"
+        f"Set a new PIN here:\n{link}\n\n"
+        f"This link expires in {settings.reset_token_ttl_hours} hours. "
+        "If you didn't request this, you can ignore this email.",
+    )

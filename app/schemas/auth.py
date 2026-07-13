@@ -2,7 +2,7 @@
 
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.enums import AgentRole
 
@@ -32,6 +32,26 @@ class TokenResponse(BaseModel):
     agent_id: uuid.UUID
     full_name: str
     mfi_account_id: uuid.UUID
+
+
+class ForgotPinRequest(BaseModel):
+    """A manager requesting a PIN-reset link by email."""
+
+    email: str
+
+
+class ForgotPinResponse(BaseModel):
+    """Ack (always the same). ``reset_link`` is only set in dev."""
+
+    status: str = "sent"
+    reset_link: str | None = None
+
+
+class ResetPinRequest(BaseModel):
+    """A manager setting a new PIN with a reset token."""
+
+    token: str
+    pin: str = Field(min_length=6, max_length=8)
 
 
 class AgentProfile(BaseModel):

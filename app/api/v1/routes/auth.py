@@ -6,17 +6,38 @@ on dashboard endpoints. This is separate from the ``X-API-Key`` gateway
 used by MFIs' own software.
 """
 
-from fastapi import APIRouter, Depends
+from datetime import UTC, datetime, timedelta
+
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_current_agent
-from app.core.exceptions import AuthenticationError
-from app.core.security import create_access_token, verify_password
+from app.core.config import settings
+from app.core.exceptions import (
+    AuthenticationError,
+    NotFoundError,
+    ValidationError,
+)
+from app.core.security import (
+    create_access_token,
+    generate_token,
+    hash_password,
+    hash_token,
+    verify_password,
+)
 from app.db.session import get_db
-from app.models import Agent
-from app.models.enums import AgentStatus
-from app.schemas.auth import AgentProfile, LoginRequest, TokenResponse
+from app.models import Agent, PinReset
+from app.models.enums import AgentRole, AgentStatus
+from app.schemas.auth import (
+    AgentProfile,
+    ForgotPinRequest,
+    ForgotPinResponse,
+    LoginRequest,
+    ResetPinRequest,
+    TokenResponse,
+)
+from app.services import email as email_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -92,3 +113,76 @@ def read_me(agent: Agent = Depends(get_current_agent)) -> AgentProfile:
         mfi_account_id=agent.mfi_account_id,
         mfi_name=agent.mfi_account.name,
     )
+
+
+@router.post(
+    "/forgot-pin",
+    response_model=ForgotPinResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def forgot_pin(
+    payload: ForgotPinRequest, db: Session = Depends(get_db)
+) -> ForgotPinResponse:
+    """Email an active manager a PIN-reset link.
+
+    Always returns the same response whether or not the email matches a
+    manager, so it can't be used to probe for accounts. (Agents have no
+    email — their PIN is reset by a manager.)
+    """
+    email = payload.email.strip().lower()
+    agent = (
+        db.query(Agent)
+        .filter_by(
+            email=email,
+            role=AgentRole.MANAGER,
+            status=AgentStatus.ACTIVE,
+        )
+        .one_or_none()
+    )
+    link = None
+    if agent is not None:
+        token = generate_token()
+        db.add(
+            PinReset(
+                email=email,
+                token_hash=hash_token(token),
+                expires_at=datetime.now(UTC)
+                + timedelta(hours=settings.reset_token_ttl_hours),
+            )
+        )
+        db.flush()
+        email_service.send_pin_reset(email, token)
+        if not settings.email_enabled:
+            link = email_service.reset_link(token)
+    return ForgotPinResponse(reset_link=link)
+
+
+@router.post("/reset-pin", status_code=status.HTTP_200_OK)
+def reset_pin(
+    payload: ResetPinRequest, db: Session = Depends(get_db)
+) -> dict[str, str]:
+    """Consume a valid reset token and set the manager's new PIN."""
+    reset = (
+        db.query(PinReset)
+        .filter_by(token_hash=hash_token(payload.token))
+        .one_or_none()
+    )
+    if reset is None:
+        raise NotFoundError("Invalid reset link.")
+    if reset.used_at is not None:
+        raise ValidationError("This reset link has already been used.")
+    if reset.expires_at < datetime.now(UTC):
+        raise ValidationError("This reset link has expired.")
+
+    agent = (
+        db.query(Agent)
+        .filter_by(email=reset.email, role=AgentRole.MANAGER)
+        .one_or_none()
+    )
+    if agent is None:
+        raise NotFoundError("Account not found.")
+
+    agent.hashed_password = hash_password(payload.pin)
+    reset.used_at = datetime.now(UTC)
+    db.flush()
+    return {"status": "reset"}
