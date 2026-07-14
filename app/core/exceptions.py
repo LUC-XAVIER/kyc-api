@@ -4,8 +4,12 @@ Centralizes error responses so the API returns consistent, descriptive
 JSON payloads (e.g. the 400 / quota-exceeded flows in Analysis doc UC1).
 """
 
+import logging
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger("app.errors")
 
 
 class KycError(Exception):
@@ -55,6 +59,13 @@ class NotFoundError(KycError):
     code = "NOT_FOUND"
 
 
+class EmailError(KycError):
+    """Raised when an outbound email could not be sent (SMTP failure)."""
+
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "EMAIL_FAILED"
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach handlers that render :class:`KycError` as JSON responses."""
 
@@ -65,4 +76,22 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": {"code": exc.code, "message": exc.message}},
+        )
+
+    @app.exception_handler(Exception)
+    async def _handle_unexpected(  # type: ignore[unused-ignore]
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        # Handling the exception here (rather than letting it 500 unhandled)
+        # keeps the response inside the middleware stack, so CORS headers are
+        # still applied and the browser sees the real error, not a CORS one.
+        logger.exception("Unhandled error on %s", request.url.path)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected error occurred.",
+                }
+            },
         )

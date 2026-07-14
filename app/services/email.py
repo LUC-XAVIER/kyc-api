@@ -11,6 +11,7 @@ import smtplib
 from email.message import EmailMessage
 
 from app.core.config import settings
+from app.core.exceptions import EmailError
 
 logger = logging.getLogger("app.email")
 
@@ -33,10 +34,21 @@ def send_email(to: str, subject: str, body: str) -> None:
     msg["To"] = to
     msg["Subject"] = subject
     msg.set_content(body)
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-        server.starttls()
-        server.login(settings.smtp_user, settings.smtp_password)
-        server.send_message(msg)
+    # Gmail shows App Passwords grouped with spaces; strip them for login.
+    password = settings.smtp_password.replace(" ", "")
+    try:
+        with smtplib.SMTP(
+            settings.smtp_host, settings.smtp_port, timeout=15
+        ) as server:
+            server.starttls()
+            server.login(settings.smtp_user, password)
+            server.send_message(msg)
+    except (smtplib.SMTPException, OSError) as exc:
+        logger.error("SMTP send to %s failed: %s", to, exc)
+        raise EmailError(
+            "Could not send the email — check the SMTP settings "
+            "(Gmail requires a 16-character App Password)."
+        ) from exc
 
 
 def signup_link(token: str) -> str:

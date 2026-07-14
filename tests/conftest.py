@@ -6,8 +6,18 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import engine, get_db
 from app.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def _email_dev_mode() -> Generator[None, None, None]:
+    """Never send real email in tests — run onboarding/reset in dev mode."""
+    original = settings.email_enabled
+    settings.email_enabled = False
+    yield
+    settings.email_enabled = original
 
 
 @pytest.fixture
