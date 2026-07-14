@@ -6,6 +6,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core.security import generate_api_key, hash_password
+from app.core.validation import normalize_cm_phone
 from app.models import ApiKey, Branch, MfiAccount, SubscriptionPlan, User
 from app.models.enums import AgentRole, PlanName
 
@@ -119,7 +120,7 @@ def create_agent(
         full_name=full_name,
         branch_id=branch_id,
         email=email,
-        phone=phone,
+        phone=normalize_cm_phone(phone) if phone else None,
         hashed_pin=hash_password(pin),
         role=role,
     )

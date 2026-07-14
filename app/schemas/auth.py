@@ -54,6 +54,13 @@ class ResetPinRequest(BaseModel):
     pin: str = Field(min_length=6, max_length=8)
 
 
+class ChangePinRequest(BaseModel):
+    """A signed-in user changing their own PIN."""
+
+    current_pin: str
+    new_pin: str = Field(min_length=6, max_length=8)
+
+
 class AgentProfile(BaseModel):
     """The signed-in agent's own profile (``GET /auth/me``)."""
 

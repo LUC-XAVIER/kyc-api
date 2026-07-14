@@ -26,11 +26,13 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
+from app.core.validation import try_normalize_cm_phone
 from app.db.session import get_db
 from app.models import PinReset, User
 from app.models.enums import AgentRole, AgentStatus
 from app.schemas.auth import (
     AgentProfile,
+    ChangePinRequest,
     ForgotPinRequest,
     ForgotPinResponse,
     LoginRequest,
@@ -65,14 +67,11 @@ def login(
         AuthenticationError: If the credentials are invalid or the account
             is disabled.
     """
+    identifier = payload.identifier.strip()
+    phone = try_normalize_cm_phone(identifier) or identifier
     agent = (
         db.query(User)
-        .filter(
-            or_(
-                User.email == payload.identifier,
-                User.phone == payload.identifier,
-            )
-        )
+        .filter(or_(User.email == identifier, User.phone == phone))
         .one_or_none()
     )
     if (
@@ -186,3 +185,19 @@ def reset_pin(
     reset.used_at = datetime.now(UTC)
     db.flush()
     return {"status": "reset"}
+
+
+@router.post("/change-pin", status_code=status.HTTP_200_OK)
+def change_pin(
+    payload: ChangePinRequest,
+    agent: User = Depends(get_current_agent),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Let a signed-in user change their own PIN (current PIN required)."""
+    if not agent.hashed_pin or not verify_password(
+        payload.current_pin, agent.hashed_pin
+    ):
+        raise AuthenticationError("Current PIN is incorrect.")
+    agent.hashed_pin = hash_password(payload.new_pin)
+    db.flush()
+    return {"status": "changed"}

@@ -279,3 +279,25 @@ def test_stats_rejects_inverted_range(
         headers=headers,
     )
     assert resp.status_code == 400
+
+
+def test_agent_sees_only_own_submissions(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A plain agent's history is scoped to their own verifications."""
+    account, _ = create_mfi_with_key(db_session)
+    mine = create_agent(db_session, account, phone="699111111")
+    other = create_agent(db_session, account, phone="699222222")
+    v_mine = _seed(db_session, account.id, "C-MINE")
+    v_mine.agent_id = mine.id
+    v_other = _seed(db_session, account.id, "C-OTHER")
+    v_other.agent_id = other.id
+    db_session.flush()
+
+    token = create_access_token(subject=str(mine.id), role="AGENT")
+    rows = api_client.get(
+        BASE, headers={"Authorization": f"Bearer {token}"}
+    ).json()
+    ids = {r["client_id"] for r in rows}
+    assert "C-MINE" in ids
+    assert "C-OTHER" not in ids

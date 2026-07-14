@@ -1,8 +1,13 @@
 """Schemas for self-service manager onboarding."""
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel, Field
+
+from app.core.validation import normalize_cm_phone
 
 _Pin = Field(min_length=6, max_length=8)
+_Phone = Annotated[str, AfterValidator(normalize_cm_phone)]
 
 
 class OnboardingStart(BaseModel):
@@ -33,7 +38,7 @@ class OnboardingComplete(BaseModel):
     full_name: str
     mfi_name: str
     pin: str = _Pin
-    phone: str | None = None
+    phone: _Phone | None = None
 
 
 class CompleteResponse(BaseModel):

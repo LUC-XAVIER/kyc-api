@@ -45,12 +45,12 @@ def test_create_list_and_login_roundtrip(
     body = created.json()
     assert body["role"] == "AGENT"
     assert body["status"] == "ACTIVE"
-    assert body["phone"] == "699100200"
+    assert body["phone"] == "+237699100200"
     assert body["branch_name"] == "Mvog-Ada"
     assert "pin" not in body and "hashed_pin" not in body
 
     listing = api_client.get(AGENTS_URL, headers=_auth(key))
-    assert [a["phone"] for a in listing.json()] == ["699100200"]
+    assert [a["phone"] for a in listing.json()] == ["+237699100200"]
 
     login = api_client.post(
         LOGIN_URL, json={"identifier": "699100200", "pin": "654321"}
@@ -68,6 +68,33 @@ def test_create_rejects_unknown_branch(
         AGENTS_URL, json=_new_agent(uuid.uuid4()), headers=_auth(key)
     )
     assert resp.status_code == 400
+
+
+def test_create_rejects_invalid_phone(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A non-Cameroonian / malformed phone fails validation (422)."""
+    account, key = create_mfi_with_key(db_session)
+    branch = get_or_create_branch(db_session, account, "Mvog-Ada")
+    resp = api_client.post(
+        AGENTS_URL, json=_new_agent(branch.id, phone="12345"),
+        headers=_auth(key),
+    )
+    assert resp.status_code == 422
+
+
+def test_create_normalizes_phone(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A local number is normalized to +237 + 9 digits."""
+    account, key = create_mfi_with_key(db_session)
+    branch = get_or_create_branch(db_session, account, "Mvog-Ada")
+    resp = api_client.post(
+        AGENTS_URL, json=_new_agent(branch.id, phone="6 99 88 77 66"),
+        headers=_auth(key),
+    )
+    assert resp.status_code == 201
+    assert resp.json()["phone"] == "+237699887766"
 
 
 def test_create_rejects_duplicate_phone(

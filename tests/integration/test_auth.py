@@ -341,3 +341,36 @@ def test_reset_pin_rejects_a_reused_token(
     assert api_client.post(
         RESET_URL, json={"token": token, "pin": "444555"}
     ).status_code == 400
+
+
+CHANGE_PIN_URL = "/api/v1/auth/change-pin"
+
+
+def test_change_pin_requires_current_pin(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Changing the PIN needs the current one; the new one then works."""
+    mfi, _ = create_mfi_with_key(db_session)
+    agent = create_agent(
+        db_session, mfi, email="me@mfi.cm", role=AgentRole.MANAGER,
+        pin="111111",
+    )
+    token = create_access_token(subject=str(agent.id), role="MANAGER")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    wrong = api_client.post(
+        CHANGE_PIN_URL,
+        json={"current_pin": "000000", "new_pin": "222222"},
+        headers=headers,
+    )
+    assert wrong.status_code == 401
+
+    ok = api_client.post(
+        CHANGE_PIN_URL,
+        json={"current_pin": "111111", "new_pin": "222222"},
+        headers=headers,
+    )
+    assert ok.status_code == 200
+    assert api_client.post(
+        LOGIN_URL, json={"identifier": "me@mfi.cm", "pin": "222222"}
+    ).status_code == 200

@@ -1,13 +1,17 @@
 """Schemas for MFI agent (dashboard staff) management."""
 
 import uuid
+from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
+from app.core.validation import normalize_cm_phone
 from app.models.enums import AgentRole, AgentStatus
 
 # PIN is the shared 6-8 character credential (see User.hashed_pin).
 Pin = Field(min_length=6, max_length=8)
+# A Cameroonian phone, normalized to +237 + 9 digits.
+Phone = Annotated[str, AfterValidator(normalize_cm_phone)]
 
 
 class AgentCreate(BaseModel):
@@ -17,7 +21,7 @@ class AgentCreate(BaseModel):
     """
 
     full_name: str
-    phone: str
+    phone: Phone
     pin: str = Pin
     branch_id: uuid.UUID
 
