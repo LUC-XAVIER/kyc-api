@@ -3,11 +3,39 @@ import { Routes } from '@angular/router';
 import { authGuard } from './core/auth.guard';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'login' },
+  {
+    path: '',
+    pathMatch: 'full',
+    loadComponent: () =>
+      import('./features/landing/landing.component').then(
+        (m) => m.LandingComponent,
+      ),
+  },
   {
     path: 'login',
     loadComponent: () =>
       import('./features/auth/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'signup',
+    loadComponent: () =>
+      import('./features/auth/signup.component').then(
+        (m) => m.SignupComponent,
+      ),
+  },
+  {
+    path: 'forgot-pin',
+    loadComponent: () =>
+      import('./features/auth/forgot-pin.component').then(
+        (m) => m.ForgotPinComponent,
+      ),
+  },
+  {
+    path: 'reset-pin',
+    loadComponent: () =>
+      import('./features/auth/reset-pin.component').then(
+        (m) => m.ResetPinComponent,
+      ),
   },
   {
     path: 'agent',
@@ -25,5 +53,5 @@ export const routes: Routes = [
         (m) => m.ManagerComponent,
       ),
   },
-  { path: '**', redirectTo: 'login' },
+  { path: '**', redirectTo: '' },
 ];

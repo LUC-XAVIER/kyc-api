@@ -57,6 +57,22 @@ export class AuthService {
     this.router.navigateByUrl('/login');
   }
 
+  forgotPin(
+    email: string,
+  ): Observable<{ status: string; reset_link: string | null }> {
+    return this.http.post<{ status: string; reset_link: string | null }>(
+      `${API_URL}/auth/forgot-pin`,
+      { email },
+    );
+  }
+
+  resetPin(token: string, pin: string): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(
+      `${API_URL}/auth/reset-pin`,
+      { token, pin },
+    );
+  }
+
   /** The dashboard route for the current role. */
   homeRoute(): string {
     return this.isManager() ? '/manager' : '/agent';

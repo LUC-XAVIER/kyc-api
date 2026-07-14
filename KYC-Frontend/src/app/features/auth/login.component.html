@@ -60,6 +60,9 @@
         (input)="pin.set($any($event.target).value)"
       />
 
+      @if (notice()) {
+        <div class="login-notice">{{ notice() }}</div>
+      }
       @if (error()) {
         <div class="login-error">{{ error() }}</div>
       }
@@ -71,6 +74,15 @@
       >
         {{ loading() ? 'Signing in…' : 'Sign in' }}
       </button>
+
+      <div class="login-links">
+        @if (actor() === 'manager') {
+          <a routerLink="/forgot-pin">Forgot your PIN?</a>
+          <a routerLink="/">Create an account</a>
+        } @else {
+          <span class="muted">Forgot your PIN? Ask your manager to reset it.</span>
+        }
+      </div>
     </form>
   </div>
 </div>

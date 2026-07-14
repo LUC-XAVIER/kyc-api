@@ -1,0 +1,52 @@
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-card__brand"><div class="logo">K</div><span>KYC-API</span></div>
+
+    @if (invalidLink()) {
+      <h2>Link not valid</h2>
+      <p class="sub">This signup link is invalid or has expired.
+        Please choose a plan again to receive a new one.</p>
+      <a class="ox-btn ox-btn--primary block" routerLink="/">Back to plans</a>
+    } @else if (invite() === null) {
+      <p class="sub">Loading…</p>
+    } @else {
+      @let info = invite()!;
+      <h2>Create your account</h2>
+      <p class="sub">{{ info.plan }} plan · finish setting up your KYC-API
+        account.</p>
+
+      <form (submit)="$event.preventDefault(); submit()">
+        <label class="lbl">Email</label>
+        <input class="field field--readonly" [value]="info.email" readonly />
+
+        <label class="lbl">Full name</label>
+        <input class="field" [value]="fullName()" (input)="fullName.set($any($event.target).value)" />
+
+        <label class="lbl">Institution (MFI) name</label>
+        <input class="field" [value]="mfiName()" (input)="mfiName.set($any($event.target).value)" />
+
+        <label class="lbl">Phone <span class="opt">(optional)</span></label>
+        <input class="field" type="tel" placeholder="6 99 00 11 22"
+          [value]="phone()" (input)="phone.set($any($event.target).value)" />
+
+        <div class="two">
+          <div>
+            <label class="lbl">PIN <span class="opt">(6-8 digits)</span></label>
+            <input class="field" type="password" inputmode="numeric"
+              [value]="pin()" (input)="pin.set($any($event.target).value)" />
+          </div>
+          <div>
+            <label class="lbl">Confirm PIN</label>
+            <input class="field" type="password" inputmode="numeric"
+              [value]="confirm()" (input)="confirm.set($any($event.target).value)" />
+          </div>
+        </div>
+
+        @if (error()) { <div class="err">{{ error() }}</div> }
+        <button type="submit" class="ox-btn ox-btn--primary block" [disabled]="loading()">
+          {{ loading() ? 'Creating…' : 'Create account' }}
+        </button>
+      </form>
+    }
+  </div>
+</div>

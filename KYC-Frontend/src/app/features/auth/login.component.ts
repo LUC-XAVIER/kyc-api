@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { AuthService } from '../../core/auth.service';
@@ -13,22 +13,31 @@ type Actor = 'manager' | 'agent';
  */
 @Component({
   selector: 'app-login',
+  imports: [RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
 export class LoginComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly actor = signal<Actor>('manager');
   readonly identifier = signal('');
   readonly pin = signal('');
   readonly error = signal('');
   readonly loading = signal(false);
+  readonly notice = signal('');
 
   constructor() {
     if (this.auth.isAuthenticated()) {
       this.router.navigateByUrl(this.auth.homeRoute());
+    }
+    const params = this.route.snapshot.queryParamMap;
+    if (params.has('created')) {
+      this.notice.set('Account created — please sign in.');
+    } else if (params.has('reset')) {
+      this.notice.set('Your PIN was updated — please sign in.');
     }
   }
 

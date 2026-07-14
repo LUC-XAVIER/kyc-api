@@ -1,0 +1,89 @@
+<div class="landing">
+  <header class="topbar">
+    <div class="brand"><div class="brand__logo">K</div><span>KYC-API</span></div>
+    <a class="signin-link" routerLink="/login">Sign in →</a>
+  </header>
+
+  <section class="hero">
+    <div class="hero__eyebrow">KYC-API FOR MICROFINANCE INSTITUTIONS</div>
+    <h1>Automated biometric identity verification</h1>
+    <p>COBAC-compliant KYC for Cameroonian MFIs — face match, liveness, OCR,
+      and duplicate detection, from one dashboard or your own software.</p>
+  </section>
+
+  @if (sentLink() !== null || sentEmail()) {
+    <section class="sent">
+      <div class="sent__icon">✓</div>
+      <div>
+        <div class="sent__title">Check your email</div>
+        <div class="sent__meta">
+          We've sent a signup link to <b>{{ sentEmail() }}</b>.
+        </div>
+        @if (sentLink()) {
+          <a class="sent__dev" [href]="sentLink()">
+            Dev link — open signup →
+          </a>
+        }
+      </div>
+    </section>
+  }
+
+  <section class="plans-wrap">
+    <h2>Choose your plan</h2>
+    <p class="plans-sub">Pick the verification volume that matches your
+      institution's size and growth.</p>
+    <div class="plans">
+      @for (p of plans; track p.key) {
+        <div class="plan" [class.plan--popular]="p.popular">
+          @if (p.popular) { <div class="plan__badge">Most popular</div> }
+          <div class="plan__name">{{ p.name }}</div>
+          <div class="plan__tag">{{ p.tagline }}</div>
+          <div class="plan__price">{{ p.price }}<span>{{ p.period }}</span></div>
+          <div class="plan__vol">{{ p.volume }}</div>
+          <button
+            class="ox-btn plan__btn"
+            [class.ox-btn--primary]="p.popular"
+            [class.ox-btn--outline-red]="!p.popular"
+            (click)="choose(p)"
+          >
+            {{ p.key === 'ENTERPRISE' ? 'Contact sales' : 'Choose ' + p.name }}
+          </button>
+          <div class="plan__features">
+            @for (f of p.features; track f) {
+              <div class="feature">✓ {{ f }}</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Email capture modal -->
+  @if (selected(); as plan) {
+    <div class="modal-overlay" (click)="cancel()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal__title">Get started — {{ plan.name }} plan</div>
+        <p class="modal__sub">Enter your email; we'll send a link to finish
+          setting up your account.</p>
+        <form (submit)="$event.preventDefault(); submit()">
+          <label class="field-label">Work email</label>
+          <input
+            class="field"
+            type="email"
+            autocomplete="email"
+            placeholder="you@mfi.cm"
+            [value]="email()"
+            (input)="email.set($any($event.target).value)"
+          />
+          @if (error()) { <div class="err">{{ error() }}</div> }
+          <div class="modal__actions">
+            <button type="button" class="ox-btn ox-btn--outline" (click)="cancel()">Cancel</button>
+            <button type="submit" class="ox-btn ox-btn--primary" [disabled]="loading()">
+              {{ loading() ? 'Sending…' : 'Send signup link' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+</div>

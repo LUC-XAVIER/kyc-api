@@ -146,3 +146,26 @@
     right: 16px;
   }
 }
+
+.login-notice {
+  background: var(--ox-green-soft);
+  color: var(--ox-green-text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.login-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 13px;
+  a {
+    color: var(--ox-red);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .muted {
+    color: var(--ox-muted);
+  }
+}
