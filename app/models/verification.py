@@ -32,7 +32,7 @@ class Verification(UUIDMixin, TimestampMixin, Base):
 
     client_id: Mapped[str] = mapped_column(String(64), index=True)
     agent_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("agents.id")
+        ForeignKey("users.id")
     )
     mfi_account_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("mfi_accounts.id"), index=True

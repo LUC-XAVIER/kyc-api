@@ -11,6 +11,7 @@ from app.api.v1.routes import (
     agents,
     api_keys,
     auth,
+    branches,
     health,
     monitoring,
     onboarding,
@@ -26,6 +27,7 @@ api_router.include_router(auth.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(account.router)
 api_router.include_router(agents.router)
+api_router.include_router(branches.router)
 api_router.include_router(api_keys.router)
 api_router.include_router(verify.router)
 api_router.include_router(reviews.router)

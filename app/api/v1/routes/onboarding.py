@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.security import generate_token, hash_password, hash_token
 from app.db.session import get_db
-from app.models import Agent, MfiAccount, SignupInvite, SubscriptionPlan
+from app.models import MfiAccount, SignupInvite, SubscriptionPlan, User
 from app.models.enums import AgentRole, AgentStatus, MfiStatus, PlanName
 from app.schemas.onboarding import (
     CompleteResponse,
@@ -104,7 +104,7 @@ def complete_onboarding(
     invite = _valid_invite(db, payload.token)
     plan = _resolve_plan(db, invite.plan)
 
-    if db.query(Agent).filter_by(email=invite.email).first() is not None:
+    if db.query(User).filter_by(email=invite.email).first() is not None:
         raise ValidationError("An account already exists for this email.")
     if (
         db.query(MfiAccount).filter_by(email=invite.email).first()
@@ -113,7 +113,7 @@ def complete_onboarding(
         raise ValidationError("An account already exists for this email.")
     if (
         payload.phone
-        and db.query(Agent).filter_by(phone=payload.phone).first()
+        and db.query(User).filter_by(phone=payload.phone).first()
         is not None
     ):
         raise ValidationError("That phone number is already in use.")
@@ -128,7 +128,7 @@ def complete_onboarding(
     db.add(mfi)
     db.flush()
 
-    manager = Agent(
+    manager = User(
         mfi_account_id=mfi.id,
         full_name=payload.full_name,
         email=invite.email,

@@ -14,7 +14,7 @@ from datetime import date
 
 from app.core.security import hash_password
 from app.db.session import SessionLocal
-from app.models import Agent, MfiAccount, SubscriptionPlan
+from app.models import MfiAccount, SubscriptionPlan, User
 from app.models.enums import AgentRole, AgentStatus, MfiStatus, PlanName
 
 
@@ -47,9 +47,9 @@ def main() -> None:
             db.add(mfi)
             db.flush()
 
-        agent = db.query(Agent).filter_by(email=args.email).one_or_none()
+        agent = db.query(User).filter_by(email=args.email).one_or_none()
         if agent is None:
-            agent = Agent(mfi_account_id=mfi.id, full_name=args.name)
+            agent = User(mfi_account_id=mfi.id, full_name=args.name)
             db.add(agent)
         agent.email = args.email
         agent.full_name = args.name

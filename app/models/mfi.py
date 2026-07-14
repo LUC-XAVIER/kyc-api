@@ -1,9 +1,16 @@
-"""MFI-side entities: subscription plan, account, agent, and API key."""
+"""MFI-side entities: subscription plan, account, user, and API key."""
 
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -56,7 +63,10 @@ class MfiAccount(UUIDMixin, TimestampMixin, Base):
     plan: Mapped["SubscriptionPlan | None"] = relationship(
         back_populates="accounts"
     )
-    agents: Mapped[list["Agent"]] = relationship(
+    users: Mapped[list["User"]] = relationship(
+        back_populates="mfi_account"
+    )
+    branches: Mapped[list["Branch"]] = relationship(
         back_populates="mfi_account"
     )
     api_keys: Mapped[list["ApiKey"]] = relationship(
@@ -64,16 +74,22 @@ class MfiAccount(UUIDMixin, TimestampMixin, Base):
     )
 
 
-class Agent(UUIDMixin, TimestampMixin, Base):
-    """An MFI field agent who submits verification requests."""
+class User(UUIDMixin, TimestampMixin, Base):
+    """A person who signs in for an MFI — a manager or a field agent.
 
-    __tablename__ = "agents"
+    The ``role`` distinguishes them; both share one login (identifier +
+    PIN). This is the ``users`` table (formerly ``agents``).
+    """
+
+    __tablename__ = "users"
 
     mfi_account_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("mfi_accounts.id")
     )
     full_name: Mapped[str] = mapped_column(String(255))
-    branch: Mapped[str | None] = mapped_column(String(255))
+    branch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("branches.id")
+    )
     # Login identity. Managers sign in with their email, agents with their
     # phone number; both are unique and nullable so an account carries only
     # the identifier its role uses. ``hashed_pin`` stores the bcrypt hash of
@@ -89,7 +105,34 @@ class Agent(UUIDMixin, TimestampMixin, Base):
     )
 
     mfi_account: Mapped["MfiAccount"] = relationship(
-        back_populates="agents"
+        back_populates="users"
+    )
+    branch: Mapped["Branch | None"] = relationship()
+
+    @property
+    def branch_name(self) -> str | None:
+        """The user's branch name, or ``None`` (e.g. org-wide managers)."""
+        return self.branch.name if self.branch else None
+
+
+class Branch(UUIDMixin, TimestampMixin, Base):
+    """A physical office of an MFI; the plan caps how many exist."""
+
+    __tablename__ = "branches"
+
+    mfi_account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("mfi_accounts.id"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(255))
+
+    mfi_account: Mapped["MfiAccount"] = relationship(
+        back_populates="branches"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "mfi_account_id", "name", name="uq_branches_mfi_name"
+        ),
     )
 
 

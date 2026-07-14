@@ -14,7 +14,7 @@ from app.api.v1.deps import Principal, require_manager_principal
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.security import hash_password
 from app.db.session import get_db
-from app.models import Agent
+from app.models import Branch, User
 from app.models.enums import AgentRole
 from app.schemas.agent import (
     AgentCreate,
@@ -28,10 +28,10 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 def _owned_agent(
     db: Session, agent_id: uuid.UUID, principal: Principal
-) -> Agent:
+) -> User:
     """Return the agent if it belongs to the caller's MFI, else 404."""
     agent = (
-        db.query(Agent)
+        db.query(User)
         .filter_by(id=agent_id, mfi_account_id=principal.mfi_account.id)
         .one_or_none()
     )
@@ -40,16 +40,29 @@ def _owned_agent(
     return agent
 
 
+def _require_branch(
+    db: Session, branch_id: uuid.UUID, mfi_account_id: uuid.UUID
+) -> None:
+    """Ensure ``branch_id`` is a branch of the caller's MFI."""
+    branch = (
+        db.query(Branch)
+        .filter_by(id=branch_id, mfi_account_id=mfi_account_id)
+        .one_or_none()
+    )
+    if branch is None:
+        raise ValidationError("Unknown branch for this MFI.")
+
+
 @router.get("", response_model=list[AgentSummary])
 def list_agents(
     principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
-) -> list[Agent]:
+) -> list[User]:
     """List the MFI's agents, ordered by name."""
     return (
-        db.query(Agent)
+        db.query(User)
         .filter_by(mfi_account_id=principal.mfi_account.id)
-        .order_by(Agent.full_name)
+        .order_by(User.full_name)
         .all()
     )
 
@@ -61,7 +74,7 @@ def create_agent(
     payload: AgentCreate,
     principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
-) -> Agent:
+) -> User:
     """Provision a new field agent (phone + initial PIN, no email).
 
     Enforces the plan's agent limit and a globally-unique phone number.
@@ -71,22 +84,24 @@ def create_agent(
     plan = mfi.plan
     if plan is not None and plan.max_agents is not None:
         existing = (
-            db.query(Agent).filter_by(mfi_account_id=mfi.id).count()
+            db.query(User).filter_by(mfi_account_id=mfi.id).count()
         )
         if existing >= plan.max_agents:
             raise ValidationError(
                 "Your plan's agent limit has been reached."
             )
 
-    if db.query(Agent).filter_by(phone=payload.phone).first() is not None:
+    if db.query(User).filter_by(phone=payload.phone).first() is not None:
         raise ValidationError("That phone number is already in use.")
 
-    agent = Agent(
+    _require_branch(db, payload.branch_id, mfi.id)
+
+    agent = User(
         mfi_account_id=mfi.id,
         full_name=payload.full_name,
         phone=payload.phone,
         hashed_pin=hash_password(payload.pin),
-        branch=payload.branch,
+        branch_id=payload.branch_id,
         role=AgentRole.AGENT,
     )
     db.add(agent)
@@ -100,13 +115,14 @@ def update_agent(
     payload: AgentUpdate,
     principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
-) -> Agent:
+) -> User:
     """Update an agent's name, branch, or status."""
     agent = _owned_agent(db, agent_id, principal)
     if payload.full_name is not None:
         agent.full_name = payload.full_name
-    if payload.branch is not None:
-        agent.branch = payload.branch
+    if payload.branch_id is not None:
+        _require_branch(db, payload.branch_id, principal.mfi_account.id)
+        agent.branch_id = payload.branch_id
     if payload.status is not None:
         agent.status = payload.status
     db.flush()
@@ -119,7 +135,7 @@ def reset_agent_pin(
     payload: AgentPinReset,
     principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
-) -> Agent:
+) -> User:
     """Re-initialise an agent's PIN (for an agent who forgot theirs)."""
     agent = _owned_agent(db, agent_id, principal)
     agent.hashed_pin = hash_password(payload.pin)

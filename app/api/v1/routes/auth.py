@@ -27,7 +27,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.session import get_db
-from app.models import Agent, PinReset
+from app.models import PinReset, User
 from app.models.enums import AgentRole, AgentStatus
 from app.schemas.auth import (
     AgentProfile,
@@ -66,11 +66,11 @@ def login(
             is disabled.
     """
     agent = (
-        db.query(Agent)
+        db.query(User)
         .filter(
             or_(
-                Agent.email == payload.identifier,
-                Agent.phone == payload.identifier,
+                User.email == payload.identifier,
+                User.phone == payload.identifier,
             )
         )
         .one_or_none()
@@ -97,7 +97,7 @@ def login(
 
 
 @router.get("/me", response_model=AgentProfile)
-def read_me(agent: Agent = Depends(get_current_agent)) -> AgentProfile:
+def read_me(agent: User = Depends(get_current_agent)) -> AgentProfile:
     """Return the signed-in agent's own profile.
 
     Lets the dashboard confirm a stored token is still valid and refresh
@@ -109,7 +109,7 @@ def read_me(agent: Agent = Depends(get_current_agent)) -> AgentProfile:
         email=agent.email,
         phone=agent.phone,
         role=agent.role,
-        branch=agent.branch,
+        branch=agent.branch_name,
         mfi_account_id=agent.mfi_account_id,
         mfi_name=agent.mfi_account.name,
     )
@@ -131,7 +131,7 @@ def forgot_pin(
     """
     email = payload.email.strip().lower()
     agent = (
-        db.query(Agent)
+        db.query(User)
         .filter_by(
             email=email,
             role=AgentRole.MANAGER,
@@ -175,7 +175,7 @@ def reset_pin(
         raise ValidationError("This reset link has expired.")
 
     agent = (
-        db.query(Agent)
+        db.query(User)
         .filter_by(email=reset.email, role=AgentRole.MANAGER)
         .one_or_none()
     )

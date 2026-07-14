@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Agent, Verification
+from app.models import Branch, User, Verification
 from app.models.enums import VerificationStatus
 from app.schemas.stats import BranchBucket, DayBucket, VerificationStats
 
@@ -58,9 +58,11 @@ def compute_verification_stats(
         *base
     )
     if branch is not None:
-        day_q = day_q.join(
-            Agent, Verification.agent_id == Agent.id
-        ).filter(Agent.branch == branch)
+        day_q = (
+            day_q.join(User, Verification.agent_id == User.id)
+            .join(Branch, User.branch_id == Branch.id)
+            .filter(Branch.name == branch)
+        )
     day_rows = day_q.group_by(day_col, Verification.status).all()
 
     by_status: dict[str, int] = {}
@@ -83,17 +85,18 @@ def compute_verification_stats(
 
     # By-branch counts (outer join so unattributed rows still total).
     branch_q = (
-        db.query(Agent.branch, func.count())
+        db.query(Branch.name, func.count())
         .select_from(Verification)
-        .outerjoin(Agent, Verification.agent_id == Agent.id)
+        .outerjoin(User, Verification.agent_id == User.id)
+        .outerjoin(Branch, User.branch_id == Branch.id)
         .filter(*base)
     )
     if branch is not None:
-        branch_q = branch_q.filter(Agent.branch == branch)
+        branch_q = branch_q.filter(Branch.name == branch)
     by_branch = [
         BranchBucket(branch=name or _UNASSIGNED, count=count)
         for name, count in sorted(
-            branch_q.group_by(Agent.branch).all(),
+            branch_q.group_by(Branch.name).all(),
             key=lambda row: row[1],
             reverse=True,
         )
@@ -109,9 +112,11 @@ def compute_verification_stats(
         .filter(*base, Verification.processed_at.isnot(None))
     )
     if branch is not None:
-        avg_q = avg_q.join(
-            Agent, Verification.agent_id == Agent.id
-        ).filter(Agent.branch == branch)
+        avg_q = (
+            avg_q.join(User, Verification.agent_id == User.id)
+            .join(Branch, User.branch_id == Branch.id)
+            .filter(Branch.name == branch)
+        )
     avg_seconds = avg_q.scalar()
 
     return VerificationStats(

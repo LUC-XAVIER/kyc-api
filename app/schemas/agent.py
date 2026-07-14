@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.models.enums import AgentRole, AgentStatus
 
-# PIN is the shared 6-8 character credential (see Agent.hashed_pin).
+# PIN is the shared 6-8 character credential (see User.hashed_pin).
 Pin = Field(min_length=6, max_length=8)
 
 
@@ -19,14 +19,14 @@ class AgentCreate(BaseModel):
     full_name: str
     phone: str
     pin: str = Pin
-    branch: str | None = None
+    branch_id: uuid.UUID
 
 
 class AgentUpdate(BaseModel):
     """Mutable fields on an existing agent (all optional / partial)."""
 
     full_name: str | None = None
-    branch: str | None = None
+    branch_id: uuid.UUID | None = None
     status: AgentStatus | None = None
 
 
@@ -43,6 +43,7 @@ class AgentSummary(BaseModel):
     full_name: str
     email: str | None
     phone: str | None
-    branch: str | None
+    branch_id: uuid.UUID | None
+    branch_name: str | None
     role: AgentRole
     status: AgentStatus

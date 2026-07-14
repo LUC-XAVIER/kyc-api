@@ -6,7 +6,13 @@ Alembic autogeneration and ``create_all`` see the full schema.
 
 from app.db.base import Base
 from app.models.compliance import AuditLog, ComplianceReport
-from app.models.mfi import Agent, ApiKey, MfiAccount, SubscriptionPlan
+from app.models.mfi import (
+    ApiKey,
+    Branch,
+    MfiAccount,
+    SubscriptionPlan,
+    User,
+)
 from app.models.onboarding import PinReset, SignupInvite
 from app.models.verification import (
     DuplicateFlag,
@@ -21,7 +27,8 @@ __all__ = [
     "Base",
     "SubscriptionPlan",
     "MfiAccount",
-    "Agent",
+    "User",
+    "Branch",
     "ApiKey",
     "Verification",
     "ExtractedData",

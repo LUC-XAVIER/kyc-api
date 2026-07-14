@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Agent, ComplianceReport, Verification
+from app.models import ComplianceReport, User, Verification
 
 _MISSING = "—"
 
@@ -90,8 +90,8 @@ def report_rows(db: Session, report: ComplianceReport) -> list[ReportRow]:
     """
     start, end = _period_bounds(report.period_start, report.period_end)
     rows = (
-        db.query(Verification, Agent)
-        .outerjoin(Agent, Verification.agent_id == Agent.id)
+        db.query(Verification, User)
+        .outerjoin(User, Verification.agent_id == User.id)
         .filter(
             Verification.mfi_account_id == report.mfi_account_id,
             Verification.created_at >= start,
@@ -104,7 +104,9 @@ def report_rows(db: Session, report: ComplianceReport) -> list[ReportRow]:
         ReportRow(
             client_id=verification.client_id,
             date=verification.created_at.date(),
-            branch=agent.branch if agent and agent.branch else _MISSING,
+            branch=agent.branch_name
+            if agent and agent.branch_name
+            else _MISSING,
             agent=agent.full_name if agent else _MISSING,
             status=verification.status.value,
         )
