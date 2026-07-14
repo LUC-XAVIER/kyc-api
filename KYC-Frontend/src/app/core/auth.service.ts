@@ -73,6 +73,16 @@ export class AuthService {
     );
   }
 
+  changePin(
+    currentPin: string,
+    newPin: string,
+  ): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(`${API_URL}/auth/change-pin`, {
+      current_pin: currentPin,
+      new_pin: newPin,
+    });
+  }
+
   /** The dashboard route for the current role. */
   homeRoute(): string {
     return this.isManager() ? '/manager' : '/agent';
