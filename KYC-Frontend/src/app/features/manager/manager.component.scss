@@ -279,3 +279,17 @@
   .table__head, .table__row--review, .table__row--history, .table__row--agents { min-width: 640px; }
   .table__row--history, .table__head { min-width: 760px; }
 }
+
+// Async loading / error banners (Phase D)
+.state-msg {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: var(--ox-surface-2, #f3f4f6);
+  color: var(--ox-text-muted, #555);
+  font-size: 14px;
+}
+.state-msg--error {
+  background: #fdecec;
+  color: var(--ox-red, #c0392b);
+}

@@ -39,7 +39,7 @@
 
       @if (page() === 'dashboard') {
         <div class="topbar__actions">
-          <div class="pill-static">📅 Jun 1 – Jun 17, 2026</div>
+          <div class="pill-static">📅 {{ dashRangeLabel() }}</div>
           <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export</button>
         </div>
       }
@@ -70,11 +70,19 @@
     <div class="content">
       <!-- DASHBOARD -->
       @if (page() === 'dashboard') {
+        @if (statsLoading()) {
+          <div class="state-msg">Loading statistics…</div>
+        } @else if (statsError()) {
+          <div class="state-msg state-msg--error">
+            Could not load statistics.
+            <button class="link-btn" (click)="loadStats()">Retry</button>
+          </div>
+        }
         <div class="kpi-grid">
-          <div class="ox-card kpi"><div class="kpi__label">TOTAL VERIFICATIONS</div><div class="kpi__value">1,284</div><div class="kpi__delta up">↑ 12% vs last period</div></div>
-          <div class="ox-card kpi"><div class="kpi__label">VERIFIED</div><div class="kpi__value">91.4%</div><div class="kpi__delta up">↑ 2.1 pts</div></div>
-          <div class="ox-card kpi"><div class="kpi__label">PENDING REVIEW</div><div class="kpi__value">5.8%</div><div class="kpi__delta warn">↑ 0.6 pts</div></div>
-          <div class="ox-card kpi"><div class="kpi__label">AVG. PROCESSING TIME</div><div class="kpi__value">4.6s</div><div class="kpi__delta up">↓ 0.4s faster</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">TOTAL VERIFICATIONS</div><div class="kpi__value">{{ kpiTotalLabel() }}</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">VERIFIED</div><div class="kpi__value">{{ verifiedPct() }}%</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">PENDING REVIEW</div><div class="kpi__value">{{ pendingPct() }}%</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">AVG. PROCESSING TIME</div><div class="kpi__value">{{ avgProcessing() }}</div></div>
         </div>
 
         <div class="chart-grid">
@@ -103,22 +111,24 @@
           <div class="ox-card chart-card">
             <div class="chart-card__title">Status breakdown</div>
             <div class="chart-card__sub">Selected period</div>
-            <div class="donut" [style.background]="donutBg"><div class="donut__hole"></div></div>
-            <div class="kv"><span><i class="dot dot--v"></i> Verified</span><b>91.4%</b></div>
-            <div class="kv"><span><i class="dot dot--p"></i> Pending</span><b>5.8%</b></div>
-            <div class="kv kv--last"><span><i class="dot dot--r"></i> Rejected</span><b>2.8%</b></div>
+            <div class="donut" [style.background]="donutBg()"><div class="donut__hole"></div></div>
+            <div class="kv"><span><i class="dot dot--v"></i> Verified</span><b>{{ verifiedPct() }}%</b></div>
+            <div class="kv"><span><i class="dot dot--p"></i> Pending</span><b>{{ pendingPct() }}%</b></div>
+            <div class="kv kv--last"><span><i class="dot dot--r"></i> Rejected</span><b>{{ rejectedPct() }}%</b></div>
           </div>
         </div>
 
         <div class="ox-card chart-card">
           <div class="chart-card__title">Verifications by branch</div>
           <div class="chart-card__sub">Selected period</div>
-          @for (b of branches; track b.name) {
+          @for (b of branches(); track b.name) {
             <div class="branch-row">
               <div class="branch-row__name">{{ b.name }}</div>
               <div class="branch-row__track"><div class="branch-row__fill" [style.width.%]="b.pct"></div></div>
               <div class="branch-row__value">{{ b.value }}</div>
             </div>
+          } @empty {
+            <div class="table__empty">No verifications in this period.</div>
           }
         </div>
       }
@@ -216,7 +226,7 @@
             <label class="input-label">Branch</label>
             <select class="input input--block" [value]="reportBranch()" (change)="reportBranch.set($any($event.target).value)">
               <option>All branches</option>
-              @for (b of branches; track b.name) { <option>{{ b.name }}</option> }
+              @for (b of branches(); track b.name) { <option>{{ b.name }}</option> }
             </select>
             <label class="input-label">Status filter</label>
             <select class="input input--block" [value]="reportStatus()" (change)="reportStatus.set($any($event.target).value)">

@@ -1,6 +1,26 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
+import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { VerificationStats } from '../../core/models';
+
+/** ISO yyyy-mm-dd for a Date (local calendar day). */
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate(),
+  ).padStart(2, '0')}`;
+}
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return isoDate(d);
+}
+
+function pct(part: number | undefined, total: number | undefined): number {
+  if (!total || part == null) return 0;
+  return Math.round((part / total) * 1000) / 10;
+}
 
 type ManagerPage =
   | 'dashboard'
@@ -92,23 +112,6 @@ interface HistoryRow {
   score: string;
 }
 
-const DAY_DATA = [
-  { label: '4', v: 60, p: 8, r: 6 }, { label: '5', v: 72, p: 6, r: 5 },
-  { label: '6', v: 52, p: 9, r: 7 }, { label: '7', v: 82, p: 7, r: 5 },
-  { label: '8', v: 65, p: 8, r: 6 }, { label: '9', v: 78, p: 6, r: 5 },
-  { label: '10', v: 56, p: 9, r: 7 }, { label: '11', v: 83, p: 5, r: 4 },
-  { label: '12', v: 76, p: 6, r: 5 }, { label: '13', v: 70, p: 8, r: 6 },
-  { label: '14', v: 60, p: 7, r: 6 }, { label: '15', v: 80, p: 6, r: 4 },
-  { label: '16', v: 68, p: 8, r: 6 }, { label: '17', v: 79, p: 6, r: 5 },
-];
-
-const BRANCHES = [
-  { name: 'Mvog-Ada', value: 412, pct: 100 },
-  { name: 'Biyem-Assi', value: 331, pct: 80 },
-  { name: 'Mokolo', value: 271, pct: 66 },
-  { name: 'Bafoussam', value: 210, pct: 51 },
-];
-
 const QUEUE_CASES: QueueCase[] = [
   { id: 'CLT-00482', initials: 'JF', name: 'FOTSO Jean-Pierre', client: 'CLT-00482', agent: 'Jeanne Mbarga', reason: 'Duplicate', score: '0.94', submitted: '2 min ago', faceMatch: '0.91 — match', ocr: '0.97', dupSim: '0.94 — high', dupWarning: 'Matches existing client CLT-00119 (KAMGA Jean-Paul) registered 14 Feb 2026 at Mvog-Ada branch. Review before approving.' },
   { id: 'CLT-00481', initials: 'MN', name: 'NGO Marie', client: 'CLT-00481', agent: 'Pierre Onana', reason: 'Low confidence', score: '0.71', submitted: '18 min ago', faceMatch: '0.71 — weak', ocr: '0.82', dupSim: '0.12 — low' },
@@ -176,7 +179,12 @@ const SETTINGS_TABS: SettingsTab[] = [
 })
 export class ManagerComponent {
   private readonly auth = inject(AuthService);
+  private readonly api = inject(ApiService);
   readonly user = this.auth.principal;
+
+  constructor() {
+    this.loadStats();
+  }
   readonly userInitials = computed(() => {
     const name = this.user()?.full_name ?? '';
     return (
@@ -206,7 +214,68 @@ export class ManagerComponent {
   readonly historySearch = signal('');
   readonly historyPage = signal(1);
 
-  readonly branches = BRANCHES;
+  // ---- Dashboard (real stats) ----
+  readonly stats = signal<VerificationStats | null>(null);
+  readonly statsLoading = signal(false);
+  readonly statsError = signal(false);
+  readonly dashStart = signal(daysAgo(13));
+  readonly dashEnd = signal(isoDate(new Date()));
+
+  loadStats(): void {
+    this.statsLoading.set(true);
+    this.statsError.set(false);
+    this.api.stats(this.dashStart(), this.dashEnd()).subscribe({
+      next: (s) => {
+        this.stats.set(s);
+        this.statsLoading.set(false);
+      },
+      error: () => {
+        this.statsError.set(true);
+        this.statsLoading.set(false);
+      },
+    });
+  }
+
+  readonly kpiTotal = computed(() => this.stats()?.total ?? 0);
+  readonly kpiTotalLabel = computed(() =>
+    this.kpiTotal().toLocaleString('en-US'),
+  );
+  readonly verifiedPct = computed(() =>
+    pct(this.stats()?.verified, this.stats()?.total),
+  );
+  readonly pendingPct = computed(() =>
+    pct(this.stats()?.pending, this.stats()?.total),
+  );
+  readonly rejectedPct = computed(() =>
+    pct(this.stats()?.rejected, this.stats()?.total),
+  );
+  readonly avgProcessing = computed(() => {
+    const s = this.stats()?.avg_processing_seconds;
+    return s == null ? '—' : `${s.toFixed(1)}s`;
+  });
+
+  readonly dashRangeLabel = computed(() => {
+    const fmt = (iso: string) =>
+      new Date(iso).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+      });
+    return `${fmt(this.dashStart())} – ${fmt(this.dashEnd())}, ${new Date(
+      this.dashEnd(),
+    ).getFullYear()}`;
+  });
+
+  /** By-branch bars, widths scaled to the busiest branch. */
+  readonly branches = computed(() => {
+    const list = this.stats()?.by_branch ?? [];
+    const max = Math.max(1, ...list.map((b) => b.count));
+    return list.map((b) => ({
+      name: b.branch,
+      value: b.count,
+      pct: (b.count / max) * 100,
+    }));
+  });
+
   readonly historyStatuses: ('All' | HistoryStatus)[] = [
     'All', 'Verified', 'Pending', 'Rejected', 'Approved',
   ];
@@ -225,20 +294,32 @@ export class ManagerComponent {
     return map[this.page()];
   });
 
-  // ---- Dashboard chart geometry ----
+  // ---- Dashboard chart geometry (from real stats) ----
   readonly dayBars = computed(() => {
-    const max = Math.max(...DAY_DATA.map((d) => d.v + d.p + d.r));
-    return DAY_DATA.map((d) => ({
-      label: d.label,
-      v: (d.v / max) * 100,
-      p: (d.p / max) * 100,
-      r: (d.r / max) * 100,
+    const days = this.stats()?.per_day ?? [];
+    const max = Math.max(
+      1,
+      ...days.map((d) => d.verified + d.pending + d.rejected),
+    );
+    return days.map((d) => ({
+      label: String(new Date(d.date).getDate()),
+      v: (d.verified / max) * 100,
+      p: (d.pending / max) * 100,
+      r: (d.rejected / max) * 100,
     }));
   });
 
-  readonly donutBg =
-    'conic-gradient(var(--ox-green) 0% 91.4%, var(--ox-orange) 91.4% ' +
-    '97.2%, var(--ox-red) 97.2% 100%)';
+  readonly donutBg = computed(() => {
+    const v = this.verifiedPct();
+    const p = this.pendingPct();
+    const vEnd = v;
+    const pEnd = v + p;
+    return (
+      `conic-gradient(var(--ox-green) 0% ${vEnd}%, ` +
+      `var(--ox-orange) ${vEnd}% ${pEnd}%, ` +
+      `var(--ox-red) ${pEnd}% 100%)`
+    );
+  });
 
   // ---- Review queue ----
   readonly queueCases = computed(() => {
