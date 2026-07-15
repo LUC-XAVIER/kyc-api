@@ -181,7 +181,14 @@ export class AgentComponent {
     const media = navigator.mediaDevices;
     try {
       return await media.getUserMedia({
-        video: { facingMode: key === 'selfie' ? 'user' : 'environment' },
+        video: {
+          facingMode: key === 'selfie' ? 'user' : 'environment',
+          // Ask for a high frame: the default is 640x480, at which the small
+          // portrait printed on an ID card is too coarse for the pipeline's
+          // face detector to find. `ideal` degrades on weaker cameras.
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
         audio: false,
       });
     } catch (err) {
@@ -213,7 +220,7 @@ export class AgentComponent {
         this.closeCamera();
       },
       'image/jpeg',
-      0.9,
+      0.95, // the pipeline reads fine detail (MRZ glyphs, printed portrait)
     );
   }
 
