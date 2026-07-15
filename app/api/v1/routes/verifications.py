@@ -9,7 +9,7 @@ import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.v1.deps import (
     Principal,
@@ -38,9 +38,10 @@ def list_verifications(
     A plain agent sees only their own submissions; managers and machine
     (API-key) callers see the whole MFI.
     """
-    query = db.query(Verification).filter_by(
-        mfi_account_id=principal.mfi_account.id
-    )
+    query = db.query(Verification).options(
+        joinedload(Verification.agent),
+        joinedload(Verification.extracted_data),
+    ).filter_by(mfi_account_id=principal.mfi_account.id)
     if not principal.is_manager and principal.agent is not None:
         query = query.filter_by(agent_id=principal.agent.id)
     if status is not None:

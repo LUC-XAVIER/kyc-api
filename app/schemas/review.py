@@ -16,9 +16,13 @@ class ReviewItem(BaseModel):
 
     id: uuid.UUID
     client_id: str
+    client_name: str | None
     status: VerificationStatus
     reject_reason: str | None
     confidence_score: float | None
+    agent_name: str | None
+    branch_name: str | None
+    flagged_duplicate: bool
     created_at: datetime
 
 

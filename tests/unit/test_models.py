@@ -8,7 +8,10 @@ from app.models import Base
 EXPECTED_TABLES = {
     "subscription_plans",
     "mfi_accounts",
-    "agents",
+    "users",
+    "branches",
+    "signup_invites",
+    "pin_resets",
     "api_keys",
     "verifications",
     "extracted_data",
@@ -21,8 +24,8 @@ EXPECTED_TABLES = {
 }
 
 
-def test_all_twelve_entities_registered() -> None:
-    """All 12 Analysis-doc entities are mapped to tables."""
+def test_all_entities_registered() -> None:
+    """Every mapped entity is registered to a table."""
     assert set(Base.metadata.tables) == EXPECTED_TABLES
 
 
@@ -36,7 +39,7 @@ def test_tenant_owned_rows_carry_account_id() -> None:
     """Tenant-scoped tables expose mfi_account_id for multi-tenancy."""
     for table in (
         "verifications",
-        "agents",
+        "users",
         "api_keys",
         "audit_logs",
         "compliance_reports",

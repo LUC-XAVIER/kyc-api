@@ -38,9 +38,13 @@ class VerificationSummary(BaseModel):
 
     id: uuid.UUID
     client_id: str
+    client_name: str | None
     status: VerificationStatus
     reject_reason: str | None
     confidence_score: float | None
+    submission_method: SubmissionMethod
+    agent_name: str | None
+    branch_name: str | None
     created_at: datetime
 
 
@@ -93,7 +97,6 @@ class DuplicateFlagSchema(BaseModel):
 class VerificationDetail(VerificationSummary):
     """A verification with its per-stage records, for manual review."""
 
-    submission_method: SubmissionMethod
     processed_at: datetime | None
     extracted_data: ExtractedDataSchema | None
     liveness_result: LivenessResultSchema | None

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -23,6 +24,9 @@ from app.models.enums import (
     SubmissionMethod,
     VerificationStatus,
 )
+
+if TYPE_CHECKING:
+    from app.models.mfi import User
 
 
 class Verification(UUIDMixin, TimestampMixin, Base):
@@ -59,6 +63,29 @@ class Verification(UUIDMixin, TimestampMixin, Base):
     duplicate_flags: Mapped[list["DuplicateFlag"]] = relationship(
         back_populates="verification"
     )
+    agent: Mapped["User | None"] = relationship("User")
+
+    # --- Derived attributes surfaced on list/summary rows (read via
+    #     Pydantic ``from_attributes``). ---
+    @property
+    def client_name(self) -> str | None:
+        """The name read off the ID document, if OCR captured one."""
+        return self.extracted_data.full_name if self.extracted_data else None
+
+    @property
+    def agent_name(self) -> str | None:
+        """Full name of the agent who submitted this verification."""
+        return self.agent.full_name if self.agent else None
+
+    @property
+    def branch_name(self) -> str | None:
+        """Branch of the submitting agent."""
+        return self.agent.branch_name if self.agent else None
+
+    @property
+    def flagged_duplicate(self) -> bool:
+        """Whether the pipeline raised any duplicate-face flag."""
+        return bool(self.duplicate_flags)
 
 
 class ExtractedData(UUIDMixin, Base):
