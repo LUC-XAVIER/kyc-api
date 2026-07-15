@@ -59,6 +59,21 @@ function dateLabel(iso: string): string {
   return `${date}, ${time}`;
 }
 
+/** Turn a getUserMedia failure into an actionable message. */
+function cameraErrorMessage(err: unknown): string {
+  const name = (err as DOMException)?.name;
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Camera permission was blocked. Allow camera access in your browser, then try again.';
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No camera was found on this device.';
+  }
+  if (name === 'NotReadableError') {
+    return 'The camera is being used by another app. Close it and try again.';
+  }
+  return 'Could not access the camera — please try again.';
+}
+
 /**
  * Agent application: New Verification (live camera capture → POST /kyc/verify),
  * My Submissions (agent-scoped list + detail), and Profile (/auth/me +
@@ -141,20 +156,39 @@ export class AgentComponent {
   async openCamera(key: DocKey): Promise<void> {
     this.cameraError.set('');
     const media = navigator.mediaDevices;
-    if (!media?.getUserMedia) {
-      this.cameraError.set('Camera not available on this device.');
+    // getUserMedia (which triggers the browser's permission prompt) only exists
+    // in a secure context — https or http://localhost. Over a plain LAN IP
+    // (e.g. testing on a phone) it's unavailable, so guide the user there.
+    if (!window.isSecureContext || !media?.getUserMedia) {
       this.cameraOpen.set(key);
+      this.cameraError.set(
+        'The camera needs a secure connection. Open the app on ' +
+          'http://localhost:4200, or serve it over HTTPS to use a phone.',
+      );
       return;
     }
     try {
-      this.stream = await media.getUserMedia({
+      this.stream = await this.requestCamera(key);
+      this.cameraOpen.set(key);
+    } catch (err) {
+      this.cameraOpen.set(key);
+      this.cameraError.set(cameraErrorMessage(err));
+    }
+  }
+
+  /** Ask for the rear camera for IDs / front for selfies, falling back to any. */
+  private async requestCamera(key: DocKey): Promise<MediaStream> {
+    const media = navigator.mediaDevices;
+    try {
+      return await media.getUserMedia({
         video: { facingMode: key === 'selfie' ? 'user' : 'environment' },
         audio: false,
       });
-      this.cameraOpen.set(key);
-    } catch {
-      this.cameraError.set('Could not access the camera — check permissions.');
-      this.cameraOpen.set(key);
+    } catch (err) {
+      if ((err as DOMException)?.name === 'OverconstrainedError') {
+        return media.getUserMedia({ video: true, audio: false });
+      }
+      throw err;
     }
   }
 

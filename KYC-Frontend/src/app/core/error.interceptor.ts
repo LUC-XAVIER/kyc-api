@@ -17,6 +17,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         req.url.includes('/auth/login') ||
         req.url.includes('/auth/forgot-pin') ||
         req.url.includes('/auth/reset-pin') ||
+        req.url.includes('/auth/change-pin') ||
         req.url.includes('/onboarding/');
       if (err.status === 401 && !isAuthFlow && auth.isAuthenticated()) {
         auth.logout();
