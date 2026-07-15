@@ -197,7 +197,9 @@ def change_pin(
     if not agent.hashed_pin or not verify_password(
         payload.current_pin, agent.hashed_pin
     ):
-        raise AuthenticationError("Current PIN is incorrect.")
+        # A 400 (not 401): the session is valid, only the entered PIN is
+        # wrong. A 401 would trip the client's auto-logout on expired sessions.
+        raise ValidationError("Current PIN is incorrect.")
     agent.hashed_pin = hash_password(payload.new_pin)
     db.flush()
     return {"status": "changed"}

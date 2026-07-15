@@ -363,7 +363,9 @@ def test_change_pin_requires_current_pin(
         json={"current_pin": "000000", "new_pin": "222222"},
         headers=headers,
     )
-    assert wrong.status_code == 401
+    # A wrong current PIN is a 400 (validation), not a 401 — a 401 would trip
+    # the client's auto-logout even though the session is still valid.
+    assert wrong.status_code == 400
 
     ok = api_client.post(
         CHANGE_PIN_URL,

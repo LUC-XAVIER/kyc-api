@@ -58,10 +58,13 @@ def list_agents(
     principal: Principal = Depends(require_manager_principal),
     db: Session = Depends(get_db),
 ) -> list[User]:
-    """List the MFI's agents, ordered by name."""
+    """List the MFI's agents (role AGENT only), ordered by name."""
     return (
         db.query(User)
-        .filter_by(mfi_account_id=principal.mfi_account.id)
+        .filter_by(
+            mfi_account_id=principal.mfi_account.id,
+            role=AgentRole.AGENT,
+        )
         .order_by(User.full_name)
         .all()
     )

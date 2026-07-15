@@ -59,6 +59,28 @@ def test_create_list_and_login_roundtrip(
     assert login.json()["role"] == "AGENT"
 
 
+def test_list_excludes_managers(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """The agents list holds AGENT-role users only, not managers."""
+    account, key = create_mfi_with_key(db_session)
+    create_agent(
+        db_session, account, email="boss@mfi.cm", phone="699111111",
+        role=AgentRole.MANAGER, full_name="The Manager",
+    )
+    create_agent(
+        db_session, account, email=None, phone="699222222",
+        role=AgentRole.AGENT, full_name="Field Agent",
+    )
+
+    listing = api_client.get(AGENTS_URL, headers=_auth(key)).json()
+    roles = {a["role"] for a in listing}
+    names = {a["full_name"] for a in listing}
+    assert roles == {"AGENT"}
+    assert "The Manager" not in names
+    assert "Field Agent" in names
+
+
 def test_create_rejects_unknown_branch(
     api_client: TestClient, db_session: Session
 ) -> None:
