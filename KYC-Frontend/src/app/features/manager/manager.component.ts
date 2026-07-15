@@ -2,7 +2,12 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { VerificationStats } from '../../core/models';
+import {
+  ReviewItem,
+  VerificationDetail,
+  VerificationStats,
+  VerificationSummary,
+} from '../../core/models';
 
 /** ISO yyyy-mm-dd for a Date (local calendar day). */
 function isoDate(d: Date): string {
@@ -86,7 +91,8 @@ type HistoryStatus =
   | 'Rejected'
   | 'Approved';
 
-interface QueueCase {
+/** A review-queue row shaped for the template (built from ReviewItem). */
+interface QueueRow {
   id: string;
   initials: string;
   name: string;
@@ -95,12 +101,9 @@ interface QueueCase {
   reason: ReviewReason;
   score: string;
   submitted: string;
-  faceMatch: string;
-  ocr: string;
-  dupSim: string;
-  dupWarning?: string;
 }
 
+/** A history row shaped for the template (built from VerificationSummary). */
 interface HistoryRow {
   id: string;
   name: string;
@@ -112,26 +115,50 @@ interface HistoryRow {
   score: string;
 }
 
-const QUEUE_CASES: QueueCase[] = [
-  { id: 'CLT-00482', initials: 'JF', name: 'FOTSO Jean-Pierre', client: 'CLT-00482', agent: 'Jeanne Mbarga', reason: 'Duplicate', score: '0.94', submitted: '2 min ago', faceMatch: '0.91 — match', ocr: '0.97', dupSim: '0.94 — high', dupWarning: 'Matches existing client CLT-00119 (KAMGA Jean-Paul) registered 14 Feb 2026 at Mvog-Ada branch. Review before approving.' },
-  { id: 'CLT-00481', initials: 'MN', name: 'NGO Marie', client: 'CLT-00481', agent: 'Pierre Onana', reason: 'Low confidence', score: '0.71', submitted: '18 min ago', faceMatch: '0.71 — weak', ocr: '0.82', dupSim: '0.12 — low' },
-  { id: 'CLT-00479', initials: 'PT', name: 'TCHOUMI Paul', client: 'CLT-00479', agent: 'Roger Tabi', reason: 'Duplicate', score: '0.89', submitted: '1h ago', faceMatch: '0.88 — match', ocr: '0.95', dupSim: '0.89 — high', dupWarning: 'Similar to client CLT-00203 (TCHOUMI P.) registered 3 Mar 2026 at Mokolo branch. Review before approving.' },
-  { id: 'CLT-00471', initials: 'SA', name: 'ABENA Sandrine', client: 'CLT-00471', agent: 'Sandrine Ekotto', reason: 'Low confidence', score: '0.68', submitted: '3h ago', faceMatch: '0.68 — weak', ocr: '0.79', dupSim: '0.08 — low' },
-  { id: 'CLT-00468', initials: 'RK', name: 'KAMDEM Robert', client: 'CLT-00468', agent: 'Boris Nguele', reason: 'Duplicate', score: '0.91', submitted: '5h ago', faceMatch: '0.90 — match', ocr: '0.93', dupSim: '0.91 — high', dupWarning: 'Matches existing client CLT-00087 (KAMDEM R.) registered 2 Jan 2026 at Mvog-Ada branch. Review before approving.' },
-];
-
-const HISTORY_ROWS: HistoryRow[] = [
-  { id: 'CLT-00482', name: 'FOTSO Jean-Pierre', date: '17 Jun, 14:32', branch: 'Mvog-Ada', agent: 'J. Mbarga', channel: 'Dashboard', status: 'Verified', score: '96%' },
-  { id: 'CLT-00481', name: 'NGO Marie-Claire', date: '17 Jun, 11:14', branch: 'Biyem-Assi', agent: 'P. Onana', channel: 'API', status: 'Verified', score: '93%' },
-  { id: 'CLT-00480', name: 'TABI Roger', date: '16 Jun, 15:08', branch: 'Mokolo', agent: 'R. Tabi', channel: 'Dashboard', status: 'Pending', score: '78%' },
-  { id: 'CLT-00479', name: 'MVOGO Pauline', date: '16 Jun, 14:55', branch: 'Mvog-Ada', agent: 'J. Mbarga', channel: 'Dashboard', status: 'Verified', score: '91%' },
-  { id: 'CLT-00478', name: 'EKOTTO Samuel', date: '15 Jun, 10:30', branch: 'Bafoussam', agent: 'S. Ekotto', channel: 'API', status: 'Rejected', score: '31%' },
-  { id: 'CLT-00477', name: 'ATEBA Christine', date: '15 Jun, 09:18', branch: 'Biyem-Assi', agent: 'P. Onana', channel: 'Dashboard', status: 'Approved', score: '88%' },
-  { id: 'CLT-00476', name: 'BEKONO Lionel', date: '14 Jun, 16:42', branch: 'Mvog-Ada', agent: 'J. Mbarga', channel: 'Dashboard', status: 'Verified', score: '94%' },
-  { id: 'CLT-00475', name: 'NKODO Sylvie', date: '14 Jun, 11:05', branch: 'Mokolo', agent: 'R. Tabi', channel: 'API', status: 'Verified', score: '97%' },
-];
-
 const HISTORY_PAGE_SIZE = 6;
+
+/** Initials from a name, e.g. "FOTSO Jean" → "FJ". */
+function initialsOf(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || '—'
+  );
+}
+
+/** VERIFIED → Verified, for the status badge/label. */
+function statusLabel(s: string): HistoryStatus {
+  return (s.charAt(0) + s.slice(1).toLowerCase()) as HistoryStatus;
+}
+
+/** A 0–1 confidence as a percentage string, or an em dash. */
+function scoreLabel(score: number | null): string {
+  return score == null ? '—' : `${Math.round(score * 100)}%`;
+}
+
+/** "17 Jun, 14:32" from an ISO timestamp. */
+function dateLabel(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${date}, ${time}`;
+}
+
+/** Rough "2 min ago" / "3h ago" / "5d ago" from an ISO timestamp. */
+function relativeTime(iso: string): string {
+  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.floor(secs / 60)} min ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
 
 const AGENTS: AgentRow[] = [
   { name: 'Jeanne Mbarga', agentId: 'AGT-014', initials: 'JM', branch: 'Mvog-Ada', submissions: 142, lastActive: 'Today, 14:28', active: true, rate: '94%', avgTime: '4.3s', email: 'j.mbarga@camfinance.cm', added: '12 January 2026' },
@@ -203,13 +230,20 @@ export class ManagerComponent {
 
   readonly page = signal<ManagerPage>('dashboard');
 
-  // Review queue
-  readonly queueIds = signal<string[]>(QUEUE_CASES.map((c) => c.id));
-  readonly activeCaseId = signal<string | null>(QUEUE_CASES[0].id);
+  // Review queue (real data)
+  readonly reviewData = signal<ReviewItem[]>([]);
+  readonly reviewLoading = signal(false);
+  readonly reviewError = signal(false);
+  readonly activeCaseId = signal<string | null>(null);
+  readonly activeDetail = signal<VerificationDetail | null>(null);
   readonly reviewReason = signal<'all' | ReviewReason>('all');
   readonly reviewSearch = signal('');
+  readonly deciding = signal(false);
 
-  // History
+  // History (real data)
+  readonly historyData = signal<VerificationSummary[]>([]);
+  readonly historyLoading = signal(false);
+  readonly historyError = signal(false);
   readonly historyStatus = signal<'All' | HistoryStatus>('All');
   readonly historySearch = signal('');
   readonly historyPage = signal(1);
@@ -322,11 +356,44 @@ export class ManagerComponent {
   });
 
   // ---- Review queue ----
-  readonly queueCases = computed(() => {
+  loadReviews(): void {
+    this.reviewLoading.set(true);
+    this.reviewError.set(false);
+    this.api.listReviews().subscribe({
+      next: (items) => {
+        this.reviewData.set(items);
+        this.reviewLoading.set(false);
+        const first = this.queueCases()[0]?.id ?? null;
+        if (first && !this.reviewData().some((r) => r.id === this.activeCaseId())) {
+          this.selectCase(first);
+        }
+      },
+      error: () => {
+        this.reviewError.set(true);
+        this.reviewLoading.set(false);
+      },
+    });
+  }
+
+  private toQueueRow(r: ReviewItem): QueueRow {
+    const name = r.client_name ?? r.client_id;
+    return {
+      id: r.id,
+      initials: initialsOf(name),
+      name,
+      client: r.client_id,
+      agent: r.agent_name ?? '—',
+      reason: r.flagged_duplicate ? 'Duplicate' : 'Low confidence',
+      score: r.confidence_score == null ? '—' : r.confidence_score.toFixed(2),
+      submitted: relativeTime(r.created_at),
+    };
+  }
+
+  readonly queueCases = computed<QueueRow[]>(() => {
     const reason = this.reviewReason();
     const q = this.reviewSearch().trim().toLowerCase();
-    return this.queueIds()
-      .map((id) => QUEUE_CASES.find((c) => c.id === id)!)
+    return this.reviewData()
+      .map((r) => this.toQueueRow(r))
       .filter((c) => reason === 'all' || c.reason === reason)
       .filter(
         (c) =>
@@ -336,7 +403,7 @@ export class ManagerComponent {
       );
   });
 
-  readonly queueCount = computed(() => this.queueIds().length);
+  readonly queueCount = computed(() => this.reviewData().length);
 
   readonly activeCase = computed(
     () =>
@@ -344,18 +411,77 @@ export class ManagerComponent {
       this.queueCases()[0],
   );
 
+  // Detail pane, derived from the fetched VerificationDetail.
+  readonly detailFaceMatch = computed(() => {
+    const fm = this.activeDetail()?.face_match_result;
+    if (!fm) return '—';
+    return `${fm.match_score.toFixed(2)} — ${fm.verified ? 'match' : 'weak'}`;
+  });
+  readonly detailLiveness = computed(() => {
+    const lv = this.activeDetail()?.liveness_result;
+    if (!lv) return '—';
+    return lv.passed ? 'Passed' : 'Failed';
+  });
+  readonly detailOcr = computed(() => {
+    const conf = this.activeDetail()?.extracted_data?.field_confidences;
+    if (!conf) return '—';
+    const vals = Object.values(conf).filter((v) => typeof v === 'number');
+    if (!vals.length) return '—';
+    return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+  });
+  readonly detailDup = computed(() => {
+    const flags = this.activeDetail()?.duplicate_flags ?? [];
+    if (!flags.length) return { sim: '—', warning: '' };
+    const top = flags.reduce((a, b) =>
+      b.similarity_score > a.similarity_score ? b : a,
+    );
+    const level = top.similarity_score >= 0.7 ? 'high' : 'low';
+    const warning = top.matched_client_id
+      ? `Matches existing client ${top.matched_client_id}. Review before approving.`
+      : '';
+    return { sim: `${top.similarity_score.toFixed(2)} — ${level}`, warning };
+  });
+
   // ---- History ----
+  loadHistory(): void {
+    this.historyLoading.set(true);
+    this.historyError.set(false);
+    this.api.listVerifications().subscribe({
+      next: (rows) => {
+        this.historyData.set(rows);
+        this.historyLoading.set(false);
+      },
+      error: () => {
+        this.historyError.set(true);
+        this.historyLoading.set(false);
+      },
+    });
+  }
+
+  readonly historyRows = computed<HistoryRow[]>(() =>
+    this.historyData().map((r) => ({
+      id: r.client_id,
+      name: r.client_name ?? '—',
+      date: dateLabel(r.created_at),
+      branch: r.branch_name ?? '—',
+      agent: r.agent_name ?? '—',
+      channel: r.submission_method === 'API' ? 'API' : 'Dashboard',
+      status: statusLabel(r.status),
+      score: scoreLabel(r.confidence_score),
+    })),
+  );
+
   readonly historyFiltered = computed(() => {
     const status = this.historyStatus();
     const q = this.historySearch().trim().toLowerCase();
-    return HISTORY_ROWS.filter(
-      (r) => status === 'All' || r.status === status,
-    ).filter(
-      (r) =>
-        !q ||
-        r.id.toLowerCase().includes(q) ||
-        r.name.toLowerCase().includes(q),
-    );
+    return this.historyRows()
+      .filter((r) => status === 'All' || r.status === status)
+      .filter(
+        (r) =>
+          !q ||
+          r.id.toLowerCase().includes(q) ||
+          r.name.toLowerCase().includes(q),
+      );
   });
 
   readonly historyPageCount = computed(() =>
@@ -373,17 +499,38 @@ export class ManagerComponent {
 
   setPage(p: ManagerPage): void {
     this.page.set(p);
+    if (p === 'review') this.loadReviews();
+    if (p === 'history') this.loadHistory();
   }
 
   selectCase(id: string): void {
     this.activeCaseId.set(id);
+    this.activeDetail.set(null);
+    this.api.getVerification(id).subscribe({
+      next: (d) => {
+        if (this.activeCaseId() === id) this.activeDetail.set(d);
+      },
+      error: () => undefined,
+    });
   }
 
-  resolveCase(): void {
+  /** Approve or reject the active case, then drop it from the queue. */
+  resolveCase(action: 'approve' | 'reject'): void {
     const id = this.activeCaseId();
-    const next = this.queueIds().filter((q) => q !== id);
-    this.queueIds.set(next);
-    this.activeCaseId.set(next[0] ?? null);
+    if (!id || this.deciding()) return;
+    this.deciding.set(true);
+    this.api.decideReview(id, action).subscribe({
+      next: () => {
+        const next = this.reviewData().filter((r) => r.id !== id);
+        this.reviewData.set(next);
+        this.activeDetail.set(null);
+        this.deciding.set(false);
+        const following = this.queueCases()[0]?.id ?? null;
+        this.activeCaseId.set(null);
+        if (following) this.selectCase(following);
+      },
+      error: () => this.deciding.set(false),
+    });
   }
 
   setReviewReason(r: 'all' | ReviewReason): void {
@@ -432,7 +579,7 @@ export class ManagerComponent {
   readonly reportStatus = signal('All statuses');
   readonly reportGenerating = signal(false);
   readonly reportGenerated = signal(false);
-  readonly reportRows = HISTORY_ROWS.slice(0, 5);
+  readonly reportRows = computed(() => this.historyRows().slice(0, 5));
 
   generateReport(): void {
     if (this.reportGenerating()) return;

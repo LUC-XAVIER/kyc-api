@@ -135,6 +135,14 @@
 
       <!-- REVIEW QUEUE -->
       @if (page() === 'review') {
+        @if (reviewLoading()) {
+          <div class="state-msg">Loading review queue…</div>
+        } @else if (reviewError()) {
+          <div class="state-msg state-msg--error">
+            Could not load the review queue.
+            <button class="link-btn" (click)="loadReviews()">Retry</button>
+          </div>
+        }
         <div class="filter-tabs">
           <button class="filter-tab" [class.is-active]="reviewReason() === 'all'" (click)="setReviewReason('all')">All <span class="count-pill">{{ queueCount() }}</span></button>
           <button class="filter-tab" [class.is-active]="reviewReason() === 'Duplicate'" (click)="setReviewReason('Duplicate')">Duplicate flagged</button>
@@ -164,16 +172,16 @@
                 <div class="thumb">📷<span>Selfie capture</span></div>
                 <div class="thumb">📄<span>NIC photo</span></div>
               </div>
-              <div class="kv"><span>Face match score</span><b class="text-green">{{ c.faceMatch }}</b></div>
-              <div class="kv"><span>Liveness check</span><b>Passed</b></div>
-              <div class="kv"><span>OCR confidence</span><b>{{ c.ocr }}</b></div>
-              <div class="kv kv--last"><span>Duplicate similarity</span><b class="text-red">{{ c.dupSim }}</b></div>
-              @if (c.dupWarning) {
-                <div class="warn-box">⚠ {{ c.dupWarning }}</div>
+              <div class="kv"><span>Face match score</span><b class="text-green">{{ detailFaceMatch() }}</b></div>
+              <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
+              <div class="kv"><span>OCR confidence</span><b>{{ detailOcr() }}</b></div>
+              <div class="kv kv--last"><span>Duplicate similarity</span><b class="text-red">{{ detailDup().sim }}</b></div>
+              @if (detailDup().warning) {
+                <div class="warn-box">⚠ {{ detailDup().warning }}</div>
               }
               <div class="review-actions">
-                <button class="ox-btn btn-approve" (click)="resolveCase()">Approve</button>
-                <button class="ox-btn btn-reject" (click)="resolveCase()">Reject</button>
+                <button class="ox-btn btn-approve" [disabled]="deciding()" (click)="resolveCase('approve')">Approve</button>
+                <button class="ox-btn btn-reject" [disabled]="deciding()" (click)="resolveCase('reject')">Reject</button>
               </div>
             </aside>
           }
@@ -182,6 +190,14 @@
 
       <!-- HISTORY -->
       @if (page() === 'history') {
+        @if (historyLoading()) {
+          <div class="state-msg">Loading history…</div>
+        } @else if (historyError()) {
+          <div class="state-msg state-msg--error">
+            Could not load history.
+            <button class="link-btn" (click)="loadHistory()">Retry</button>
+          </div>
+        }
         <div class="history-tabbar">
           <div class="filter-tabs">
             @for (s of historyStatuses; track s) {
@@ -258,7 +274,7 @@
                 <div class="report-kpi"><div class="report-kpi__n">36</div><div class="report-kpi__l">Rejected</div></div>
               </div>
               <div class="report-table__head"><div>CLIENT ID</div><div>DATE</div><div>BRANCH</div><div>STATUS</div></div>
-              @for (r of reportRows; track r.id) {
+              @for (r of reportRows(); track r.id) {
                 <div class="report-table__row"><div>{{ r.id }}</div><div>{{ r.date }}</div><div>{{ r.branch }}</div><div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div></div>
               }
               <div class="report-doc__foot"><span>Confidential — for COBAC audit purposes only</span><span>Page 1 of 24</span></div>

@@ -21,9 +21,13 @@ export type AgentStatus = 'ACTIVE' | 'DISABLED';
 export interface VerificationSummary {
   id: string;
   client_id: string;
+  client_name: string | null;
   status: VerificationStatus;
   reject_reason: string | null;
   confidence_score: number | null;
+  submission_method: SubmissionMethod;
+  agent_name: string | null;
+  branch_name: string | null;
   created_at: string;
 }
 
@@ -58,7 +62,6 @@ export interface DuplicateFlag {
 }
 
 export interface VerificationDetail extends VerificationSummary {
-  submission_method: SubmissionMethod;
   processed_at: string | null;
   extracted_data: ExtractedData | null;
   liveness_result: LivenessResult | null;
@@ -106,9 +109,13 @@ export interface VerificationStats {
 export interface ReviewItem {
   id: string;
   client_id: string;
+  client_name: string | null;
   status: VerificationStatus;
   reject_reason: string | null;
   confidence_score: number | null;
+  agent_name: string | null;
+  branch_name: string | null;
+  flagged_duplicate: boolean;
   created_at: string;
 }
 

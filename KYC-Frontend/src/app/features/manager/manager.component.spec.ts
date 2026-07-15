@@ -1,11 +1,50 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+
 import { ManagerComponent } from './manager.component';
+import { API_URL } from '../../core/config';
+import { ReviewItem, VerificationSummary } from '../../core/models';
+
+function review(over: Partial<ReviewItem>): ReviewItem {
+  return {
+    id: 'v1',
+    client_id: 'CLT-1',
+    client_name: 'Test Client',
+    status: 'PENDING',
+    reject_reason: null,
+    confidence_score: 0.7,
+    agent_name: 'Agent A',
+    branch_name: 'Central',
+    flagged_duplicate: false,
+    created_at: new Date().toISOString(),
+    ...over,
+  };
+}
+
+function summary(over: Partial<VerificationSummary>): VerificationSummary {
+  return {
+    id: 'v1',
+    client_id: 'CLT-1',
+    client_name: 'Test Client',
+    status: 'VERIFIED',
+    reject_reason: null,
+    confidence_score: 0.9,
+    submission_method: 'DASHBOARD',
+    agent_name: 'Agent A',
+    branch_name: 'Central',
+    created_at: new Date().toISOString(),
+    ...over,
+  };
+}
 
 describe('ManagerComponent', () => {
   let component: ManagerComponent;
+  let http: HttpTestingController;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -17,6 +56,11 @@ describe('ManagerComponent', () => {
       ],
     }).compileComponents();
     component = TestBed.createComponent(ManagerComponent).componentInstance;
+    http = TestBed.inject(HttpTestingController);
+    // The constructor kicks off a dashboard stats request; drain it so it
+    // doesn't interfere with the per-test expectations below.
+    const stats = http.match((r) => r.url.endsWith('/kyc/verifications/stats'));
+    stats.forEach((r) => r.flush({}, { status: 200, statusText: 'OK' }));
   });
 
   it('starts on the dashboard', () => {
@@ -24,27 +68,48 @@ describe('ManagerComponent', () => {
   });
 
   it('filters the review queue by reason', () => {
+    component.loadReviews();
+    http.expectOne(`${API_URL}/kyc/reviews`).flush([
+      review({ id: 'a', flagged_duplicate: true }),
+      review({ id: 'b', flagged_duplicate: false }),
+    ]);
     component.setReviewReason('Duplicate');
-    expect(
-      component.queueCases().every((c) => c.reason === 'Duplicate'),
-    ).toBeTrue();
+    expect(component.queueCases().every((c) => c.reason === 'Duplicate')).toBeTrue();
+    expect(component.queueCases().length).toBe(1);
   });
 
   it('searches the review queue by client or name', () => {
+    component.loadReviews();
+    http.expectOne(`${API_URL}/kyc/reviews`).flush([
+      review({ id: 'a', client_name: 'NGO Marie' }),
+      review({ id: 'b', client_name: 'FOTSO Jean' }),
+    ]);
     component.reviewSearch.set('ngo');
     const rows = component.queueCases();
     expect(rows.length).toBe(1);
     expect(rows[0].name).toContain('NGO');
   });
 
-  it('removes the active case from the queue on resolve', () => {
+  it('removes the active case from the queue on approve', () => {
+    component.loadReviews();
+    http.expectOne(`${API_URL}/kyc/reviews`).flush([
+      review({ id: 'a' }),
+      review({ id: 'b' }),
+    ]);
     const before = component.queueCount();
-    component.resolveCase();
+    component.resolveCase('approve');
+    http
+      .expectOne(`${API_URL}/kyc/reviews/a/decision`)
+      .flush({ verification_id: 'a', status: 'APPROVED' });
     expect(component.queueCount()).toBe(before - 1);
   });
 
   it('filters history by status and resets to page 1', () => {
-    component.goToPage(2);
+    component.loadHistory();
+    http.expectOne(`${API_URL}/kyc/verifications`).flush([
+      summary({ id: '1', status: 'VERIFIED' }),
+      summary({ id: '2', status: 'REJECTED' }),
+    ]);
     component.setHistoryStatus('Verified');
     expect(component.historyPage()).toBe(1);
     expect(
@@ -53,6 +118,11 @@ describe('ManagerComponent', () => {
   });
 
   it('paginates the history view', () => {
+    component.loadHistory();
+    const rows = Array.from({ length: 8 }, (_, i) =>
+      summary({ id: `v${i}`, client_id: `CLT-${i}` }),
+    );
+    http.expectOne(`${API_URL}/kyc/verifications`).flush(rows);
     expect(component.historyPageCount()).toBe(2);
     expect(component.historyPaged().length).toBe(6);
     component.goToPage(2);
