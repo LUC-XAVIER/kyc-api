@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 import { API_URL } from './config';
 import {
   AccountSummary,
+  AgentProfile,
   AgentSummary,
   ApiKeyCreated,
   ApiKeySummary,
@@ -61,6 +62,11 @@ export class ApiService {
   // ---- Verify (agent capture) ----
   verify(form: FormData): Observable<VerifyResponse> {
     return this.http.post<VerifyResponse>(`${this.base}/kyc/verify`, form);
+  }
+
+  // ---- Profile ----
+  me(): Observable<AgentProfile> {
+    return this.http.get<AgentProfile>(`${this.base}/auth/me`);
   }
 
   // ---- Review queue ----

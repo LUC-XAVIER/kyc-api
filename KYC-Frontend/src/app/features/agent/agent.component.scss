@@ -575,3 +575,32 @@
   .table__head, .table__row--sub { min-width: 460px; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
 }
+
+// Phase D4 — live camera capture + async states
+.state-msg {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: var(--ox-surface-2, #f3f4f6);
+  color: var(--ox-text-muted, #555);
+  font-size: 14px;
+}
+.state-msg--error { background: #fdecec; color: var(--ox-red, #c0392b); }
+
+.doc-box__preview {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.camera-modal { width: min(520px, 92vw); }
+.camera-video {
+  width: 100%;
+  border-radius: 10px;
+  background: #000;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  margin-bottom: 14px;
+}
