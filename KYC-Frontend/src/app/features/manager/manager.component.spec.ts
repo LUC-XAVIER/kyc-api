@@ -57,10 +57,15 @@ describe('ManagerComponent', () => {
     }).compileComponents();
     component = TestBed.createComponent(ManagerComponent).componentInstance;
     http = TestBed.inject(HttpTestingController);
-    // The constructor kicks off a dashboard stats request; drain it so it
-    // doesn't interfere with the per-test expectations below.
-    const stats = http.match((r) => r.url.endsWith('/kyc/verifications/stats'));
-    stats.forEach((r) => r.flush({}, { status: 200, statusText: 'OK' }));
+    // The constructor kicks off dashboard stats + account requests; drain them
+    // so they don't interfere with the per-test expectations below.
+    http
+      .match(
+        (r) =>
+          r.url.endsWith('/kyc/verifications/stats') ||
+          r.url.endsWith('/account'),
+      )
+      .forEach((r) => r.flush({}, { status: 200, statusText: 'OK' }));
   });
 
   it('starts on the dashboard', () => {
@@ -135,24 +140,70 @@ describe('ManagerComponent', () => {
     expect(() => component.exportHistoryCsv()).not.toThrow();
   });
 
-  it('adds an agent through the modal', () => {
-    const before = component.agentCount();
+  it('creates an agent through the modal', () => {
+    component.loadAgents();
+    http.expectOne(`${API_URL}/agents`).flush([]);
+    http.expectOne(`${API_URL}/branches`).flush([{ id: 'b1', name: 'Central' }]);
+
     component.openAddAgent();
     component.setAgentField('name', 'Test User');
-    component.setAgentField('email', 't@x.cm');
+    component.setAgentField('phone', '+237699001122');
+    component.setAgentField('pin', '123456');
+    component.setAgentField('branchId', 'b1');
     component.saveAgent();
-    expect(component.agentCount()).toBe(before + 1);
+
+    const created = {
+      id: 'a1',
+      full_name: 'Test User',
+      email: null,
+      phone: '+237699001122',
+      branch_id: 'b1',
+      branch_name: 'Central',
+      role: 'AGENT',
+      status: 'ACTIVE',
+    };
+    http.expectOne(`${API_URL}/agents`).flush(created); // POST
+    // Success reloads the list + branches.
+    http.expectOne(`${API_URL}/agents`).flush([created]);
+    http.expectOne(`${API_URL}/branches`).flush([{ id: 'b1', name: 'Central' }]);
+
     expect(component.agentModalOpen()).toBeFalse();
+    expect(component.agentCount()).toBe(1);
+  });
+
+  it('rejects an agent with an invalid phone', () => {
+    component.openAddAgent();
+    component.setAgentField('name', 'Bad Phone');
+    component.setAgentField('phone', '123');
+    component.setAgentField('pin', '123456');
+    component.setAgentField('branchId', 'b1');
+    component.saveAgent();
+    http.expectNone(`${API_URL}/agents`);
+    expect(component.agentFormError()).toContain('phone');
   });
 
   it('generates an API key revealed once, then revokes it', () => {
-    const before = component.keys().length;
+    component.loadKeys();
+    http.expectOne(`${API_URL}/api-keys`).flush([]);
     component.generateKey();
-    expect(component.keys().length).toBe(before + 1);
-    const created = component.keys()[0];
-    expect(created.fullKey).toBeTruthy();
-    component.revokeKey(created.id);
-    expect(component.keys().some((k) => k.id === created.id)).toBeFalse();
+    http.expectOne(`${API_URL}/api-keys`).flush({
+      id: 'k1',
+      prefix: 'kyc_live_abc',
+      full_key: 'kyc_live_abcSECRET',
+      created_at: new Date().toISOString(),
+    });
+    expect(component.keys().length).toBe(1);
+    expect(component.keys()[0].fullKey).toBe('kyc_live_abcSECRET');
+
+    component.revokeKey('k1');
+    http.expectOne(`${API_URL}/api-keys/k1`).flush({
+      id: 'k1',
+      prefix: 'kyc_live_abc',
+      is_active: false,
+      created_at: new Date().toISOString(),
+      last_used_at: null,
+    });
+    expect(component.keys().some((k) => k.id === 'k1')).toBeFalse();
   });
 
   it('switches settings tabs and navigates to/from pricing', () => {

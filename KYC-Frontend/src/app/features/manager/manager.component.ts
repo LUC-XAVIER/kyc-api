@@ -3,11 +3,20 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import {
+  AccountSummary,
+  AgentSummary,
+  ApiKeyCreated,
+  BranchSummary,
+  ReportSummary,
   ReviewItem,
   VerificationDetail,
   VerificationStats,
   VerificationSummary,
 } from '../../core/models';
+import {
+  isValidPin,
+  normalizeCmPhone,
+} from '../../core/validators';
 
 /** ISO yyyy-mm-dd for a Date (local calendar day). */
 function isoDate(d: Date): string {
@@ -27,6 +36,12 @@ function pct(part: number | undefined, total: number | undefined): number {
   return Math.round((part / total) * 1000) / 10;
 }
 
+/** Pull the backend error message out of an HttpErrorResponse, else fallback. */
+function apiMessage(err: unknown, fallback: string): string {
+  const body = (err as { error?: { error?: { message?: string } } })?.error;
+  return body?.error?.message ?? fallback;
+}
+
 type ManagerPage =
   | 'dashboard'
   | 'review'
@@ -44,33 +59,15 @@ type SettingsTab =
   | 'Security'
   | 'Danger zone';
 
-interface AgentRow {
-  name: string;
-  agentId: string;
-  initials: string;
-  branch: string;
-  submissions: number;
-  lastActive: string;
-  active: boolean;
-  rate: string;
-  avgTime: string;
-  email: string;
-  added: string;
-}
-
+/** A key card shaped for the template (built from ApiKeySummary/Created). */
 interface ApiKeyRow {
-  id: number;
-  name: string;
+  id: string;
+  prefix: string;
   created: string;
   lastUsed: string;
-  masked: string;
-  rateLimit: string;
-  reqToday: number;
-  thisMonth: number;
-  expires: string;
-  quotaPct: number;
   active: boolean;
   copied: boolean;
+  /** Present only right after creation — the one time we can show it. */
   fullKey?: string;
 }
 
@@ -160,22 +157,6 @@ function relativeTime(iso: string): string {
   return `${Math.floor(secs / 86400)}d ago`;
 }
 
-const AGENTS: AgentRow[] = [
-  { name: 'Jeanne Mbarga', agentId: 'AGT-014', initials: 'JM', branch: 'Mvog-Ada', submissions: 142, lastActive: 'Today, 14:28', active: true, rate: '94%', avgTime: '4.3s', email: 'j.mbarga@camfinance.cm', added: '12 January 2026' },
-  { name: 'Pierre Onana', agentId: 'AGT-015', initials: 'PO', branch: 'Biyem-Assi', submissions: 98, lastActive: 'Today, 11:02', active: true, rate: '92%', avgTime: '4.6s', email: 'p.onana@camfinance.cm', added: '18 January 2026' },
-  { name: 'Roger Tabi', agentId: 'AGT-016', initials: 'RT', branch: 'Mokolo', submissions: 76, lastActive: 'Yesterday', active: true, rate: '90%', avgTime: '4.9s', email: 'r.tabi@camfinance.cm', added: '2 February 2026' },
-  { name: 'Sandrine Ekotto', agentId: 'AGT-017', initials: 'SE', branch: 'Bafoussam', submissions: 54, lastActive: '16 Jun', active: true, rate: '89%', avgTime: '5.1s', email: 's.ekotto@camfinance.cm', added: '10 February 2026' },
-  { name: 'Boris Nguele', agentId: 'AGT-018', initials: 'BN', branch: 'Mvog-Ada', submissions: 38, lastActive: '15 Jun', active: true, rate: '87%', avgTime: '5.3s', email: 'b.nguele@camfinance.cm', added: '20 February 2026' },
-  { name: 'Celine Ateba', agentId: 'AGT-019', initials: 'CA', branch: 'Biyem-Assi', submissions: 21, lastActive: '14 Jun', active: false, rate: '81%', avgTime: '5.8s', email: 'c.ateba@camfinance.cm', added: '1 March 2026' },
-];
-
-const PLAN_MAX_AGENTS = 15;
-
-const API_KEYS_DATA: ApiKeyRow[] = [
-  { id: 1, name: 'Production key', created: '12 Jan 2026', lastUsed: 'today, 14:31', masked: 'kyc_live_a7f3e2b19d84c6••••••••••••••••••', rateLimit: '100 req / min', reqToday: 284, thisMonth: 847, expires: 'Never', quotaPct: 84.7, active: true, copied: false },
-  { id: 2, name: 'Staging / test key', created: '20 Jan 2026', lastUsed: '10 Jun 2026', masked: 'kyc_test_b9c1d5e28f71a4••••••••••••••••••', rateLimit: '20 req / min', reqToday: 0, thisMonth: 12, expires: '31 Dec 2026', quotaPct: 1.2, active: true, copied: false },
-];
-
 const PLANS: Plan[] = [
   { name: 'Starter', tagline: 'For single-branch MFIs and pilots', price: '25,000', period: 'FCFA/mo', volume: '200 verifications / month', popular: false, features: ['Dashboard for 1 branch', 'Up to 3 agent accounts', 'Face match + liveness + OCR', 'Duplicate detection', 'Monthly compliance report', 'Email support'] },
   { name: 'Growth', tagline: 'For multi-branch MFIs', price: '65,000', period: 'FCFA/mo', volume: '1,000 verifications / month', popular: false, features: ['Dashboard for up to 5 branches', 'Up to 15 agent accounts', 'Everything in Starter', 'On-demand compliance reports', 'API access for integration', 'Priority email support'] },
@@ -211,6 +192,7 @@ export class ManagerComponent {
 
   constructor() {
     this.loadStats();
+    this.loadAccount();
   }
   readonly userInitials = computed(() => {
     const name = this.user()?.full_name ?? '';
@@ -501,6 +483,10 @@ export class ManagerComponent {
     this.page.set(p);
     if (p === 'review') this.loadReviews();
     if (p === 'history') this.loadHistory();
+    if (p === 'reports') this.loadHistory();
+    if (p === 'agents') this.loadAgents();
+    if (p === 'apikeys') this.loadKeys();
+    if (p === 'settings') this.loadAccount();
   }
 
   selectCase(id: string): void {
@@ -564,113 +550,185 @@ export class ManagerComponent {
     );
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    this.saveBlob(blob, 'verification-history.csv');
+  }
+
+  /** Trigger a browser download for a Blob. */
+  private saveBlob(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'verification-history.csv';
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   // ---- Reports ----
-  readonly reportStart = signal('2026-06-01');
-  readonly reportEnd = signal('2026-06-17');
-  readonly reportBranch = signal('All branches');
-  readonly reportStatus = signal('All statuses');
+  readonly reportStart = signal(daysAgo(30));
+  readonly reportEnd = signal(isoDate(new Date()));
   readonly reportGenerating = signal(false);
-  readonly reportGenerated = signal(false);
+  readonly reportError = signal('');
+  readonly generatedReport = signal<ReportSummary | null>(null);
+  readonly downloading = signal(false);
   readonly reportRows = computed(() => this.historyRows().slice(0, 5));
+  readonly reportGenerated = computed(() => this.generatedReport() !== null);
+
+  readonly reportKpis = computed(() => {
+    const r = this.generatedReport();
+    const sb = r?.status_breakdown ?? {};
+    return {
+      total: r?.total_verifications ?? 0,
+      verified: sb['VERIFIED'] ?? 0,
+      pending: sb['PENDING'] ?? 0,
+      rejected: sb['REJECTED'] ?? 0,
+    };
+  });
 
   generateReport(): void {
     if (this.reportGenerating()) return;
     this.reportGenerating.set(true);
-    this.reportGenerated.set(false);
-    // Simulated; the real POST /kyc/reports lands in the API phase.
-    setTimeout(() => {
-      this.reportGenerating.set(false);
-      this.reportGenerated.set(true);
-    }, 900);
+    this.reportError.set('');
+    this.generatedReport.set(null);
+    this.api.generateReport(this.reportStart(), this.reportEnd()).subscribe({
+      next: (r) => {
+        this.generatedReport.set(r);
+        this.reportGenerating.set(false);
+      },
+      error: () => {
+        this.reportError.set('Could not generate the report.');
+        this.reportGenerating.set(false);
+      },
+    });
   }
 
-  /** Local-phase download; the signed PDF comes from the API later. */
+  /** Download the signed PDF for the just-generated report. */
   downloadReport(): void {
-    const text =
-      `KYC Compliance Report\n` +
-      `Period: ${this.reportStart()} to ${this.reportEnd()}\n` +
-      `Branch: ${this.reportBranch()} · Status: ${this.reportStatus()}\n\n` +
-      `Total verifications: 1284\nVerified: 1174\nPending: 74\nRejected: 36\n`;
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'compliance-report.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+    const r = this.generatedReport();
+    if (!r || this.downloading()) return;
+    this.downloading.set(true);
+    this.api.downloadReportPdf(r.id).subscribe({
+      next: (blob) => {
+        this.saveBlob(
+          blob,
+          `compliance-report-${r.period_start}_${r.period_end}.pdf`,
+        );
+        this.downloading.set(false);
+      },
+      error: () => this.downloading.set(false),
+    });
   }
 
   // ---- Agents ----
-  readonly agents = signal<AgentRow[]>(AGENTS.map((a) => ({ ...a })));
-  readonly activeAgentId = signal<string | null>(AGENTS[0].agentId);
+  readonly agentData = signal<AgentSummary[]>([]);
+  readonly agentsLoading = signal(false);
+  readonly agentsError = signal(false);
+  readonly branchList = signal<BranchSummary[]>([]);
+  readonly activeAgentId = signal<string | null>(null);
   readonly agentSearch = signal('');
   readonly agentModalOpen = signal(false);
+  readonly agentSaving = signal(false);
+  readonly agentFormError = signal('');
   readonly agentForm = signal({
     name: '',
-    email: '',
-    branch: '',
+    phone: '',
+    pin: '',
+    branchId: '',
+    newBranch: '',
     editingId: null as string | null,
   });
-  readonly planMaxAgents = PLAN_MAX_AGENTS;
+
+  // Reset-PIN modal
+  readonly resetPinOpen = signal(false);
+  readonly resetPinValue = signal('');
+  readonly resetPinError = signal('');
+  readonly resetPinDone = signal(false);
+
+  loadAgents(): void {
+    this.agentsLoading.set(true);
+    this.agentsError.set(false);
+    this.api.listAgents().subscribe({
+      next: (rows) => {
+        this.agentData.set(rows);
+        this.agentsLoading.set(false);
+        if (!this.agentData().some((a) => a.id === this.activeAgentId())) {
+          this.activeAgentId.set(this.agentData()[0]?.id ?? null);
+        }
+      },
+      error: () => {
+        this.agentsError.set(true);
+        this.agentsLoading.set(false);
+      },
+    });
+    this.api.listBranches().subscribe({
+      next: (b) => this.branchList.set(b),
+      error: () => undefined,
+    });
+  }
 
   readonly agentList = computed(() => {
     const q = this.agentSearch().trim().toLowerCase();
-    return this.agents()
-      .filter(
-        (a) =>
-          !q ||
-          a.name.toLowerCase().includes(q) ||
-          a.branch.toLowerCase().includes(q),
-      )
-      .map((a) => ({ ...a, status: this.agentStatus(a) }));
+    return this.agentData().filter(
+      (a) =>
+        !q ||
+        a.full_name.toLowerCase().includes(q) ||
+        (a.branch_name ?? '').toLowerCase().includes(q) ||
+        (a.phone ?? '').toLowerCase().includes(q),
+    );
   });
-  readonly agentCount = computed(() => this.agents().length);
+  readonly agentCount = computed(() => this.agentData().length);
   readonly activeAgent = computed(
     () =>
-      this.agents().find((a) => a.agentId === this.activeAgentId()) ??
-      this.agents()[0],
-  );
-  readonly atAgentLimit = computed(
-    () => this.agents().length >= PLAN_MAX_AGENTS,
+      this.agentData().find((a) => a.id === this.activeAgentId()) ??
+      this.agentData()[0],
   );
 
-  agentStatus(a: AgentRow): 'Active' | 'Inactive' | 'Disabled' {
-    if (!a.active) return 'Disabled';
-    return a.submissions < 25 ? 'Inactive' : 'Active';
+  agentInitials(name: string): string {
+    return initialsOf(name);
+  }
+
+  agentStatusLabel(status: string): 'Active' | 'Disabled' {
+    return status === 'DISABLED' ? 'Disabled' : 'Active';
   }
 
   selectAgent(id: string): void {
     this.activeAgentId.set(id);
   }
 
+  /** Toggle the active agent between ACTIVE and DISABLED. */
   toggleAgentActive(): void {
-    const id = this.activeAgentId();
-    this.agents.update((list) =>
-      list.map((a) => (a.agentId === id ? { ...a, active: !a.active } : a)),
-    );
+    const a = this.activeAgent();
+    if (!a) return;
+    const status = a.status === 'DISABLED' ? 'ACTIVE' : 'DISABLED';
+    this.api.updateAgent(a.id, { status }).subscribe({
+      next: () => this.loadAgents(),
+      error: () => undefined,
+    });
   }
 
   openAddAgent(): void {
-    this.agentForm.set({ name: '', email: '', branch: '', editingId: null });
+    this.agentFormError.set('');
+    this.agentForm.set({
+      name: '',
+      phone: '',
+      pin: '',
+      branchId: this.branchList()[0]?.id ?? '',
+      newBranch: '',
+      editingId: null,
+    });
     this.agentModalOpen.set(true);
   }
 
   openEditAgent(): void {
     const a = this.activeAgent();
     if (!a) return;
+    this.agentFormError.set('');
     this.agentForm.set({
-      name: a.name,
-      email: a.email,
-      branch: a.branch,
-      editingId: a.agentId,
+      name: a.full_name,
+      phone: a.phone ?? '',
+      pin: '',
+      branchId: a.branch_id ?? '',
+      newBranch: '',
+      editingId: a.id,
     });
     this.agentModalOpen.set(true);
   }
@@ -679,81 +737,166 @@ export class ManagerComponent {
     this.agentModalOpen.set(false);
   }
 
-  setAgentField(field: 'name' | 'email' | 'branch', value: string): void {
+  setAgentField(
+    field: 'name' | 'phone' | 'pin' | 'branchId' | 'newBranch',
+    value: string,
+  ): void {
     this.agentForm.update((f) => ({ ...f, [field]: value }));
   }
 
   saveAgent(): void {
+    if (this.agentSaving()) return;
     const f = this.agentForm();
-    if (!f.name.trim() || !f.email.trim()) return;
-    const initials = f.name
-      .trim()
-      .split(/\s+/)
-      .map((w) => w[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-
-    if (f.editingId) {
-      this.agents.update((list) =>
-        list.map((a) =>
-          a.agentId === f.editingId
-            ? { ...a, name: f.name, email: f.email, branch: f.branch, initials }
-            : a,
-        ),
-      );
-    } else {
-      if (this.atAgentLimit()) {
-        this.agentModalOpen.set(false);
+    if (!f.name.trim()) {
+      this.agentFormError.set('Full name is required.');
+      return;
+    }
+    // New agents need a valid phone + PIN; edits keep the existing ones.
+    if (!f.editingId) {
+      if (!normalizeCmPhone(f.phone)) {
+        this.agentFormError.set('Enter a valid Cameroonian phone (+237 …).');
         return;
       }
-      const next: AgentRow = {
-        name: f.name,
-        email: f.email,
-        branch: f.branch || '—',
-        agentId: 'AGT-0' + (14 + this.agents().length + 1),
-        initials,
-        submissions: 0,
-        lastActive: 'Just now',
-        active: true,
-        rate: '—',
-        avgTime: '—',
-        added: 'Today',
-      };
-      this.agents.update((list) => [...list, next]);
-      this.activeAgentId.set(next.agentId);
+      if (!isValidPin(f.pin)) {
+        this.agentFormError.set('PIN must be 6–8 digits.');
+        return;
+      }
     }
-    this.agentModalOpen.set(false);
+    if (!f.branchId && !f.newBranch.trim()) {
+      this.agentFormError.set('Choose or create a branch.');
+      return;
+    }
+    this.agentFormError.set('');
+    this.agentSaving.set(true);
+
+    const withBranch = (branchId: string) => {
+      const done = {
+        next: () => {
+          this.agentSaving.set(false);
+          this.agentModalOpen.set(false);
+          this.loadAgents();
+        },
+        error: (err: unknown) => {
+          this.agentSaving.set(false);
+          this.agentFormError.set(apiMessage(err, 'Could not save the agent.'));
+        },
+      };
+      if (f.editingId) {
+        this.api
+          .updateAgent(f.editingId, {
+            full_name: f.name.trim(),
+            branch_id: branchId,
+          })
+          .subscribe(done);
+      } else {
+        this.api
+          .createAgent({
+            full_name: f.name.trim(),
+            phone: normalizeCmPhone(f.phone)!,
+            pin: f.pin,
+            branch_id: branchId,
+          })
+          .subscribe(done);
+      }
+    };
+
+    if (f.newBranch.trim()) {
+      this.api.createBranch(f.newBranch.trim()).subscribe({
+        next: (b) => withBranch(b.id),
+        error: (err) => {
+          this.agentSaving.set(false);
+          this.agentFormError.set(
+            apiMessage(err, 'Could not create the branch.'),
+          );
+        },
+      });
+    } else {
+      withBranch(f.branchId);
+    }
+  }
+
+  // Reset an agent's PIN (manager action).
+  openResetPin(): void {
+    this.resetPinValue.set('');
+    this.resetPinError.set('');
+    this.resetPinDone.set(false);
+    this.resetPinOpen.set(true);
+  }
+
+  closeResetPin(): void {
+    this.resetPinOpen.set(false);
+  }
+
+  confirmResetPin(): void {
+    const a = this.activeAgent();
+    if (!a) return;
+    if (!isValidPin(this.resetPinValue())) {
+      this.resetPinError.set('PIN must be 6–8 digits.');
+      return;
+    }
+    this.resetPinError.set('');
+    this.api.resetAgentPin(a.id, this.resetPinValue()).subscribe({
+      next: () => this.resetPinDone.set(true),
+      error: (err) =>
+        this.resetPinError.set(apiMessage(err, 'Could not reset the PIN.')),
+    });
   }
 
   // ---- API keys ----
-  readonly keys = signal<ApiKeyRow[]>(API_KEYS_DATA.map((k) => ({ ...k })));
-  private keySeq = 100;
+  readonly keys = signal<ApiKeyRow[]>([]);
+  readonly keysLoading = signal(false);
+  readonly keysError = signal(false);
+  readonly keyCreating = signal(false);
 
-  generateKey(): void {
-    const rand = () => Math.random().toString(36).slice(2);
-    const full = 'kyc_live_' + (rand() + rand()).slice(0, 32);
-    const key: ApiKeyRow = {
-      id: ++this.keySeq,
-      name: 'New API key',
-      created: 'Just now',
-      lastUsed: 'never',
-      masked: full.slice(0, 20) + '••••••••••••••••••',
-      rateLimit: '100 req / min',
-      reqToday: 0,
-      thisMonth: 0,
-      expires: 'Never',
-      quotaPct: 0,
-      active: true,
+  private toKeyRow(k: {
+    id: string;
+    prefix: string;
+    created_at: string;
+    last_used_at?: string | null;
+    is_active?: boolean;
+  }): ApiKeyRow {
+    return {
+      id: k.id,
+      prefix: k.prefix,
+      created: dateLabel(k.created_at),
+      lastUsed: k.last_used_at ? dateLabel(k.last_used_at) : 'never',
+      active: k.is_active ?? true,
       copied: false,
-      fullKey: full,
     };
-    this.keys.update((list) => [key, ...list]);
   }
 
-  copyKey(id: number): void {
+  loadKeys(): void {
+    this.keysLoading.set(true);
+    this.keysError.set(false);
+    this.api.listApiKeys().subscribe({
+      next: (rows) => {
+        this.keys.set(rows.map((k) => this.toKeyRow(k)));
+        this.keysLoading.set(false);
+      },
+      error: () => {
+        this.keysError.set(true);
+        this.keysLoading.set(false);
+      },
+    });
+  }
+
+  generateKey(): void {
+    if (this.keyCreating()) return;
+    this.keyCreating.set(true);
+    this.api.createApiKey().subscribe({
+      next: (created: ApiKeyCreated) => {
+        // Prepend the new key WITH its full value — shown once.
+        const row = { ...this.toKeyRow(created), fullKey: created.full_key };
+        this.keys.update((list) => [row, ...list]);
+        this.keyCreating.set(false);
+      },
+      error: () => this.keyCreating.set(false),
+    });
+  }
+
+  copyKey(id: string): void {
     const k = this.keys().find((x) => x.id === id);
-    const text = k?.fullKey ?? k?.masked ?? '';
+    const text = k?.fullKey ?? k?.prefix ?? '';
     navigator.clipboard?.writeText(text).catch(() => undefined);
     this.keys.update((list) =>
       list.map((x) => (x.id === id ? { ...x, copied: true } : x)),
@@ -767,33 +910,31 @@ export class ManagerComponent {
     );
   }
 
-  rotateKey(id: number): void {
-    const rand = Math.random().toString(36).slice(2, 10);
-    this.keys.update((list) =>
-      list.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              masked: 'kyc_live_' + rand + '••••••••••••••••••',
-              lastUsed: 'never',
-              created: 'Just now',
-            }
-          : x,
-      ),
-    );
+  revokeKey(id: string): void {
+    this.api.revokeApiKey(id).subscribe({
+      next: () =>
+        this.keys.update((list) => list.filter((x) => x.id !== id)),
+      error: () => undefined,
+    });
   }
 
-  revokeKey(id: number): void {
-    this.keys.update((list) => list.filter((x) => x.id !== id));
-  }
-
-  // ---- Settings ----
+  // ---- Settings / account ----
   readonly settingsTab = signal<SettingsTab>('Subscription');
   readonly settingsTabs = SETTINGS_TABS;
-  readonly mfiName = signal('CamFinance Microfinance');
-  readonly contactEmail = signal('contact@camfinance.cm');
-  readonly phone = signal('+237 6 99 00 11 22');
+  readonly account = signal<AccountSummary | null>(null);
+  readonly mfiName = signal('');
+  readonly contactEmail = signal('');
+  readonly accountSaving = signal(false);
+  readonly accountError = signal('');
   readonly settingsSaved = signal(false);
+
+  // Change PIN (Security tab)
+  readonly curPin = signal('');
+  readonly newPin = signal('');
+  readonly pinError = signal('');
+  readonly pinSaved = signal(false);
+  readonly pinSaving = signal(false);
+
   readonly notifs = signal<Record<string, boolean>>({
     quota: true,
     pending: true,
@@ -802,13 +943,70 @@ export class ManagerComponent {
   });
   readonly notifDefs = NOTIF_DEFS;
 
+  readonly usagePct = computed(() => {
+    const a = this.account();
+    return pct(a?.current_period_usage, a?.verification_quota ?? undefined);
+  });
+
+  loadAccount(): void {
+    this.api.getAccount().subscribe({
+      next: (a) => {
+        this.account.set(a);
+        this.mfiName.set(a.name);
+        this.contactEmail.set(a.email);
+      },
+      error: () => undefined,
+    });
+  }
+
   setSettingsTab(t: SettingsTab): void {
     this.settingsTab.set(t);
   }
 
   saveSettings(): void {
-    this.settingsSaved.set(true);
-    setTimeout(() => this.settingsSaved.set(false), 2000);
+    if (this.accountSaving()) return;
+    this.accountSaving.set(true);
+    this.accountError.set('');
+    this.api
+      .updateAccount({
+        name: this.mfiName().trim(),
+        email: this.contactEmail().trim(),
+      })
+      .subscribe({
+        next: (a) => {
+          this.account.set(a);
+          this.accountSaving.set(false);
+          this.settingsSaved.set(true);
+          setTimeout(() => this.settingsSaved.set(false), 2000);
+        },
+        error: (err) => {
+          this.accountSaving.set(false);
+          this.accountError.set(apiMessage(err, 'Could not save changes.'));
+        },
+      });
+  }
+
+  changePin(): void {
+    if (this.pinSaving()) return;
+    if (!isValidPin(this.newPin())) {
+      this.pinError.set('New PIN must be 6–8 digits.');
+      return;
+    }
+    this.pinError.set('');
+    this.pinSaving.set(true);
+    this.auth.changePin(this.curPin(), this.newPin()).subscribe({
+      next: () => {
+        this.pinSaving.set(false);
+        this.pinSaved.set(true);
+        this.curPin.set('');
+        this.newPin.set('');
+        setTimeout(() => this.pinSaved.set(false), 2000);
+      },
+      error: (err) => {
+        this.pinSaving.set(false);
+        this.pinError.set(apiMessage(err, 'Could not change the PIN.'));
+      },
+    });
   }
 
   toggleNotif(key: string): void {

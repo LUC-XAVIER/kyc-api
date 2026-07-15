@@ -293,3 +293,6 @@
   background: #fdecec;
   color: var(--ox-red, #c0392b);
 }
+
+// Reset-PIN link in the agent detail pane (Phase D3)
+.detail__resetpin { margin-top: 12px; display: inline-block; }
