@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    DateTime,
     Enum,
     ForeignKey,
     Integer,
@@ -103,11 +104,23 @@ class User(UUIDMixin, TimestampMixin, Base):
     status: Mapped[AgentStatus] = mapped_column(
         Enum(AgentStatus, name="agent_status"), default=AgentStatus.ACTIVE
     )
+    # Brute-force throttle. A PIN is only 6-8 digits, so consecutive failures
+    # are counted and the account is locked for a cooling-off window once
+    # they pass the threshold. Kept on the row (not in process memory) so the
+    # count holds across uvicorn workers and restarts. Both reset on success.
+    failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     mfi_account: Mapped["MfiAccount"] = relationship(
         back_populates="users"
     )
     branch: Mapped["Branch | None"] = relationship()
+
+    def is_locked(self, now: datetime) -> bool:
+        """Whether the account is inside its lockout window."""
+        return self.locked_until is not None and self.locked_until > now
 
     @property
     def branch_name(self) -> str | None:

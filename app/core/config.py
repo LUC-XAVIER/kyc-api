@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     # Server-side pepper mixed into API-key hashing.
     api_key_pepper: str = Field(default="change-me-in-production")
+    # Login brute-force throttle. A 6-digit PIN is only 1e6 combinations, so
+    # unlimited guessing is the weakest link in staff auth. Lockout is always
+    # time-boxed: a permanent lock would let anyone who knows an agent's
+    # phone number deny them access at will.
+    login_max_attempts: int = 5
+    login_lockout_minutes: int = 15
 
     # --- Database ---
     database_url: str = Field(

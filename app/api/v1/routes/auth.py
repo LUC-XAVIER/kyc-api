@@ -44,6 +44,29 @@ from app.services import email as email_service
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _register_failed_login(db: Session, agent: User, now: datetime) -> None:
+    """Count a failed PIN attempt and lock the account at the threshold.
+
+    Committed even though the request ends in an error: the whole point is
+    that the count survives, and an exception raised afterwards must not
+    roll the increment back.
+
+    Args:
+        db: Request-scoped database session.
+        agent: The account the failed attempt was made against.
+        now: Current UTC time, shared with the caller's lock check.
+    """
+    agent.failed_login_count += 1
+    if agent.failed_login_count >= settings.login_max_attempts:
+        agent.locked_until = now + timedelta(
+            minutes=settings.login_lockout_minutes
+        )
+        # Restart the streak so the next failure after the window expires
+        # doesn't re-lock the account immediately.
+        agent.failed_login_count = 0
+    db.commit()
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(
     payload: LoginRequest,
@@ -56,6 +79,13 @@ def login(
     and disabled accounts all return the same generic error so the endpoint
     cannot be used to enumerate accounts.
 
+    Consecutive PIN failures lock the account for a cooling-off window (see
+    ``login_max_attempts``), which is what makes guessing a 6-digit PIN
+    infeasible. The lockout message is deliberately distinct from the
+    generic failure: it only reaches someone who already knows the
+    identifier exists, and a silent lock is indistinguishable from a broken
+    login for the legitimate user it inconveniences.
+
     Args:
         payload: The submitted email and password.
         db: Request-scoped database session.
@@ -64,8 +94,8 @@ def login(
         The signed token plus the authenticated agent's identity and role.
 
     Raises:
-        AuthenticationError: If the credentials are invalid or the account
-            is disabled.
+        AuthenticationError: If the credentials are invalid, the account is
+            disabled, or it is inside a lockout window.
     """
     identifier = payload.identifier.strip()
     phone = try_normalize_cm_phone(identifier) or identifier
@@ -74,14 +104,29 @@ def login(
         .filter(or_(User.email == identifier, User.phone == phone))
         .one_or_none()
     )
-    if (
-        agent is None
-        or not agent.hashed_pin
-        or not verify_password(payload.pin, agent.hashed_pin)
+    if agent is None:
+        raise AuthenticationError("Invalid credentials.")
+
+    now = datetime.now(UTC)
+    if agent.is_locked(now):
+        raise AuthenticationError(
+            "Too many failed attempts. Try again later."
+        )
+
+    if not agent.hashed_pin or not verify_password(
+        payload.pin, agent.hashed_pin
     ):
+        _register_failed_login(db, agent, now)
         raise AuthenticationError("Invalid credentials.")
     if agent.status != AgentStatus.ACTIVE:
         raise AuthenticationError("Invalid credentials.")
+
+    # A clean login clears the streak; the counter tracks *consecutive*
+    # failures, not lifetime ones.
+    if agent.failed_login_count or agent.locked_until:
+        agent.failed_login_count = 0
+        agent.locked_until = None
+        db.commit()
 
     token = create_access_token(
         subject=str(agent.id), role=agent.role.value
