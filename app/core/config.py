@@ -61,7 +61,9 @@ class Settings(BaseSettings):
     reset_token_ttl_hours: int = 2
     # When email is disabled (dev), links are logged and returned by the
     # API instead of sent. Set email_enabled=true + SMTP creds for real mail.
-    email_enabled: bool = False
+    email_enabled: bool = True
+    # Must match the authenticated SMTP account or the provider will reject
+    # or rewrite it — set EMAIL_FROM in .env, never hardcode a real address.
     email_from: str = "KYC-API <no-reply@kyc-api.local>"
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
