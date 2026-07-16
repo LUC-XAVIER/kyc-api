@@ -183,11 +183,11 @@ export class AgentComponent {
       return await media.getUserMedia({
         video: {
           facingMode: key === 'selfie' ? 'user' : 'environment',
-          // Ask for a high frame: the default is 640x480, at which the small
-          // portrait printed on an ID card is too coarse for the pipeline's
-          // face detector to find. `ideal` degrades on weaker cameras.
+          // Hint for a large frame (the default 640x480 is coarse for the
+          // portrait printed on a card). Width only, deliberately: pinning
+          // height too would force 16:9 and stretch a portrait-shaped source,
+          // and the pipeline's face detector rejects distorted faces.
           width: { ideal: 1920 },
-          height: { ideal: 1080 },
         },
         audio: false,
       });
