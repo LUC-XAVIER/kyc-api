@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # phone number deny them access at will.
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
+    # AES-256 key (base64 of 32 bytes) for the encrypted PII columns.
+    # Generate with app.core.crypto.generate_key. No default on purpose: a
+    # fallback key shared by every checkout would be no protection at all,
+    # and a dev database holds real ID data too. Rotating this makes existing
+    # encrypted rows unreadable — see docs §10 before doing so.
+    encryption_key: str = Field(default="")
 
     # --- Database ---
     database_url: str = Field(
@@ -91,9 +97,10 @@ class Settings(BaseSettings):
     def _reject_weak_secrets(self) -> "Settings":
         """Fail fast if production is running on dev-grade secrets.
 
-        Guards secret_key (signs dashboard JWTs) and api_key_pepper (mixed
-        into the API-key digest). Outside production the weak defaults are
-        allowed, so local dev and tests keep working untouched.
+        Guards secret_key (signs dashboard JWTs), api_key_pepper (mixed into
+        the API-key digest), and encryption_key (seals the PII columns).
+        Outside production the weak defaults are allowed, so local dev and
+        tests keep working untouched.
 
         Raises:
             ValueError: if a guarded secret is the shipped placeholder or is
@@ -104,6 +111,7 @@ class Settings(BaseSettings):
             guarded = (
                 ("SECRET_KEY", self.secret_key),
                 ("API_KEY_PEPPER", self.api_key_pepper),
+                ("ENCRYPTION_KEY", self.encryption_key),
             )
             weak = [
                 name

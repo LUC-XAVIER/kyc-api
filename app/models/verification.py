@@ -18,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import EMBEDDING_DIM, Base, TimestampMixin, UUIDMixin
+from app.db.types import EncryptedDate, EncryptedString
 from app.models.enums import (
     DuplicateResolution,
     Sex,
@@ -89,17 +90,27 @@ class Verification(UUIDMixin, TimestampMixin, Base):
 
 
 class ExtractedData(UUIDMixin, Base):
-    """OCR output extracted from the NIC card."""
+    """OCR output extracted from the NIC card.
+
+    The four directly identifying fields are encrypted at rest (NFR03/NFR04)
+    via :mod:`app.db.types`, so a database dump or a leaked backup does not
+    expose a client's identity. Encryption is transparent to callers.
+
+    ``expiry_date``, ``sex`` and ``occupation`` are left readable: none of
+    them identifies a person on its own, and keeping them queryable leaves
+    room for aggregate reporting. ``field_confidences`` holds OCR scores,
+    not the field values.
+    """
 
     __tablename__ = "extracted_data"
 
     verification_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("verifications.id"), unique=True
     )
-    full_name: Mapped[str | None] = mapped_column(String(255))
-    id_number: Mapped[str | None] = mapped_column(String(64))
-    date_of_birth: Mapped[date | None] = mapped_column()
-    place_of_birth: Mapped[str | None] = mapped_column(String(255))
+    full_name: Mapped[str | None] = mapped_column(EncryptedString)
+    id_number: Mapped[str | None] = mapped_column(EncryptedString)
+    date_of_birth: Mapped[date | None] = mapped_column(EncryptedDate)
+    place_of_birth: Mapped[str | None] = mapped_column(EncryptedString)
     expiry_date: Mapped[date | None] = mapped_column()
     sex: Mapped[Sex | None] = mapped_column(Enum(Sex, name="sex"))
     occupation: Mapped[str | None] = mapped_column(String(255))

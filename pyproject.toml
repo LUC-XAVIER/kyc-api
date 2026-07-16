@@ -20,6 +20,9 @@ dependencies = [
     "alembic>=1.13",
     "pyjwt>=2.8",
     "bcrypt>=4.1",
+    # AES-GCM for the encrypted PII columns (NFR03/NFR04). Already present
+    # transitively via pyjwt/bcrypt, but declared here because we import it.
+    "cryptography>=42.0",
     "python-multipart>=0.0.9",
     # Server-side compliance-report PDF rendering (the dashboard only
     # downloads the result via the API).
