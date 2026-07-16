@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { AuthService } from '../../core/auth.service';
+import { CM_PHONE_DIGITS, phoneDigits } from '../../core/validators';
 
 type Actor = 'manager' | 'agent';
 
@@ -47,6 +48,11 @@ export class LoginComponent {
     this.error.set('');
   }
 
+  /** Agents type the 9 national digits only; +237 is a fixed prefix. */
+  setPhoneIdentifier(value: string): void {
+    this.identifier.set(phoneDigits(value));
+  }
+
   submit(): void {
     if (this.loading()) return;
     const identifier = this.identifier().trim();
@@ -54,6 +60,10 @@ export class LoginComponent {
     if (!identifier || !pin) {
       const id = this.actor() === 'manager' ? 'email' : 'phone number';
       this.error.set(`Enter your ${id} and PIN.`);
+      return;
+    }
+    if (this.actor() === 'agent' && identifier.length !== CM_PHONE_DIGITS) {
+      this.error.set(`Your phone number must be ${CM_PHONE_DIGITS} digits.`);
       return;
     }
     this.loading.set(true);

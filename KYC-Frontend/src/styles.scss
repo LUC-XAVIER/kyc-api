@@ -212,3 +212,26 @@ body {
     }
   }
 }
+
+/* Cameroonian phone entry: fixed +237 prefix box + 9-digit national number. */
+.phone-input {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.phone-input__prefix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--ox-border);
+  border-radius: var(--ox-radius);
+  background: var(--ox-surface-2, #f3f4f6);
+  color: var(--ox-text-muted, #555);
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+}
+.phone-input__field {
+  flex: 1;
+  min-width: 0;
+}

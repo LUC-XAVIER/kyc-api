@@ -3,7 +3,12 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
 import { InviteInfo, OnboardingService } from '../../core/onboarding.service';
-import { isValidPin, normalizeCmPhone } from '../../core/validators';
+import {
+  CM_PHONE_DIGITS,
+  isValidPin,
+  normalizeCmPhone,
+  phoneDigits,
+} from '../../core/validators';
 
 /** Manager signup, reached from the emailed link (?token=). Email pre-filled. */
 @Component({
@@ -42,6 +47,11 @@ export class SignupComponent {
     });
   }
 
+  /** Phone field holds the 9 national digits only; +237 is a fixed prefix. */
+  setPhone(value: string): void {
+    this.phone.set(phoneDigits(value));
+  }
+
   submit(): void {
     if (this.loading()) return;
     if (!this.fullName().trim() || !this.mfiName().trim()) {
@@ -58,7 +68,7 @@ export class SignupComponent {
     }
     const phone = this.phone().trim();
     if (phone && !normalizeCmPhone(phone)) {
-      this.error.set('Enter a valid phone (+237 and 9 digits).');
+      this.error.set(`Your phone number must be ${CM_PHONE_DIGITS} digits.`);
       return;
     }
 

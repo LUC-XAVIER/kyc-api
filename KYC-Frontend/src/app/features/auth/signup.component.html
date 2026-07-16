@@ -26,8 +26,12 @@
         <input class="field" [value]="mfiName()" (input)="mfiName.set($any($event.target).value)" />
 
         <label class="lbl">Phone <span class="opt">(optional)</span></label>
-        <input class="field" type="tel" placeholder="6 99 00 11 22"
-          [value]="phone()" (input)="phone.set($any($event.target).value)" />
+        <div class="phone-input">
+          <span class="phone-input__prefix">+237</span>
+          <input class="field phone-input__field" type="tel" inputmode="numeric"
+            maxlength="9" placeholder="699001122"
+            [value]="phone()" (input)="setPhone($any($event.target).value)" />
+        </div>
 
         <div class="two">
           <div>

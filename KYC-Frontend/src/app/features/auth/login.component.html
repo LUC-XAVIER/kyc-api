@@ -40,14 +40,30 @@
       <label class="field-label">
         {{ actor() === 'manager' ? 'Email' : 'Phone number' }}
       </label>
-      <input
-        class="field"
-        [type]="actor() === 'manager' ? 'email' : 'tel'"
-        autocomplete="username"
-        [placeholder]="actor() === 'manager' ? 'you@mfi.cm' : '6 99 00 11 22'"
-        [value]="identifier()"
-        (input)="identifier.set($any($event.target).value)"
-      />
+      @if (actor() === 'manager') {
+        <input
+          class="field"
+          type="email"
+          autocomplete="username"
+          placeholder="you@mfi.cm"
+          [value]="identifier()"
+          (input)="identifier.set($any($event.target).value)"
+        />
+      } @else {
+        <div class="phone-input">
+          <span class="phone-input__prefix">+237</span>
+          <input
+            class="field phone-input__field"
+            type="tel"
+            inputmode="numeric"
+            maxlength="9"
+            autocomplete="username"
+            placeholder="699001122"
+            [value]="identifier()"
+            (input)="setPhoneIdentifier($any($event.target).value)"
+          />
+        </div>
+      }
 
       <label class="field-label">PIN</label>
       <input

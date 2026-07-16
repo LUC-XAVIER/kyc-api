@@ -471,8 +471,13 @@
         <label class="input-label">Full name</label>
         <input class="input input--block" [value]="agentForm().name" (input)="setAgentField('name', $any($event.target).value)" />
         @if (!agentForm().editingId) {
-          <label class="input-label">Phone number (+237 …)</label>
-          <input class="input input--block" type="tel" placeholder="+237 6XX XX XX XX" [value]="agentForm().phone" (input)="setAgentField('phone', $any($event.target).value)" />
+          <label class="input-label">Phone number</label>
+          <div class="phone-input">
+            <span class="phone-input__prefix">+237</span>
+            <input class="input input--block phone-input__field" type="tel" inputmode="numeric"
+                   maxlength="9" placeholder="699001122"
+                   [value]="agentForm().phone" (input)="setAgentPhone($any($event.target).value)" />
+          </div>
           <label class="input-label">PIN (6–8 digits)</label>
           <input class="input input--block" type="password" inputmode="numeric" [value]="agentForm().pin" (input)="setAgentField('pin', $any($event.target).value)" />
         }

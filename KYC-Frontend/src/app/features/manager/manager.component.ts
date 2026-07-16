@@ -16,6 +16,7 @@ import {
 import {
   isValidPin,
   normalizeCmPhone,
+  phoneDigits,
 } from '../../core/validators';
 
 /** ISO yyyy-mm-dd for a Date (local calendar day). */
@@ -742,6 +743,11 @@ export class ManagerComponent {
     value: string,
   ): void {
     this.agentForm.update((f) => ({ ...f, [field]: value }));
+  }
+
+  /** Phone field holds the 9 national digits only; +237 is a fixed prefix. */
+  setAgentPhone(value: string): void {
+    this.agentForm.update((f) => ({ ...f, phone: phoneDigits(value) }));
   }
 
   saveAgent(): void {
