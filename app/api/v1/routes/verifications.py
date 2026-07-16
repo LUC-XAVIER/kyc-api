@@ -9,16 +9,16 @@ import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.v1.deps import (
     Principal,
-    get_current_mfi,
+    get_principal,
     require_manager_principal,
 )
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
-from app.models import MfiAccount, Verification
+from app.models import Verification
 from app.models.enums import VerificationStatus
 from app.schemas.stats import VerificationStats
 from app.schemas.verification import VerificationDetail, VerificationSummary
@@ -30,11 +30,20 @@ router = APIRouter(prefix="/kyc/verifications", tags=["verifications"])
 @router.get("", response_model=list[VerificationSummary])
 def list_verifications(
     status: VerificationStatus | None = Query(default=None),
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> list[Verification]:
-    """List the MFI's verifications, newest first, optionally by status."""
-    query = db.query(Verification).filter_by(mfi_account_id=mfi.id)
+    """List verifications for the caller, newest first, optional status.
+
+    A plain agent sees only their own submissions; managers and machine
+    (API-key) callers see the whole MFI.
+    """
+    query = db.query(Verification).options(
+        joinedload(Verification.agent),
+        joinedload(Verification.extracted_data),
+    ).filter_by(mfi_account_id=principal.mfi_account.id)
+    if not principal.is_manager and principal.agent is not None:
+        query = query.filter_by(agent_id=principal.agent.id)
     if status is not None:
         query = query.filter_by(status=status)
     return query.order_by(Verification.created_at.desc()).all()
@@ -67,15 +76,23 @@ def verification_stats(
 @router.get("/{verification_id}", response_model=VerificationDetail)
 def get_verification(
     verification_id: uuid.UUID,
-    mfi: MfiAccount = Depends(get_current_mfi),
+    principal: Principal = Depends(get_principal),
     db: Session = Depends(get_db),
 ) -> Verification:
-    """Return one verification with its per-stage records."""
+    """Return one verification with its per-stage records (scoped)."""
     verification = (
         db.query(Verification)
-        .filter_by(id=verification_id, mfi_account_id=mfi.id)
+        .filter_by(
+            id=verification_id, mfi_account_id=principal.mfi_account.id
+        )
         .one_or_none()
     )
-    if verification is None:
+    hidden_from_agent = (
+        verification is not None
+        and not principal.is_manager
+        and principal.agent is not None
+        and verification.agent_id != principal.agent.id
+    )
+    if verification is None or hidden_from_agent:
         raise NotFoundError("Verification not found.")
     return verification

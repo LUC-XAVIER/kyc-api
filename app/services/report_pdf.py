@@ -1,6 +1,6 @@
 """Render a :class:`ComplianceReport` to a COBAC-ready PDF (ReportLab).
 
-Lays out the Openxtech-branded compliance report from the design mockup:
+Lays out the KYC-API-branded compliance report from the design mockup:
 a header with the generation stamp and report id, four KPI cards (total /
 verified / pending / rejected), the per-verification detail table, and a
 confidential footer with page numbers.
@@ -112,7 +112,7 @@ def _header(report: ComplianceReport) -> Table:
     )
     table = Table(
         [[
-            Paragraph("OPENXTECH", brand),
+            Paragraph("KYC-API", brand),
             Paragraph(
                 f"Generated: {stamp:%d %b %Y, %H:%M}<br/>"
                 f"Report ID: {_report_id(report)}",

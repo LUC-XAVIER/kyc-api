@@ -90,6 +90,21 @@ def extract_prefix(full_key: str) -> str:
     return full_key[:PREFIX_DISPLAY_LEN]
 
 
+# --- Single-use email tokens (signup invites, PIN resets) ---------------
+# The raw token travels in the emailed link; only its SHA-256 digest is
+# stored, so a database leak can't be turned back into a usable link.
+
+
+def generate_token() -> str:
+    """Return a new URL-safe single-use token (the raw value to email)."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    """Return the stored SHA-256 digest of an email token."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 # --- Dashboard staff passwords (bcrypt) ---------------------------------
 # bcrypt only consumes the first 72 bytes of its input, so a long password
 # would be silently truncated (or rejected outright by bcrypt >= 4.1). We
@@ -110,7 +125,7 @@ def hash_password(password: str) -> str:
         password: The plaintext password chosen by the staff member.
 
     Returns:
-        The bcrypt hash string, safe to persist in ``agents.hashed_password``.
+        The bcrypt hash string, safe to persist in ``agents.hashed_pin``.
     """
     hashed = bcrypt.hashpw(_prepare_password(password), bcrypt.gensalt())
     return hashed.decode()

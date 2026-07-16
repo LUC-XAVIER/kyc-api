@@ -14,3 +14,10 @@ class AccountSummary(BaseModel):
     plan_name: str | None
     verification_quota: int | None
     current_period_usage: int
+
+
+class AccountUpdate(BaseModel):
+    """Editable MFI-profile fields (manager Settings)."""
+
+    name: str | None = None
+    email: str | None = None

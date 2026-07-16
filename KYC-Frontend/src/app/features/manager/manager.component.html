@@ -1,0 +1,523 @@
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">K</div>
+      <div class="sidebar__brandname">KYC-API</div>
+    </div>
+
+    <div class="sidebar__section">OVERVIEW</div>
+    <button class="nav-item" [class.is-active]="page() === 'dashboard'" (click)="setPage('dashboard')">Dashboard</button>
+    <button class="nav-item" [class.is-active]="page() === 'review'" (click)="setPage('review')">Review queue</button>
+    <button class="nav-item" [class.is-active]="page() === 'history'" (click)="setPage('history')">History</button>
+    <button class="nav-item" [class.is-active]="page() === 'reports'" (click)="setPage('reports')">Reports</button>
+
+    <div class="sidebar__section sidebar__section--spaced">ACCOUNT</div>
+    <button class="nav-item" [class.is-active]="page() === 'agents'" (click)="setPage('agents')">Agents</button>
+    <button class="nav-item" [class.is-active]="page() === 'apikeys'" (click)="setPage('apikeys')">API keys</button>
+    <button class="nav-item" [class.is-active]="page() === 'settings'" (click)="setPage('settings')">Settings</button>
+
+    <div class="sidebar__spacer"></div>
+
+    <div class="sidebar__user">
+      <div class="avatar avatar--purple">{{ userInitials() }}</div>
+      <div class="sidebar__userinfo">
+        <div class="sidebar__username">{{ user()?.full_name || 'Manager' }}</div>
+        <div class="sidebar__usermeta">Manager · CamFinance</div>
+      </div>
+      <button class="logout-btn" title="Log out" (click)="logout()">⎋</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="topbar__title">{{ title()[0] }}</div>
+        <div class="topbar__subtitle">{{ title()[1] }}</div>
+      </div>
+
+      @if (page() === 'dashboard') {
+        <div class="topbar__actions">
+          <div class="pill-static">📅 {{ dashRangeLabel() }}</div>
+          <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export</button>
+        </div>
+      }
+      @if (page() === 'review') {
+        <div class="topbar__actions">
+          <input class="input" placeholder="Search client ID or name" [value]="reviewSearch()" (input)="reviewSearch.set($any($event.target).value)" />
+        </div>
+      }
+      @if (page() === 'history') {
+        <div class="topbar__actions">
+          <input class="input" placeholder="Search client ID or name" [value]="historySearch()" (input)="onHistorySearch($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export CSV</button>
+        </div>
+      }
+      @if (page() === 'agents') {
+        <div class="topbar__actions">
+          <input class="input" placeholder="Search agent" [value]="agentSearch()" (input)="agentSearch.set($any($event.target).value)" />
+          <button class="ox-btn ox-btn--primary" (click)="openAddAgent()">+ Add agent</button>
+        </div>
+      }
+      @if (page() === 'apikeys') {
+        <div class="topbar__actions">
+          <button class="ox-btn ox-btn--primary" (click)="generateKey()">+ Generate new key</button>
+        </div>
+      }
+    </header>
+
+    <div class="content">
+      <!-- DASHBOARD -->
+      @if (page() === 'dashboard') {
+        @if (statsLoading()) {
+          <div class="state-msg">Loading statistics…</div>
+        } @else if (statsError()) {
+          <div class="state-msg state-msg--error">
+            Could not load statistics.
+            <button class="link-btn" (click)="loadStats()">Retry</button>
+          </div>
+        }
+        <div class="kpi-grid">
+          <div class="ox-card kpi"><div class="kpi__label">TOTAL VERIFICATIONS</div><div class="kpi__value">{{ kpiTotalLabel() }}</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">VERIFIED</div><div class="kpi__value">{{ verifiedPct() }}%</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">PENDING REVIEW</div><div class="kpi__value">{{ pendingPct() }}%</div></div>
+          <div class="ox-card kpi"><div class="kpi__label">AVG. PROCESSING TIME</div><div class="kpi__value">{{ avgProcessing() }}</div></div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="ox-card chart-card">
+            <div class="chart-card__title">Verifications per day</div>
+            <div class="chart-card__sub">Last 14 days, by status</div>
+            <div class="bars">
+              @for (d of dayBars(); track d.label) {
+                <div class="bars__col">
+                  <div class="bars__stack">
+                    <div class="seg seg--v" [style.height.%]="d.v"></div>
+                    <div class="seg seg--p" [style.height.%]="d.p"></div>
+                    <div class="seg seg--r" [style.height.%]="d.r"></div>
+                  </div>
+                  <div class="bars__label">{{ d.label }}</div>
+                </div>
+              }
+            </div>
+            <div class="legend">
+              <span><i class="dot dot--v"></i> Verified</span>
+              <span><i class="dot dot--p"></i> Pending</span>
+              <span><i class="dot dot--r"></i> Rejected</span>
+            </div>
+          </div>
+
+          <div class="ox-card chart-card">
+            <div class="chart-card__title">Status breakdown</div>
+            <div class="chart-card__sub">Selected period</div>
+            <div class="donut" [style.background]="donutBg()"><div class="donut__hole"></div></div>
+            <div class="kv"><span><i class="dot dot--v"></i> Verified</span><b>{{ verifiedPct() }}%</b></div>
+            <div class="kv"><span><i class="dot dot--p"></i> Pending</span><b>{{ pendingPct() }}%</b></div>
+            <div class="kv kv--last"><span><i class="dot dot--r"></i> Rejected</span><b>{{ rejectedPct() }}%</b></div>
+          </div>
+        </div>
+
+        <div class="ox-card chart-card">
+          <div class="chart-card__title">Verifications by branch</div>
+          <div class="chart-card__sub">Selected period</div>
+          @for (b of branches(); track b.name) {
+            <div class="branch-row">
+              <div class="branch-row__name">{{ b.name }}</div>
+              <div class="branch-row__track"><div class="branch-row__fill" [style.width.%]="b.pct"></div></div>
+              <div class="branch-row__value">{{ b.value }}</div>
+            </div>
+          } @empty {
+            <div class="table__empty">No verifications in this period.</div>
+          }
+        </div>
+      }
+
+      <!-- REVIEW QUEUE -->
+      @if (page() === 'review') {
+        @if (reviewLoading()) {
+          <div class="state-msg">Loading review queue…</div>
+        } @else if (reviewError()) {
+          <div class="state-msg state-msg--error">
+            Could not load the review queue.
+            <button class="link-btn" (click)="loadReviews()">Retry</button>
+          </div>
+        }
+        <div class="filter-tabs">
+          <button class="filter-tab" [class.is-active]="reviewReason() === 'all'" (click)="setReviewReason('all')">All <span class="count-pill">{{ queueCount() }}</span></button>
+          <button class="filter-tab" [class.is-active]="reviewReason() === 'Duplicate'" (click)="setReviewReason('Duplicate')">Duplicate flagged</button>
+          <button class="filter-tab" [class.is-active]="reviewReason() === 'Low confidence'" (click)="setReviewReason('Low confidence')">Low confidence</button>
+        </div>
+
+        <div class="split">
+          <div class="ox-card table">
+            <div class="table__head table__row--review"><div>CLIENT</div><div>REASON</div><div>SCORE</div><div>SUBMITTED</div></div>
+            @for (c of queueCases(); track c.id) {
+              <div class="table__row table__row--review" [class.is-selected]="c.id === activeCaseId()" (click)="selectCase(c.id)">
+                <div class="cell-client"><div class="avatar avatar--grey">{{ c.initials }}</div><span class="cell-client__id">{{ c.name }}</span></div>
+                <div><span class="ox-badge ox-badge--pending">● {{ c.reason }}</span></div>
+                <div class="cell-strong">{{ c.score }}</div>
+                <div class="cell-muted">{{ c.submitted }}</div>
+              </div>
+            } @empty {
+              <div class="table__empty">All caught up — no cases pending review.</div>
+            }
+          </div>
+
+          @if (activeCase(); as c) {
+            <aside class="ox-card detail">
+              <div class="detail__id">{{ c.name }}</div>
+              <div class="detail__sub">Client {{ c.client }} · Agent {{ c.agent }}</div>
+              <div class="detail__thumbs">
+                <div class="thumb">📷<span>Selfie capture</span></div>
+                <div class="thumb">📄<span>NIC photo</span></div>
+              </div>
+              <div class="kv"><span>Face match score</span><b class="text-green">{{ detailFaceMatch() }}</b></div>
+              <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
+              <div class="kv"><span>OCR confidence</span><b>{{ detailOcr() }}</b></div>
+              <div class="kv kv--last"><span>Duplicate similarity</span><b class="text-red">{{ detailDup().sim }}</b></div>
+              @if (detailDup().warning) {
+                <div class="warn-box">⚠ {{ detailDup().warning }}</div>
+              }
+              <div class="review-actions">
+                <button class="ox-btn btn-approve" [disabled]="deciding()" (click)="resolveCase('approve')">Approve</button>
+                <button class="ox-btn btn-reject" [disabled]="deciding()" (click)="resolveCase('reject')">Reject</button>
+              </div>
+            </aside>
+          }
+        </div>
+      }
+
+      <!-- HISTORY -->
+      @if (page() === 'history') {
+        @if (historyLoading()) {
+          <div class="state-msg">Loading history…</div>
+        } @else if (historyError()) {
+          <div class="state-msg state-msg--error">
+            Could not load history.
+            <button class="link-btn" (click)="loadHistory()">Retry</button>
+          </div>
+        }
+        <div class="history-tabbar">
+          <div class="filter-tabs">
+            @for (s of historyStatuses; track s) {
+              <button class="filter-tab" [class.is-active]="historyStatus() === s" (click)="setHistoryStatus(s)">{{ s }}</button>
+            }
+          </div>
+          <div class="history-count">{{ historyFiltered().length }} records</div>
+        </div>
+
+        <div class="ox-card table">
+          <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div></div>
+          @for (r of historyPaged(); track r.id) {
+            <div class="table__row table__row--history">
+              <div class="cell-link">{{ r.id }}</div><div>{{ r.name }}</div><div class="cell-muted">{{ r.date }}</div><div class="cell-muted">{{ r.branch }}</div><div class="cell-muted">{{ r.agent }}</div>
+              <div><span class="chip">{{ r.channel }}</span></div>
+              <div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div>
+              <div class="cell-strong">{{ r.score }}</div>
+            </div>
+          } @empty {
+            <div class="table__empty">No records match this filter.</div>
+          }
+        </div>
+
+        <div class="pager">
+          <button class="pager__btn" [disabled]="historyPage() === 1" (click)="goToPage(historyPage() - 1)">‹</button>
+          @for (p of historyPages(); track p) {
+            <button class="pager__btn" [class.is-active]="p === historyPage()" (click)="goToPage(p)">{{ p }}</button>
+          }
+          <button class="pager__btn" [disabled]="historyPage() === historyPageCount()" (click)="goToPage(historyPage() + 1)">›</button>
+        </div>
+      }
+
+      <!-- REPORTS -->
+      @if (page() === 'reports') {
+        <div class="split">
+          <div class="ox-card report-form">
+            <div class="report-form__title">Report parameters</div>
+            <label class="input-label">Start date</label>
+            <input class="input input--block" type="date" [value]="reportStart()" (input)="reportStart.set($any($event.target).value)" />
+            <label class="input-label">End date</label>
+            <input class="input input--block" type="date" [value]="reportEnd()" (input)="reportEnd.set($any($event.target).value)" />
+            <p class="muted-p">A COBAC-ready record covering all branches for the selected period.</p>
+            <button class="ox-btn ox-btn--primary btn-block" [disabled]="reportGenerating()" (click)="generateReport()">
+              {{ reportGenerating() ? 'Generating…' : 'Generate report' }}
+            </button>
+            @if (reportGenerated()) {
+              <div class="ok-msg">✓ Report generated successfully</div>
+            }
+            @if (reportError()) {
+              <div class="state-msg state-msg--error">{{ reportError() }}</div>
+            }
+            <button class="ox-btn ox-btn--outline btn-block" [disabled]="!reportGenerated() || downloading()" (click)="downloadReport()">
+              {{ downloading() ? 'Preparing…' : 'Download PDF' }}
+            </button>
+          </div>
+
+          <div class="report-preview">
+            <div class="preview-label">Preview</div>
+            <div class="ox-card report-doc">
+              <div class="report-doc__head">
+                <div class="report-doc__brand"><div class="report-doc__logo">K</div><b>KYC-API</b></div>
+                <div class="report-doc__meta">
+                  @if (generatedReport(); as r) { Report ID: {{ r.id.slice(0, 8) }} } @else { Not yet generated }
+                </div>
+              </div>
+              <div class="report-doc__title">KYC Compliance Report</div>
+              <div class="report-doc__sub">{{ account()?.name || 'Your institution' }} · Period: {{ reportStart() }} – {{ reportEnd() }}</div>
+              <div class="report-kpis">
+                <div class="report-kpi"><div class="report-kpi__n">{{ reportKpis().total }}</div><div class="report-kpi__l">Total verifications</div></div>
+                <div class="report-kpi"><div class="report-kpi__n">{{ reportKpis().verified }}</div><div class="report-kpi__l">Verified</div></div>
+                <div class="report-kpi"><div class="report-kpi__n">{{ reportKpis().pending }}</div><div class="report-kpi__l">Pending</div></div>
+                <div class="report-kpi"><div class="report-kpi__n">{{ reportKpis().rejected }}</div><div class="report-kpi__l">Rejected</div></div>
+              </div>
+              <div class="report-table__head"><div>CLIENT ID</div><div>DATE</div><div>BRANCH</div><div>STATUS</div></div>
+              @for (r of reportRows(); track r.id) {
+                <div class="report-table__row"><div>{{ r.id }}</div><div>{{ r.date }}</div><div>{{ r.branch }}</div><div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div></div>
+              }
+              <div class="report-doc__foot"><span>Confidential — for COBAC audit purposes only</span><span>Page 1 of 24</span></div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- AGENTS -->
+      @if (page() === 'agents') {
+        @if (agentsLoading()) {
+          <div class="state-msg">Loading agents…</div>
+        } @else if (agentsError()) {
+          <div class="state-msg state-msg--error">
+            Could not load agents.
+            <button class="link-btn" (click)="loadAgents()">Retry</button>
+          </div>
+        }
+        <div class="split">
+          <div class="ox-card table">
+            <div class="table__head table__row--agents"><div>AGENT</div><div>BRANCH</div><div>PHONE</div><div>ROLE</div><div>STATUS</div></div>
+            @for (a of agentList(); track a.id) {
+              <div class="table__row table__row--agents" [class.is-selected]="a.id === activeAgentId()" (click)="selectAgent(a.id)">
+                <div class="cell-client"><div class="avatar avatar--grey">{{ agentInitials(a.full_name) }}</div><span class="cell-client__id">{{ a.full_name }}</span></div>
+                <div class="cell-muted">{{ a.branch_name || '—' }}</div>
+                <div class="cell-muted">{{ a.phone || '—' }}</div>
+                <div class="cell-muted">{{ a.role }}</div>
+                <div><span [class]="badgeClass(agentStatusLabel(a.status))">● {{ agentStatusLabel(a.status) }}</span></div>
+              </div>
+            } @empty {
+              <div class="table__empty">No agents yet — add your first one.</div>
+            }
+          </div>
+
+          @if (activeAgent(); as a) {
+            <aside class="ox-card detail">
+              <div class="detail__row">
+                <div><div class="detail__id">{{ a.full_name }}</div><div class="detail__sub">{{ a.branch_name || 'No branch' }}</div></div>
+                <div class="toggle" [class.is-on]="a.status !== 'DISABLED'" (click)="toggleAgentActive()"><div class="toggle__knob"></div></div>
+              </div>
+              <div class="kv"><span>Phone</span><b>{{ a.phone || '—' }}</b></div>
+              <div class="kv"><span>Branch</span><b>{{ a.branch_name || '—' }}</b></div>
+              <div class="kv"><span>Role</span><b>{{ a.role }}</b></div>
+              <div class="kv kv--last"><span>Status</span><b>{{ agentStatusLabel(a.status) }}</b></div>
+              <div class="review-actions">
+                <button class="ox-btn ox-btn--outline" (click)="openEditAgent()">Edit</button>
+                <button class="ox-btn btn-reject" (click)="toggleAgentActive()">{{ a.status === 'DISABLED' ? 'Enable' : 'Disable' }}</button>
+              </div>
+              <button class="link-btn detail__resetpin" (click)="openResetPin()">Reset PIN</button>
+            </aside>
+          }
+        </div>
+        <div class="plan-note"><b>{{ account()?.plan_name || 'Your plan' }}:</b> {{ agentCount() }} agent account(s) in use.</div>
+      }
+
+      <!-- API KEYS -->
+      @if (page() === 'apikeys') {
+        <div class="info-banner">ℹ API keys let your internal software call <b>POST /kyc/verify</b> programmatically. Keep them secret — never expose them in client-side code or public repositories.</div>
+        @if (keysLoading()) {
+          <div class="state-msg">Loading API keys…</div>
+        } @else if (keysError()) {
+          <div class="state-msg state-msg--error">
+            Could not load API keys.
+            <button class="link-btn" (click)="loadKeys()">Retry</button>
+          </div>
+        }
+        @for (k of keys(); track k.id) {
+          <div class="ox-card key-card">
+            @if (k.fullKey) {
+              <div class="ok-msg key-reveal">New key — copy it now, it won't be shown again: <code>{{ k.fullKey }}</code></div>
+            }
+            <div class="key-card__head">
+              <div><div class="key-card__name">{{ k.prefix }}…</div><div class="key-card__meta">Created {{ k.created }} · Last used {{ k.lastUsed }}</div></div>
+              <span class="ox-badge" [class.ox-badge--active]="k.active" [class.ox-badge--rejected]="!k.active">● {{ k.active ? 'Active' : 'Revoked' }}</span>
+            </div>
+            <div class="key-value">
+              <code>{{ k.fullKey || k.prefix + '••••••••••••••••••••••••' }}</code>
+              <button class="copy-btn" (click)="copyKey(k.id)">{{ k.copied ? 'Copied!' : 'Copy' }}</button>
+            </div>
+            <div class="review-actions">
+              <button class="ox-btn btn-reject" (click)="revokeKey(k.id)">Revoke</button>
+            </div>
+          </div>
+        } @empty {
+          @if (!keysLoading()) {
+            <div class="table__empty">No API keys yet — generate one to integrate.</div>
+          }
+        }
+      }
+
+      <!-- SETTINGS -->
+      @if (page() === 'settings') {
+        <div class="split">
+          <div class="ox-card settings-tabs">
+            @for (t of settingsTabs; track t) {
+              <button class="settings-tab" [class.is-active]="settingsTab() === t" (click)="setSettingsTab(t)">{{ t }}</button>
+            }
+          </div>
+          <div class="settings-content">
+            @switch (settingsTab()) {
+              @case ('Subscription') {
+                <div class="plan-banner">
+                  <div class="plan-banner__row">
+                    <div><div class="plan-banner__name">{{ account()?.plan_name || 'No plan' }}</div><div class="plan-banner__desc">{{ account()?.verification_quota || 0 }} verifications / month</div></div>
+                    <button class="ox-btn plan-banner__btn" (click)="goPricing()">Upgrade plan</button>
+                  </div>
+                  <div class="plan-banner__track"><div class="plan-banner__fill" [style.width.%]="usagePct()"></div></div>
+                  <div class="plan-banner__meta">{{ account()?.current_period_usage || 0 }} / {{ account()?.verification_quota || 0 }} verifications used this cycle</div>
+                </div>
+              }
+              @case ('MFI profile') {
+                <div class="ox-card card--pad">
+                  <div class="section-label">MFI PROFILE</div>
+                  <label class="input-label">Institution name</label>
+                  <input class="input input--block" [value]="mfiName()" (input)="mfiName.set($any($event.target).value)" />
+                  <label class="input-label">Contact email</label>
+                  <input class="input input--block" type="email" [value]="contactEmail()" (input)="contactEmail.set($any($event.target).value)" />
+                  @if (accountError()) { <div class="state-msg state-msg--error">{{ accountError() }}</div> }
+                  <div class="pw-actions">
+                    <button class="ox-btn ox-btn--primary" [disabled]="accountSaving()" (click)="saveSettings()">{{ accountSaving() ? 'Saving…' : 'Save changes' }}</button>
+                    @if (settingsSaved()) { <span class="saved-msg">✓ Saved</span> }
+                  </div>
+                </div>
+              }
+              @case ('Notifications') {
+                <div class="ox-card card--pad">
+                  <div class="section-label">NOTIFICATIONS</div>
+                  @for (n of notifDefs; track n.key) {
+                    <div class="notif-row">
+                      <div><div class="notif-row__title">{{ n.title }}</div><div class="notif-row__desc">{{ n.desc }}</div></div>
+                      <div class="toggle" [class.is-on]="notifs()[n.key]" (click)="toggleNotif(n.key)"><div class="toggle__knob"></div></div>
+                    </div>
+                  }
+                </div>
+              }
+              @case ('Security') {
+                <div class="ox-card card--pad">
+                  <div class="section-label">CHANGE PIN</div>
+                  <label class="input-label">Current PIN</label>
+                  <input class="input input--block" type="password" inputmode="numeric" [value]="curPin()" (input)="curPin.set($any($event.target).value)" />
+                  <label class="input-label">New PIN (6–8 digits)</label>
+                  <input class="input input--block" type="password" inputmode="numeric" [value]="newPin()" (input)="newPin.set($any($event.target).value)" />
+                  @if (pinError()) { <div class="state-msg state-msg--error">{{ pinError() }}</div> }
+                  <div class="pw-actions">
+                    <button class="ox-btn ox-btn--primary" [disabled]="pinSaving()" (click)="changePin()">{{ pinSaving() ? 'Saving…' : 'Update PIN' }}</button>
+                    @if (pinSaved()) { <span class="saved-msg">✓ PIN updated</span> }
+                  </div>
+                </div>
+              }
+              @case ('Danger zone') {
+                <div class="ox-card card--pad danger">
+                  <div class="section-label section-label--danger">DANGER ZONE</div>
+                  <p class="muted-p">Deactivating the MFI account revokes all API keys and disables every agent. This cannot be undone.</p>
+                  <button class="ox-btn btn-reject">Deactivate account</button>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <!-- PRICING -->
+      @if (page() === 'pricing') {
+        <div class="pricing-head">
+          <div class="pricing-head__eyebrow">KYC API FOR MICROFINANCE INSTITUTIONS</div>
+          <div class="pricing-head__title">Subscription plans</div>
+          <div class="pricing-head__sub">Choose the verification volume that matches your institution's size and growth</div>
+        </div>
+        <div class="plans">
+          @for (p of plans; track p.name) {
+            <div class="plan-card" [class.plan-card--popular]="p.popular">
+              @if (p.popular) { <div class="plan-card__badge">Most popular</div> }
+              <div class="plan-card__name">{{ p.name }}</div>
+              <div class="plan-card__tag">{{ p.tagline }}</div>
+              <div class="plan-card__price">{{ p.price }}<span>{{ p.period }}</span></div>
+              <div class="plan-card__vol">{{ p.volume }}</div>
+              <button class="ox-btn plan-card__btn" [class.ox-btn--primary]="p.popular" [class.ox-btn--outline-red]="!p.popular">
+                {{ p.name === 'Enterprise' ? 'Contact sales' : 'Choose ' + p.name }}
+              </button>
+              <div class="plan-card__features">
+                @for (f of p.features; track f) { <div class="feature">✓ {{ f }}</div> }
+              </div>
+            </div>
+          }
+        </div>
+        <div class="pricing-back"><button class="link-btn" (click)="backToSettings()">← Back to Settings</button></div>
+      }
+    </div>
+  </main>
+
+  <!-- ADD / EDIT AGENT MODAL -->
+  @if (agentModalOpen()) {
+    <div class="modal-overlay" (click)="closeAgentModal()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal__title">{{ agentForm().editingId ? 'Edit agent' : 'Add agent' }}</div>
+        <label class="input-label">Full name</label>
+        <input class="input input--block" [value]="agentForm().name" (input)="setAgentField('name', $any($event.target).value)" />
+        @if (!agentForm().editingId) {
+          <label class="input-label">Phone number</label>
+          <div class="phone-input">
+            <span class="phone-input__prefix">+237</span>
+            <input class="input input--block phone-input__field" type="tel" inputmode="numeric"
+                   maxlength="9" placeholder="699001122"
+                   [value]="agentForm().phone" (input)="setAgentPhone($any($event.target).value)" />
+          </div>
+          <label class="input-label">PIN (6–8 digits)</label>
+          <input class="input input--block" type="password" inputmode="numeric" [value]="agentForm().pin" (input)="setAgentField('pin', $any($event.target).value)" />
+        }
+        <label class="input-label">Branch</label>
+        <select class="input input--block" [value]="agentForm().branchId" (change)="setAgentField('branchId', $any($event.target).value)">
+          <option value="">— Select a branch —</option>
+          @for (b of branchList(); track b.id) { <option [value]="b.id">{{ b.name }}</option> }
+        </select>
+        <label class="input-label">…or create a new branch</label>
+        <input class="input input--block" placeholder="New branch name" [value]="agentForm().newBranch" (input)="setAgentField('newBranch', $any($event.target).value)" />
+        @if (agentFormError()) { <div class="state-msg state-msg--error">{{ agentFormError() }}</div> }
+        <div class="modal__actions">
+          <button class="ox-btn ox-btn--outline" (click)="closeAgentModal()">Cancel</button>
+          <button class="ox-btn ox-btn--primary" [disabled]="agentSaving()" (click)="saveAgent()">{{ agentForm().editingId ? 'Save' : 'Add agent' }}</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- RESET AGENT PIN MODAL -->
+  @if (resetPinOpen()) {
+    <div class="modal-overlay" (click)="closeResetPin()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal__title">Reset agent PIN</div>
+        @if (resetPinDone()) {
+          <div class="ok-msg">✓ PIN reset. Share the new PIN with the agent.</div>
+          <div class="modal__actions">
+            <button class="ox-btn ox-btn--primary" (click)="closeResetPin()">Done</button>
+          </div>
+        } @else {
+          <p class="muted-p">Set a new PIN for {{ activeAgent().full_name }}.</p>
+          <label class="input-label">New PIN (6–8 digits)</label>
+          <input class="input input--block" type="password" inputmode="numeric" [value]="resetPinValue()" (input)="resetPinValue.set($any($event.target).value)" />
+          @if (resetPinError()) { <div class="state-msg state-msg--error">{{ resetPinError() }}</div> }
+          <div class="modal__actions">
+            <button class="ox-btn ox-btn--outline" (click)="closeResetPin()">Cancel</button>
+            <button class="ox-btn ox-btn--primary" (click)="confirmResetPin()">Reset PIN</button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

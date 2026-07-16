@@ -1,0 +1,237 @@
+/* KYC-API dashboard — global theme.
+   Palette taken from the design mockups (design-reference/). */
+
+:root {
+  /* Brand */
+  --ox-red: #c0392b;
+  --ox-red-soft: #fdece9;
+  --ox-navy: #17181d;
+  --ox-navy-2: #24252b;
+  --ox-purple: #3f2d68;
+
+  /* Status */
+  --ox-green: #1ea672;
+  --ox-green-text: #178a5c;
+  --ox-green-soft: #e6f7ef;
+  --ox-orange: #e2933a;
+  --ox-orange-text: #b3720b;
+  --ox-orange-soft: #fdf1e0;
+  --ox-reject-text: #c0392b;
+  --ox-reject-soft: #fde8e6;
+
+  /* Neutrals */
+  --ox-bg: #f5f6f8;
+  --ox-surface: #ffffff;
+  --ox-border: #e6e7eb;
+  --ox-line: #f0f1f3;
+  --ox-text: #17181d;
+  --ox-muted: #6b7280;
+
+  --ox-radius: 10px;
+  --ox-radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ox-bg);
+  color: var(--ox-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Shared building blocks reused across feature components */
+.ox-card {
+  background: var(--ox-surface);
+  border: 1px solid var(--ox-border);
+  border-radius: var(--ox-radius);
+}
+
+.ox-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+
+  &--verified,
+  &--approved,
+  &--active {
+    background: var(--ox-green-soft);
+    color: var(--ox-green-text);
+  }
+  &--pending,
+  &--inactive {
+    background: var(--ox-orange-soft);
+    color: var(--ox-orange-text);
+  }
+  &--rejected,
+  &--disabled {
+    background: var(--ox-reject-soft);
+    color: var(--ox-reject-text);
+  }
+}
+
+.ox-btn {
+  border: none;
+  border-radius: var(--ox-radius-sm);
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+
+  &--primary {
+    background: var(--ox-red);
+    color: #fff;
+  }
+  &--outline {
+    background: #fff;
+    border: 1px solid var(--ox-border);
+    color: var(--ox-text);
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+/* Shared auth-form pages (signup, forgot-pin, reset-pin) */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  background: var(--ox-bg);
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid var(--ox-border);
+  border-radius: 14px;
+  padding: 32px;
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    .logo {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--ox-red);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+  h2 {
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+  .sub {
+    font-size: 13px;
+    color: var(--ox-muted);
+    margin: 0 0 22px;
+    line-height: 1.5;
+  }
+  .lbl {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    .opt {
+      color: var(--ox-muted);
+      font-weight: 400;
+    }
+  }
+  .field {
+    width: 100%;
+    border: 1px solid var(--ox-border);
+    border-radius: 8px;
+    padding: 11px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    margin-bottom: 14px;
+    &:focus {
+      border-color: var(--ox-red);
+    }
+    &--readonly {
+      background: var(--ox-bg);
+      color: var(--ox-muted);
+    }
+  }
+  .two {
+    display: flex;
+    gap: 12px;
+    & > div {
+      flex: 1;
+    }
+  }
+  .err {
+    background: var(--ox-reject-soft);
+    color: var(--ox-reject-text);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .block {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 12px;
+    text-decoration: none;
+    box-sizing: border-box;
+  }
+  .link-row {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+    a {
+      color: var(--ox-red);
+      font-weight: 600;
+      text-decoration: none;
+    }
+  }
+}
+
+/* Cameroonian phone entry: fixed +237 prefix box + 9-digit national number. */
+.phone-input {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.phone-input__prefix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px solid var(--ox-border);
+  border-radius: var(--ox-radius);
+  background: var(--ox-surface-2, #f3f4f6);
+  color: var(--ox-text-muted, #555);
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+}
+.phone-input__field {
+  flex: 1;
+  min-width: 0;
+}

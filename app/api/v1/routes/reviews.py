@@ -9,7 +9,7 @@ on the verification are resolved to match the decision.
 import uuid
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.v1.deps import Principal, require_manager_principal
 from app.core.exceptions import NotFoundError, ValidationError
@@ -39,6 +39,11 @@ def list_pending_reviews(
     """List the MFI's PENDING verifications, oldest first."""
     return (
         db.query(Verification)
+        .options(
+            joinedload(Verification.agent),
+            joinedload(Verification.extracted_data),
+            selectinload(Verification.duplicate_flags),
+        )
         .filter_by(
             mfi_account_id=principal.mfi_account.id,
             status=VerificationStatus.PENDING,

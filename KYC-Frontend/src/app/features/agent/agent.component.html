@@ -1,0 +1,224 @@
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">K</div>
+      <div class="sidebar__brandname">KYC-API</div>
+    </div>
+
+    <div class="sidebar__section">VERIFICATION</div>
+    <button class="nav-item" [class.is-active]="page() === 'new'" (click)="setPage('new')">New Verification</button>
+    <button class="nav-item" [class.is-active]="page() === 'submissions'" (click)="setPage('submissions')">My Submissions</button>
+
+    <div class="sidebar__section sidebar__section--spaced">ACCOUNT</div>
+    <button class="nav-item" [class.is-active]="page() === 'profile'" (click)="setPage('profile')">Profile</button>
+
+    <div class="sidebar__spacer"></div>
+
+    <div class="sidebar__user">
+      <div class="avatar avatar--purple">{{ userInitials() }}</div>
+      <div class="sidebar__userinfo">
+        <div class="sidebar__username">{{ user()?.full_name || 'Agent' }}</div>
+        <div class="sidebar__usermeta">Agent · {{ profile()?.branch || '—' }}</div>
+      </div>
+      <button class="logout-btn" title="Log out" (click)="logout()">⎋</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <div class="topbar__title">{{ title()[0] }}</div>
+        <div class="topbar__subtitle">{{ title()[1] }}</div>
+      </div>
+
+      @if (page() === 'submissions') {
+        <div class="topbar__actions">
+          <input class="input" placeholder="Search client ID or name" [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+      }
+    </header>
+
+    <div class="content">
+      <!-- NEW VERIFICATION -->
+      @if (page() === 'new') {
+        <section class="ox-card card--form">
+          <div class="section-label">CLIENT INFORMATION</div>
+          <div class="field-row">
+            <div class="field">
+              <label>Client ID <span class="req">*</span></label>
+              <input class="input input--block" placeholder="e.g. CLT-00482" [value]="clientId()" (input)="clientId.set($any($event.target).value)" />
+            </div>
+            <div class="field">
+              <label>Document type</label>
+              <select class="input input--block" [value]="docType()" (change)="docType.set($any($event.target).value)">
+                <option value="NIC">National ID card (NIC)</option>
+                <option value="PASSPORT">Passport</option>
+              </select>
+            </div>
+          </div>
+          <hr class="divider" />
+
+          <div class="section-label">CAPTURE DOCUMENTS</div>
+          <div class="doc-grid">
+            @for (doc of requiredDocs(); track doc) {
+              <div class="doc-box" [class.doc-box--captured]="isCaptured(doc)" (click)="openCamera(doc)">
+                @if (captured()[doc]; as c) {
+                  <img class="doc-box__preview" [src]="c.url" alt="" />
+                } @else {
+                  <div class="doc-box__icon">📷</div>
+                }
+                <div class="doc-box__title">{{ docLabel(doc) }}</div>
+                <div class="doc-box__btn">{{ isCaptured(doc) ? 'Retake photo' : 'Open camera' }}</div>
+              </div>
+            }
+          </div>
+
+          <div class="note">
+            ℹ Camera capture only — file upload is disabled to ensure live, on-the-spot identity capture.
+          </div>
+
+          @if (verifyError()) {
+            <div class="state-msg state-msg--error">{{ verifyError() }}</div>
+          }
+
+          <div class="form-actions">
+            <button class="ox-btn ox-btn--outline" (click)="resetForm()">Cancel</button>
+            <button class="ox-btn ox-btn--primary" [disabled]="!canVerify() || verifying()" (click)="verify()">
+              {{ verifying() ? 'Verifying…' : 'Verify identity' }}
+            </button>
+          </div>
+        </section>
+
+        @if (result(); as r) {
+          <section class="result-banner" [class.result-banner--reject]="r.status === 'REJECTED'">
+            <div class="result-banner__icon">{{ r.status === 'REJECTED' ? '✕' : '✓' }}</div>
+            <div>
+              <div class="result-banner__title">{{ r.status }} — confidence {{ scorePct(r.confidence_score) }}</div>
+              <div class="result-banner__meta">
+                Client {{ r.client_id }}{{ r.reject_reason ? ' · ' + r.reject_reason : '' }} · {{ r.quota_remaining }} verifications left this cycle
+              </div>
+              @if (r.quota_warning) {
+                <div class="result-banner__meta">⚠ You are close to your monthly quota.</div>
+              }
+            </div>
+          </section>
+        }
+      }
+
+      <!-- MY SUBMISSIONS -->
+      @if (page() === 'submissions') {
+        @if (subsLoading()) {
+          <div class="state-msg">Loading submissions…</div>
+        } @else if (subsError()) {
+          <div class="state-msg state-msg--error">
+            Could not load submissions.
+            <button class="link-btn" (click)="loadSubmissions()">Retry</button>
+          </div>
+        }
+        <div class="filter-tabs">
+          <button class="filter-tab" [class.is-active]="filter() === 'all'" (click)="setFilter('all')">All ({{ counts().all }})</button>
+          <button class="filter-tab" [class.is-active]="filter() === 'Verified'" (click)="setFilter('Verified')">Verified ({{ counts().Verified }})</button>
+          <button class="filter-tab" [class.is-active]="filter() === 'Pending'" (click)="setFilter('Pending')">Pending ({{ counts().Pending }})</button>
+          <button class="filter-tab" [class.is-active]="filter() === 'Rejected'" (click)="setFilter('Rejected')">Rejected ({{ counts().Rejected }})</button>
+        </div>
+
+        <div class="split">
+          <div class="ox-card table">
+            <div class="table__head table__row--sub">
+              <div>CLIENT</div><div>DATE</div><div>STATUS</div><div>SCORE</div>
+            </div>
+            @for (s of filtered(); track s.id) {
+              <div class="table__row table__row--sub" [class.is-selected]="s.id === selectedId()" (click)="selectSubmission(s.id)">
+                <div class="cell-client">
+                  <div class="avatar avatar--grey">{{ s.initials }}</div>
+                  <span class="cell-client__id">{{ s.client }}</span>
+                </div>
+                <div class="cell-muted">{{ s.date }}</div>
+                <div><span [class]="badgeClass(s.status)">● {{ s.status }}</span></div>
+                <div class="cell-strong">{{ s.score }}</div>
+              </div>
+            } @empty {
+              <div class="table__empty">No submissions match this filter.</div>
+            }
+          </div>
+
+          @if (selected(); as sel) {
+            <aside class="ox-card detail">
+              <div class="detail__head">
+                <div class="detail__id">{{ sel.client }}</div>
+                <span [class]="badgeClass(sel.status)">● {{ sel.status }}</span>
+              </div>
+              <div class="detail__sub">Submitted {{ sel.date }}</div>
+              <div class="kv"><span>Client name (OCR)</span><b>{{ sel.name }}</b></div>
+              <div class="kv"><span>Face match score</span><b class="text-green">{{ detailFaceMatch() }}</b></div>
+              <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
+              <div class="kv kv--last"><span>Confidence</span><b>{{ sel.score }}</b></div>
+            </aside>
+          }
+        </div>
+      }
+
+      <!-- PROFILE -->
+      @if (page() === 'profile') {
+        <div class="split">
+          <div class="ox-card profile-card">
+            <div class="avatar avatar--purple avatar--lg">{{ userInitials() }}</div>
+            <div class="profile-card__name">{{ profile()?.full_name || user()?.full_name }}</div>
+            <div class="profile-card__role">{{ profile()?.role || 'Agent' }}</div>
+            <span class="ox-badge ox-badge--active">Active</span>
+            <div class="stat-grid">
+              <div class="stat"><div class="stat__n">{{ profileStats().total }}</div><div class="stat__l">Total submissions</div></div>
+              <div class="stat"><div class="stat__n">{{ profileStats().rate }}</div><div class="stat__l">Verified rate</div></div>
+              <div class="stat"><div class="stat__n">{{ profileStats().pending }}</div><div class="stat__l">Pending review</div></div>
+            </div>
+          </div>
+
+          <div class="profile-right">
+            <div class="ox-card card--pad">
+              <div class="section-label">ACCOUNT INFORMATION</div>
+              <div class="kv"><span>Full name</span><b>{{ profile()?.full_name || '—' }}</b></div>
+              <div class="kv"><span>Phone</span><b>{{ profile()?.phone || '—' }}</b></div>
+              <div class="kv"><span>Role</span><b>{{ profile()?.role || '—' }}</b></div>
+              <div class="kv"><span>Branch</span><b>{{ profile()?.branch || '—' }}</b></div>
+              <div class="kv kv--last"><span>MFI account</span><b>{{ profile()?.mfi_name || '—' }}</b></div>
+            </div>
+
+            <div class="ox-card card--pad">
+              <div class="section-label">CHANGE PIN</div>
+              <label class="input-label">Current PIN</label>
+              <input class="input input--block" type="password" inputmode="numeric" [value]="curPin()" (input)="curPin.set($any($event.target).value)" />
+              <label class="input-label">New PIN (6–8 digits)</label>
+              <input class="input input--block" type="password" inputmode="numeric" placeholder="Enter new PIN" [value]="newPin()" (input)="newPin.set($any($event.target).value)" />
+              <label class="input-label">Confirm new PIN</label>
+              <input class="input input--block" type="password" inputmode="numeric" placeholder="Confirm new PIN" [value]="confirmPin()" (input)="confirmPin.set($any($event.target).value)" />
+              @if (pinError()) { <div class="state-msg state-msg--error">{{ pinError() }}</div> }
+              <div class="pw-actions">
+                <button class="ox-btn ox-btn--primary" [disabled]="pinSaving()" (click)="updatePin()">{{ pinSaving() ? 'Saving…' : 'Update PIN' }}</button>
+                @if (pinSaved()) { <span class="saved-msg">✓ PIN updated</span> }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </main>
+
+  <!-- CAMERA MODAL -->
+  @if (cameraOpen(); as slot) {
+    <div class="modal-overlay" (click)="closeCamera()">
+      <div class="modal camera-modal" (click)="$event.stopPropagation()">
+        <div class="modal__title">Capture — {{ docLabel(slot) }}</div>
+        @if (cameraError()) {
+          <div class="state-msg state-msg--error">{{ cameraError() }}</div>
+        }
+        <video #cam class="camera-video" autoplay playsinline muted></video>
+        <div class="modal__actions">
+          <button class="ox-btn ox-btn--outline" (click)="closeCamera()">Cancel</button>
+          <button class="ox-btn ox-btn--primary" [disabled]="!!cameraError()" (click)="capture(slot)">Capture</button>
+        </div>
+      </div>
+    </div>
+  }
+</div>

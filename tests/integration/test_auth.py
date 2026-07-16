@@ -60,26 +60,26 @@ def test_valid_key_returns_account_summary(
     assert body["current_period_usage"] == 0
 
 
-# --- Dashboard staff login (email/password -> JWT) ----------------------
+# --- Dashboard login (email or phone + PIN -> JWT) ----------------------
 
 
-def test_login_success_returns_token_and_identity(
+def test_manager_logs_in_by_email(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """Valid credentials return a bearer token carrying id and role."""
+    """A manager signs in with email + PIN and gets an identity token."""
     mfi, _ = create_mfi_with_key(db_session)
     agent = create_agent(
         db_session,
         mfi,
         email="manager@mfi.cm",
-        password="s3cret-pass",
+        pin="483920",
         role=AgentRole.MANAGER,
         full_name="Eric Ngono",
     )
 
     resp = api_client.post(
         LOGIN_URL,
-        json={"email": "manager@mfi.cm", "password": "s3cret-pass"},
+        json={"identifier": "manager@mfi.cm", "pin": "483920"},
     )
 
     assert resp.status_code == 200
@@ -94,27 +94,42 @@ def test_login_success_returns_token_and_identity(
     assert claims["role"] == "MANAGER"
 
 
-def test_login_wrong_password_is_unauthorized(
+def test_agent_logs_in_by_phone(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """A wrong password returns the generic 401 envelope."""
+    """An agent signs in with their phone number + PIN."""
     mfi, _ = create_mfi_with_key(db_session)
-    create_agent(db_session, mfi, email="a@mfi.cm", password="right")
+    create_agent(db_session, mfi, phone="699112233", pin="778899")
 
     resp = api_client.post(
-        LOGIN_URL, json={"email": "a@mfi.cm", "password": "wrong"}
+        LOGIN_URL, json={"identifier": "699112233", "pin": "778899"}
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["role"] == "AGENT"
+
+
+def test_login_wrong_pin_is_unauthorized(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A wrong PIN returns the generic 401 envelope."""
+    mfi, _ = create_mfi_with_key(db_session)
+    create_agent(db_session, mfi, phone="699000111", pin="123456")
+
+    resp = api_client.post(
+        LOGIN_URL, json={"identifier": "699000111", "pin": "000000"}
     )
 
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "AUTHENTICATION_FAILED"
 
 
-def test_login_unknown_email_is_unauthorized(
+def test_login_unknown_identifier_is_unauthorized(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """An unknown email returns the same generic 401 (no enumeration)."""
+    """An unknown identifier returns the same generic 401 (no enum)."""
     resp = api_client.post(
-        LOGIN_URL, json={"email": "nobody@mfi.cm", "password": "x"}
+        LOGIN_URL, json={"identifier": "nobody@mfi.cm", "pin": "123456"}
     )
     assert resp.status_code == 401
 
@@ -122,14 +137,14 @@ def test_login_unknown_email_is_unauthorized(
 def test_login_disabled_account_is_unauthorized(
     api_client: TestClient, db_session: Session
 ) -> None:
-    """A disabled agent cannot log in even with the right password."""
+    """A disabled agent cannot log in even with the right PIN."""
     mfi, _ = create_mfi_with_key(db_session)
-    agent = create_agent(db_session, mfi, email="d@mfi.cm", password="pw")
+    agent = create_agent(db_session, mfi, phone="699222333", pin="123456")
     agent.status = AgentStatus.DISABLED
     db_session.flush()
 
     resp = api_client.post(
-        LOGIN_URL, json={"email": "d@mfi.cm", "password": "pw"}
+        LOGIN_URL, json={"identifier": "699222333", "pin": "123456"}
     )
     assert resp.status_code == 401
 
@@ -242,3 +257,122 @@ def test_me_returns_the_signed_in_profile(
 def test_me_requires_a_token(api_client: TestClient) -> None:
     """The profile endpoint is not reachable without a bearer token."""
     assert api_client.get(ME_URL).status_code == 401
+
+
+# --- Manager forgot / reset PIN -----------------------------------------
+
+FORGOT_URL = "/api/v1/auth/forgot-pin"
+RESET_URL = "/api/v1/auth/reset-pin"
+
+
+def _reset_token(api_client: TestClient, email: str) -> str:
+    link = api_client.post(FORGOT_URL, json={"email": email}).json()[
+        "reset_link"
+    ]
+    return link.split("token=")[1]
+
+
+def test_forgot_pin_returns_a_reset_link_for_a_manager(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A known manager gets a (dev) reset link."""
+    mfi, _ = create_mfi_with_key(db_session)
+    create_agent(
+        db_session, mfi, email="mgr@mfi.cm", role=AgentRole.MANAGER
+    )
+    resp = api_client.post(FORGOT_URL, json={"email": "mgr@mfi.cm"})
+    assert resp.status_code == 202
+    assert "token=" in resp.json()["reset_link"]
+
+
+def test_forgot_pin_is_silent_for_unknown_email(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """An unknown email returns the same ack with no link (no enum)."""
+    resp = api_client.post(FORGOT_URL, json={"email": "nobody@mfi.cm"})
+    assert resp.status_code == 202
+    assert resp.json()["reset_link"] is None
+
+
+def test_reset_pin_sets_a_new_pin(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """After reset the new PIN works and the old one stops."""
+    mfi, _ = create_mfi_with_key(db_session)
+    create_agent(
+        db_session, mfi, email="mgr2@mfi.cm", role=AgentRole.MANAGER,
+        pin="111111",
+    )
+    token = _reset_token(api_client, "mgr2@mfi.cm")
+
+    assert api_client.post(
+        RESET_URL, json={"token": token, "pin": "999888"}
+    ).status_code == 200
+    assert api_client.post(
+        LOGIN_URL, json={"identifier": "mgr2@mfi.cm", "pin": "999888"}
+    ).status_code == 200
+    assert api_client.post(
+        LOGIN_URL, json={"identifier": "mgr2@mfi.cm", "pin": "111111"}
+    ).status_code == 401
+
+
+def test_reset_pin_invalid_token_is_404(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """An unknown reset token is a 404."""
+    resp = api_client.post(
+        RESET_URL, json={"token": "nope", "pin": "123456"}
+    )
+    assert resp.status_code == 404
+
+
+def test_reset_pin_rejects_a_reused_token(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A reset token can only be used once."""
+    mfi, _ = create_mfi_with_key(db_session)
+    create_agent(
+        db_session, mfi, email="mgr3@mfi.cm", role=AgentRole.MANAGER
+    )
+    token = _reset_token(api_client, "mgr3@mfi.cm")
+    assert api_client.post(
+        RESET_URL, json={"token": token, "pin": "222333"}
+    ).status_code == 200
+    assert api_client.post(
+        RESET_URL, json={"token": token, "pin": "444555"}
+    ).status_code == 400
+
+
+CHANGE_PIN_URL = "/api/v1/auth/change-pin"
+
+
+def test_change_pin_requires_current_pin(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Changing the PIN needs the current one; the new one then works."""
+    mfi, _ = create_mfi_with_key(db_session)
+    agent = create_agent(
+        db_session, mfi, email="me@mfi.cm", role=AgentRole.MANAGER,
+        pin="111111",
+    )
+    token = create_access_token(subject=str(agent.id), role="MANAGER")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    wrong = api_client.post(
+        CHANGE_PIN_URL,
+        json={"current_pin": "000000", "new_pin": "222222"},
+        headers=headers,
+    )
+    # A wrong current PIN is a 400 (validation), not a 401 — a 401 would trip
+    # the client's auto-logout even though the session is still valid.
+    assert wrong.status_code == 400
+
+    ok = api_client.post(
+        CHANGE_PIN_URL,
+        json={"current_pin": "111111", "new_pin": "222222"},
+        headers=headers,
+    )
+    assert ok.status_code == 200
+    assert api_client.post(
+        LOGIN_URL, json={"identifier": "me@mfi.cm", "pin": "222222"}
+    ).status_code == 200

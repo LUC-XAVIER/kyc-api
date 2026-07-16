@@ -1,12 +1,33 @@
 """Helpers to seed test data into a (rolled-back) database session."""
 
+import itertools
 from datetime import date
 
 from sqlalchemy.orm import Session
 
 from app.core.security import generate_api_key, hash_password
-from app.models import Agent, ApiKey, MfiAccount, SubscriptionPlan
+from app.core.validation import normalize_cm_phone
+from app.models import ApiKey, Branch, MfiAccount, SubscriptionPlan, User
 from app.models.enums import AgentRole, PlanName
+
+_IDENT_SEQ = itertools.count(1)
+
+
+def get_or_create_branch(
+    db: Session, mfi: MfiAccount, name: str
+) -> Branch:
+    """Return the MFI's branch by name, creating it if needed."""
+    existing = (
+        db.query(Branch)
+        .filter_by(mfi_account_id=mfi.id, name=name)
+        .one_or_none()
+    )
+    if existing is not None:
+        return existing
+    branch = Branch(mfi_account_id=mfi.id, name=name)
+    db.add(branch)
+    db.flush()
+    return branch
 
 
 def create_mfi_with_key(
@@ -58,32 +79,49 @@ def create_agent(
     db: Session,
     mfi: MfiAccount,
     *,
-    email: str = "agent@example.com",
-    password: str = "password123",
+    email: str | None = None,
+    phone: str | None = None,
+    pin: str = "123456",
     role: AgentRole = AgentRole.AGENT,
-    full_name: str = "Test Agent",
-    branch: str = "Central",
-) -> Agent:
+    full_name: str = "Test User",
+    branch: str | None = "Central",
+) -> User:
     """Create a login-capable agent under ``mfi``.
+
+    Managers sign in by email, agents by phone; if neither is given a
+    unique one is generated for the role so callers can seed many agents.
 
     Args:
         db: An open session (caller owns rollback/cleanup).
         mfi: The owning account the agent belongs to.
-        email: Login email (unique).
-        password: Plaintext password; stored hashed.
+        email: Manager login email (unique).
+        phone: User login phone (unique).
+        pin: Plaintext PIN; stored hashed.
         role: The agent's dashboard role.
         full_name: Display name.
         branch: Branch label.
 
     Returns:
-        The flushed :class:`~app.models.mfi.Agent`.
+        The flushed :class:`~app.models.mfi.User`.
     """
-    agent = Agent(
+    if email is None and phone is None:
+        seq = next(_IDENT_SEQ)
+        if role in (AgentRole.MANAGER, AgentRole.ADMIN):
+            email = f"staff{seq}@example.com"
+        else:
+            phone = f"6{seq:08d}"
+    branch_id = (
+        get_or_create_branch(db, mfi, branch).id
+        if branch is not None
+        else None
+    )
+    agent = User(
         mfi_account_id=mfi.id,
         full_name=full_name,
-        branch=branch,
+        branch_id=branch_id,
         email=email,
-        hashed_password=hash_password(password),
+        phone=normalize_cm_phone(phone) if phone else None,
+        hashed_pin=hash_password(pin),
         role=role,
     )
     db.add(agent)

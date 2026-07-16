@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet data-dc-atomics>
+<style>
+  @keyframes mg-fade { from { opacity:0; transform:translateY(4px);} to {opacity:1; transform:translateY(0);} }
+  body { margin:0; background:#f5f6f8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+</style>
+</helmet>
+
+<div style="display:flex; height:100vh; width:100%; color:#17181d; overflow:hidden;">
+
+  <!-- SIDEBAR -->
+  <div style="width:240px; flex:none; background:#17181d; display:flex; flex-direction:column; padding:20px 0;">
+    <div style="display:flex; align-items:center; gap:10px; padding:0 20px 24px;">
+      <div style="width:30px; height:30px; border-radius:7px; background:#c0392b; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px;">X</div>
+      <div style="color:#fff; font-weight:700; font-size:15px;">Openxtech</div>
+    </div>
+
+    <div style="padding:0 20px; margin-bottom:8px; font-size:11px; letter-spacing:.06em; font-weight:600; color:rgba(255,255,255,.35);">OVERVIEW</div>
+    <div onClick="{{ goPage_dashboard }}" style="{{ navItemStyle_dashboard }}">Dashboard</div>
+    <div onClick="{{ goPage_review }}" style="{{ navItemStyle_review }}">Review queue</div>
+    <div onClick="{{ goPage_history }}" style="{{ navItemStyle_history }}">History</div>
+    <div onClick="{{ goPage_reports }}" style="{{ navItemStyle_reports }}">Reports</div>
+
+    <div style="padding:0 20px; margin:20px 0 8px; font-size:11px; letter-spacing:.06em; font-weight:600; color:rgba(255,255,255,.35);">ACCOUNT</div>
+    <div onClick="{{ goPage_agents }}" style="{{ navItemStyle_agents }}">Agents</div>
+    <div onClick="{{ goPage_apikeys }}" style="{{ navItemStyle_apikeys }}">API keys</div>
+    <div onClick="{{ goPage_settings }}" style="{{ navItemStyle_settings }}">Settings</div>
+
+    <div style="flex:1;"></div>
+
+    <div style="display:flex; align-items:center; gap:10px; padding:14px 20px 0; border-top:1px solid rgba(255,255,255,.08);">
+      <div style="width:36px; height:36px; border-radius:50%; background:#3f2d68; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex:none;">EN</div>
+      <div>
+        <div style="color:#fff; font-size:13px; font-weight:600;">Eric Ngono</div>
+        <div style="color:rgba(255,255,255,.45); font-size:12px;">Manager &middot; CamFinance</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div style="flex:1; display:flex; flex-direction:column; overflow-y:auto;">
+
+    <!-- TOP BAR -->
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 32px; background:#fff; border-bottom:1px solid #e6e7eb; flex:none;">
+      <div>
+        <div style="font-size:20px; font-weight:700;">{{ pageTitle }}</div>
+        <div style="font-size:13px; color:#6b7280; margin-top:2px;">{{ pageSubtitle }}</div>
+      </div>
+
+      <sc-if value="{{ isDashboard }}">
+        <div style="display:flex; gap:10px;">
+          <div style="border:1px solid #e6e7eb; border-radius:8px; padding:9px 14px; font-size:13px;">&#128197; Jun 1 &ndash; Jun 17, 2026</div>
+          <div style="border:1px solid #e6e7eb; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600;">Export</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isReview }}">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input placeholder="Search client ID" style="border:1px solid #e6e7eb; background:#f5f6f8; border-radius:8px; padding:9px 14px; font-size:13px; width:200px; outline:none;"/>
+          <div style="width:36px; height:36px; border-radius:8px; background:#f0f1f3; display:flex; align-items:center; justify-content:center;">&#128276;</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isHistory }}">
+        <div style="display:flex; gap:10px;">
+          <input placeholder="Search client ID or name" style="border:1px solid #e6e7eb; background:#f5f6f8; border-radius:8px; padding:9px 14px; font-size:13px; width:200px; outline:none;"/>
+          <div style="border:1px solid #e6e7eb; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600;">Export CSV</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isAgents }}">
+        <div style="display:flex; gap:10px;">
+          <input placeholder="Search agent" style="border:1px solid #e6e7eb; background:#f5f6f8; border-radius:8px; padding:9px 14px; font-size:13px; width:180px; outline:none;"/>
+          <div onClick="{{ openAddAgent }}" style="background:#c0392b; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">+ Add agent</div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isApiKeys }}">
+        <div onClick="{{ generateKey }}" style="background:#c0392b; color:#fff; border-radius:8px; padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer;">+ Generate new key</div>
+      </sc-if>
+    </div>
+
+    <!-- PAGE CONTENT -->
+    <div style="padding:28px 32px; flex:1;">
+
+      <!-- DASHBOARD -->
+      <sc-if value="{{ isDashboard }}">
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px;">
+          <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:18px 20px;"><div style="font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b7280;">TOTAL VERIFICATIONS</div><div style="font-size:26px; font-weight:700; margin:8px 0 4px;">1,284</div><div style="font-size:12px; color:#1ea672;">&#8593; 12% vs last period</div></div>
+          <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:18px 20px;"><div style="font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b7280;">VERIFIED</div><div style="font-size:26px; font-weight:700; margin:8px 0 4px;">91.4%</div><div style="font-size:12px; color:#1ea672;">&#8593; 2.1 pts</div></div>
+          <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:18px 20px;"><div style="font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b7280;">PENDING REVIEW</div><div style="font-size:26px; font-weight:700; margin:8px 0 4px;">5.8%</div><div style="font-size:12px; color:#b3720b;">&#8593; 0.6 pts</div></div>
+          <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:18px 20px;"><div style="font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b7280;">AVG. PROCESSING TIME</div><div style="font-size:26px; font-weight:700; margin:8px 0 4px;">4.6s</div><div style="font-size:12px; color:#1ea672;">&#8595; 0.4s faster</div></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1.6fr 1fr; gap:16px; margin-bottom:20px;">
+          <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:20px 24px;">
+            <div style="font-weight:700; font-size:14px;">Verifications per day</div>
+            <div style="font-size:12px; color:#6b7280; margin-bottom:16px;">Last 14 days, by status</div>
+            <div style="display:flex; align-items:flex-end; gap:8px; height:150px;">
+              <sc-for list="{{ dayBars }}" as="d" hint-placeholder-count="14">
+                <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%;">
+                  <div style="width:100%; display:flex; flex-direction:column; justify-content:flex-end; height:100%;">
+                    <div style="{{ d.verifiedStyle }}"></div>
+                    <div style="{{ d.pendingStyle }}"></div>
+                    <div style="{{ d.rejectedStyle }}"></div>
+                  </div>
+                  <div style="font-size:10px; color:#9ca3af; margin-top:6px;">{{ d.label }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex; gap:16px; margin-top:14px; font-size:12px; color:#374151;">
+              <span>&#9679; <span style="color:#1ea672;">&#9679;</span> Verified</span>
+              <span style="color:#e2933a;">&#9679; Pending</span>
+              <span style="color:#c0392b;">&#9679; Rejected</span>
+            </div>
+          </div>
+
+          <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:20px 24px;">
+            <div style="font-weight:700; font-size:14px;">Status breakdown</div>
+            <div style="font-size:12px; color:#6b7280; margin-bottom:16px;">Selected period</div>
+            <div style="width:150px; height:150px; border-radius:50%; margin:0 auto 16px; background:conic-gradient(#1ea672 0% 91.4%, #e2933a 91.4% 97.2%, #c0392b 97.2% 100%); display:flex; align-items:center; justify-content:center;">
+              <div style="width:90px; height:90px; border-radius:50%; background:#fff;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:6px 0;"><span>&#9679; Verified</span><b>91.4%</b></div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:6px 0; color:#e2933a;"><span>&#9679; Pending</span><b style="color:#17181d;">5.8%</b></div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; padding:6px 0; color:#c0392b;"><span>&#9679; Rejected</span><b style="color:#17181d;">2.8%</b></div>
+          </div>
+        </div>
+
+        <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:20px 24px;">
+          <div style="font-weight:700; font-size:14px; margin-bottom:2px;">Verifications by branch</div>
+          <div style="font-size:12px; color:#6b7280; margin-bottom:16px;">Selected period</div>
+          <sc-for list="{{ branchBars }}" as="b" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; gap:16px; padding:10px 0; border-bottom:1px solid #f0f1f3;">
+              <div style="width:100px; font-size:13px; font-weight:600;">{{ b.name }}</div>
+              <div style="flex:1; height:8px; background:#eef0f2; border-radius:4px; overflow:hidden;"><div style="{{ b.barStyle }}"></div></div>
+              <div style="width:50px; text-align:right; font-size:13px; font-weight:700;">{{ b.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- REVIEW QUEUE -->
+      <sc-if value="{{ isReview }}">
+        <div style="display:flex; gap:12px; margin-bottom:18px;">
+          <div style="padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; background:#17181d; color:#fff;">All <span style="background:#c0392b; border-radius:10px; padding:1px 7px; margin-left:6px;">{{ queueCount }}</span></div>
+          <div style="padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; background:#eef0f2; color:#374151;">Duplicate flagged</div>
+          <div style="padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; background:#eef0f2; color:#374151;">Low confidence</div>
+        </div>
+        <div style="display:flex; gap:20px; align-items:flex-start;">
+          <div style="flex:1; background:#fff; border:1px solid #e6e7eb; border-radius:10px; overflow:hidden;">
+            <div style="display:grid; grid-template-columns:1.4fr 1fr 0.6fr 0.8fr; padding:12px 20px; font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b7280; border-bottom:1px solid #eee;">
+              <div>CLIENT</div><div>REASON</div><div>SCORE</div><div>SUBMITTED</div>
+            </div>
+            <sc-for list="{{ queueCases }}" as="c" hint-placeholder-count="5">
+              <div onClick="{{ c.select }}" style="{{ c.rowStyle }}">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="width:28px; height:28px; border-radius:50%; background:#e5e7eb; color:#374151; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">{{ c.initials }}</div>
+                  <div style="font-weight:600; font-size:13px;">{{ c.name }}</div>
+                </div>
+                <div><span style="{{ c.reasonStyle }}">&#9679; {{ c.reason }}</span></div>
+                <div style="font-size:13px; font-weight:600;">{{ c.score }}</div>
+                <div style="font-size:13px; color:#6b7280;">{{ c.submitted }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:40px; text-align:center; color:#9ca3af; font-size:13px;">All caught up &mdash; no cases pending review.</div>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{ hasCase }}" hint-placeholder-val="{{ true }}">
+            <div style="width:360px; flex:none; background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:22px;">
+              <div style="font-weight:700; font-size:15px;">{{ activeCase.name }}</div>
+              <div style="font-size:12px; color:#6b7280; margin-bottom:16px;">Client {{ activeCase.client }} &middot; Agent {{ activeCase.agent }}</div>
+              <div style="display:flex; gap:10px; margin-bottom:18px;">
+                <div style="flex:1; background:#f5f6f8; border-radius:8px; height:80px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#9ca3af; flex-direction:column; gap:4px;">&#128247;<span>Selfie capture</span></div>
+                <div style="flex:1; background:#f5f6f8; border-radius:8px; height:80px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#9ca3af; flex-direction:column; gap:4px;">&#128196;<span>NIC photo</span></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f1f3; font-size:13px;"><span style="color:#6b7280;">Face match score</span><b style="color:#1ea672;">{{ activeCase.faceMatch }}</b></div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f1f3; font-size:13px;"><span style="color:#6b7280;">Liveness check</span><b>Passed</b></div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f1f3; font-size:13px;"><span style="color:#6b7280;">OCR confidence</span><b>{{ activeCase.ocr }}</b></div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:13px;"><span style="color:#6b7280;">Duplicate similarity</span><b style="color:#c0392b;">{{ activeCase.dupSim }}</b></div>
+
+              <sc-if value="{{ activeCase.hasDupWarning }}" hint-placeholder-val="{{ false }}">
+                <div style="background:#fdece9; border-radius:8px; padding:12px 14px; font-size:12.5px; color:#8a2c20; margin:14px 0;">&#9888; {{ activeCase.dupWarning }}</div>
+              </sc-if>
+
+              <div style="display:flex; gap:10px; margin-top:16px;">
+                <div onClick="{{ approveCase }}" style="flex:1; text-align:center; background:#1ea672; color:#fff; border-radius:8px; padding:11px; font-weight:600; font-size:14px; cursor:pointer;">Approve</div>
+                <div onClick="{{ rejectCase }}" style="flex:1; text-align:center; border:1px solid #f0c4bd; color:#c0392b; border-radius:8px; padding:11px; font-weight:600; font-size:14px; cursor:pointer;">Reject</div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- HISTORY -->
+      <sc-if value="{{ isHistory }}">
+        <div style="display:flex; gap:10px; margin-bottom:18px; align-items:center;">
+          <sc-for list="{{ historyTabs }}" as="t" hint-placeholder-count="5">
+            <div onClick="{{ t.select }}" style="{{ t.style }}">{{ t.label }}</div>
+          </sc-for>
+          <div style="flex:1;"></div>
+          <div style="font-size:12px; color:#6b7280;">{{ historyCount }} records</div>
+        </div>
+        <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; overflow:hidden;">
+          <div style="display:grid; grid-template-columns:1fr 1.2fr 1fr 0.9fr 0.9fr 0.8fr 0.8fr 0.6fr; padding:12px 20px; font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b7280; border-bottom:1px solid #eee;">
+            <div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div>
+          </div>
+          <sc-for list="{{ historyRows }}" as="r" hint-placeholder-count="8">
+            <div style="display:grid; grid-template-columns:1fr 1.2fr 1fr 0.9fr 0.9fr 0.8fr 0.8fr 0.6fr; align-items:center; padding:13px 20px; border-bottom:1px solid #f0f1f3; font-size:13px;">
+              <div style="color:#2563eb; font-weight:600;">{{ r.id }}</div><div>{{ r.name }}</div><div style="color:#374151;">{{ r.date }}</div><div style="color:#374151;">{{ r.branch }}</div><div style="color:#374151;">{{ r.agent }}</div>
+              <div><span style="background:#eef0f2; border-radius:5px; padding:3px 8px; font-size:11px; font-weight:600;">{{ r.channel }}</span></div>
+              <div><span style="{{ r.statusStyle }}">&#9679; {{ r.status }}</span></div>
+              <div style="font-weight:600;">{{ r.score }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+          <div style="width:32px; height:32px; border-radius:8px; border:1px solid #e6e7eb; display:flex; align-items:center; justify-content:center; color:#9ca3af;">&#8249;</div>
+          <div style="width:32px; height:32px; border-radius:8px; background:#c0392b; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600;">1</div>
+          <div style="width:32px; height:32px; border-radius:8px; border:1px solid #e6e7eb; display:flex; align-items:center; justify-content:center;">2</div>
+          <div style="width:32px; height:32px; border-radius:8px; border:1px solid #e6e7eb; display:flex; align-items:center; justify-content:center;">3</div>
+          <div style="width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#9ca3af;">&hellip;</div>
+          <div style="width:32px; height:32px; border-radius:8px; border:1px solid #e6e7eb; display:flex; align-items:center; justify-content:center;">161</div>
+          <div style="width:32px; height:32px; border-radius:8px; border:1px solid #e6e7eb; display:flex; align-items:center; justify-content:center;">&#8250;</div>
+        </div>
+      </sc-if>
+
+      <!-- REPORTS -->
+      <sc-if value="{{ isReports }}">
+        <div style="display:flex; gap:20px; align-items:flex-start;">
+          <div style="width:360px; flex:none; background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:24px;">
+            <div style="font-weight:700; font-size:14px; margin-bottom:16px;">Report parameters</div>
+            <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Start date</div>
+            <div style="border:1px solid #e6e7eb; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:14px;">01 / 06 / 2026</div>
+            <div style="font-size:13px; font-weight:600; margin-bottom:6px;">End date</div>
+            <div style="border:1px solid #e6e7eb; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:14px;">17 / 06 / 2026</div>
+            <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Branch</div>
+            <div style="border:1px solid #e6e7eb; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:14px; display:flex; justify-content:space-between;">All branches <span>&#9662;</span></div>
+            <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Status filter</div>
+            <div style="border:1px solid #e6e7eb; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:20px; display:flex; justify-content:space-between;">All statuses <span>&#9662;</span></div>
+            <div onClick="{{ generateReport }}" style="text-align:center; background:#c0392b; color:#fff; font-weight:600; font-size:14px; padding:12px; border-radius:8px; cursor:pointer; margin-bottom:12px;">{{ generateLabel }}</div>
+            <sc-if value="{{ reportGenerated }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#e6f7ef; color:#178a5c; border-radius:8px; padding:11px; font-size:13px; font-weight:600; text-align:center; margin-bottom:12px;">&#10003; Report generated successfully</div>
+            </sc-if>
+            <div style="text-align:center; border:1px solid #e6e7eb; font-weight:600; font-size:14px; padding:12px; border-radius:8px; cursor:pointer;">Download PDF</div>
+          </div>
+
+          <div style="flex:1;">
+            <div style="font-size:13px; color:#6b7280; margin-bottom:10px;">Preview</div>
+            <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:28px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #17181d; padding-bottom:16px; margin-bottom:20px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="width:26px; height:26px; border-radius:6px; background:#c0392b; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">X</div>
+                  <div style="font-weight:700; letter-spacing:.05em;">OPENXTECH</div>
+                </div>
+                <div style="text-align:right; font-size:11px; color:#6b7280;">Generated: 17 Jun 2026, 14:32<br/>Report ID: RPT-2026-0617-003</div>
+              </div>
+              <div style="font-size:19px; font-weight:700; margin-bottom:4px;">KYC Compliance Report</div>
+              <div style="font-size:13px; color:#6b7280; margin-bottom:20px;">CamFinance Microfinance &middot; Period: 01 Jun 2026 &ndash; 17 Jun 2026 &middot; All branches</div>
+              <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px;">
+                <div style="background:#f5f6f8; border-radius:8px; padding:14px;"><div style="font-size:18px; font-weight:700;">1,284</div><div style="font-size:11px; color:#6b7280;">Total verifications</div></div>
+                <div style="background:#f5f6f8; border-radius:8px; padding:14px;"><div style="font-size:18px; font-weight:700;">1,174</div><div style="font-size:11px; color:#6b7280;">Verified</div></div>
+                <div style="background:#f5f6f8; border-radius:8px; padding:14px;"><div style="font-size:18px; font-weight:700;">74</div><div style="font-size:11px; color:#6b7280;">Pending</div></div>
+                <div style="background:#f5f6f8; border-radius:8px; padding:14px;"><div style="font-size:18px; font-weight:700;">36</div><div style="font-size:11px; color:#6b7280;">Rejected</div></div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; font-size:11px; font-weight:700; color:#6b7280; padding:8px 0; border-bottom:1px solid #eee;"><div>CLIENT ID</div><div>DATE</div><div>BRANCH</div><div>STATUS</div></div>
+              <sc-for list="{{ reportRows }}" as="r" hint-placeholder-count="5">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; font-size:13px; padding:9px 0; border-bottom:1px solid #f5f6f8;"><div>{{ r.id }}</div><div>{{ r.date }}</div><div>{{ r.branch }}</div><div><span style="{{ r.statusStyle }}">&#9679; {{ r.status }}</span></div></div>
+              </sc-for>
+              <div style="display:flex; justify-content:space-between; margin-top:20px; font-size:11px; color:#9ca3af;"><span>Confidential &mdash; for COBAC audit purposes only</span><span>Page 1 of 24</span></div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- AGENTS -->
+      <sc-if value="{{ isAgents }}">
+        <div style="display:flex; gap:20px; align-items:flex-start;">
+          <div style="flex:1; background:#fff; border:1px solid #e6e7eb; border-radius:10px; overflow:hidden;">
+            <div style="display:grid; grid-template-columns:1.4fr 0.9fr 0.9fr 1fr 0.8fr; padding:12px 20px; font-size:11px; font-weight:700; letter-spacing:.04em; color:#6b7280; border-bottom:1px solid #eee;">
+              <div>AGENT</div><div>BRANCH</div><div>SUBMISSIONS</div><div>LAST ACTIVE</div><div>STATUS</div>
+            </div>
+            <sc-for list="{{ agentRows }}" as="a" hint-placeholder-count="8">
+              <div onClick="{{ a.select }}" style="{{ a.rowStyle }}">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="width:28px; height:28px; border-radius:50%; background:#e5e7eb; color:#374151; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">{{ a.initials }}</div>
+                  <div style="font-weight:600; font-size:13px;">{{ a.name }}</div>
+                </div>
+                <div style="font-size:13px; color:#374151;">{{ a.branch }}</div>
+                <div style="font-size:13px;">{{ a.submissions }}</div>
+                <div style="font-size:13px; color:#374151;">{{ a.lastActive }}</div>
+                <div><span style="{{ a.statusStyle }}">&#9679; {{ a.status }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ hasAgent }}" hint-placeholder-val="{{ true }}">
+            <div style="width:320px; flex:none; background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:22px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+                <div><div style="font-weight:700; font-size:15px;">{{ activeAgent.name }}</div><div style="font-size:12px; color:#6b7280; margin-top:2px;">{{ activeAgent.agentId }} &middot; {{ activeAgent.branch }} branch</div></div>
+                <div onClick="{{ toggleAgentActive }}" style="{{ toggleStyle }}"><div style="{{ toggleKnobStyle }}"></div></div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:18px;">
+                <div style="background:#f5f6f8; border-radius:8px; padding:12px; text-align:center;"><div style="font-size:17px; font-weight:700;">{{ activeAgent.submissions }}</div><div style="font-size:10px; color:#6b7280;">Submissions</div></div>
+                <div style="background:#f5f6f8; border-radius:8px; padding:12px; text-align:center;"><div style="font-size:17px; font-weight:700;">{{ activeAgent.rate }}</div><div style="font-size:10px; color:#6b7280;">Verified rate</div></div>
+                <div style="background:#f5f6f8; border-radius:8px; padding:12px; text-align:center;"><div style="font-size:17px; font-weight:700;">{{ activeAgent.avgTime }}</div><div style="font-size:10px; color:#6b7280;">Avg. time</div></div>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f1f3; font-size:13px;"><span style="color:#6b7280;">Email</span><b>{{ activeAgent.email }}</b></div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f1f3; font-size:13px;"><span style="color:#6b7280;">Branch</span><b>{{ activeAgent.branch }}</b></div>
+              <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:13px;"><span style="color:#6b7280;">Added</span><b>{{ activeAgent.added }}</b></div>
+              <div style="display:flex; gap:10px; margin-top:16px;">
+                <div style="flex:1; text-align:center; border:1px solid #e6e7eb; border-radius:8px; padding:10px; font-weight:600; font-size:14px; cursor:pointer;">Edit</div>
+                <div onClick="{{ toggleAgentActive }}" style="flex:1; text-align:center; border:1px solid #f0c4bd; color:#c0392b; background:#fdece9; border-radius:8px; padding:10px; font-weight:600; font-size:14px; cursor:pointer;">{{ disableLabel }}</div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <div style="background:#f5f6f8; border-radius:8px; padding:14px 18px; font-size:13px; color:#374151; margin-top:16px; max-width:900px;"><b>Plan limit:</b> Your Growth plan allows up to 15 agent accounts. You are currently using {{ agentCount }}.</div>
+      </sc-if>
+
+      <!-- API KEYS -->
+      <sc-if value="{{ isApiKeys }}">
+        <div style="background:#eef4fc; border-radius:10px; padding:16px 20px; font-size:13px; color:#1e3a5f; margin-bottom:20px; max-width:900px;">
+          &#8505; API keys allow your internal software to call <b>POST /kyc/verify</b> programmatically. Keep your keys secret &mdash; never expose them in client-side code or public repositories.
+        </div>
+        <sc-for list="{{ apiKeys }}" as="k" hint-placeholder-count="2">
+          <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:22px 24px; max-width:900px; margin-bottom:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+              <div><div style="font-weight:700; font-size:15px;">{{ k.name }}</div><div style="font-size:12px; color:#6b7280; margin-top:2px;">Created {{ k.created }} &middot; Last used {{ k.lastUsed }}</div></div>
+              <span style="background:#e6f7ef; color:#178a5c; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px;">&#9679; Active</span>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#f5f6f8; border-radius:8px; padding:12px 16px; margin-bottom:16px;">
+              <div style="font-family:monospace; font-size:13px;">{{ k.masked }}</div>
+              <div onClick="{{ k.copy }}" style="background:#fff; border:1px solid #e6e7eb; border-radius:6px; padding:6px 14px; font-size:12px; font-weight:600; color:#c0392b; cursor:pointer;">{{ k.copyLabel }}</div>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(4,1fr); margin-bottom:10px;">
+              <div><div style="font-size:11px; font-weight:700; color:#6b7280;">RATE LIMIT</div><div style="font-weight:700; font-size:14px; margin-top:4px;">{{ k.rateLimit }}</div></div>
+              <div><div style="font-size:11px; font-weight:700; color:#6b7280;">REQUESTS TODAY</div><div style="font-weight:700; font-size:14px; margin-top:4px;">{{ k.reqToday }}</div></div>
+              <div><div style="font-size:11px; font-weight:700; color:#6b7280;">THIS MONTH</div><div style="font-weight:700; font-size:14px; margin-top:4px;">{{ k.thisMonth }}</div></div>
+              <div><div style="font-size:11px; font-weight:700; color:#6b7280;">EXPIRES</div><div style="font-weight:700; font-size:14px; margin-top:4px;">{{ k.expires }}</div></div>
+            </div>
+            <div style="font-size:11px; color:#6b7280; margin-bottom:6px;">Monthly quota usage: {{ k.quotaLabel }}</div>
+            <div style="height:6px; background:#eef0f2; border-radius:3px; overflow:hidden; margin-bottom:16px;"><div style="{{ k.quotaBarStyle }}"></div></div>
+            <div style="display:flex; gap:10px;">
+              <div style="border:1px solid #e6e7eb; border-radius:8px; padding:9px 18px; font-weight:600; font-size:13px; cursor:pointer;">Rotate key</div>
+              <div style="border:1px solid #f0c4bd; color:#c0392b; background:#fdece9; border-radius:8px; padding:9px 18px; font-weight:600; font-size:13px; cursor:pointer;">Revoke</div>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
+
+      <!-- SETTINGS -->
+      <sc-if value="{{ isSettings }}">
+        <div style="display:flex; gap:20px; align-items:flex-start;">
+          <div style="width:220px; flex:none; background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:8px;">
+            <sc-for list="{{ settingsTabs }}" as="t" hint-placeholder-count="5">
+              <div onClick="{{ t.select }}" style="{{ t.style }}">{{ t.label }}</div>
+            </sc-for>
+          </div>
+          <div style="flex:1; display:flex; flex-direction:column; gap:20px;">
+            <div style="background:#3f2d68; border-radius:10px; padding:24px 28px; color:#fff;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <div style="font-size:19px; font-weight:700; margin-bottom:6px;">Growth plan</div>
+                  <div style="font-size:13px; color:rgba(255,255,255,.8);">1,000 verifications / month &middot; 5 branches &middot; 15 agents</div>
+                </div>
+                <div onClick="{{ goPricing }}" style="background:#fff; color:#3f2d68; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; cursor:pointer; white-space:nowrap;">Upgrade plan</div>
+              </div>
+              <div style="height:6px; background:rgba(255,255,255,.25); border-radius:3px; margin:18px 0 8px; overflow:hidden;"><div style="width:84.7%; height:100%; background:#fff; border-radius:3px;"></div></div>
+              <div style="font-size:12px; color:rgba(255,255,255,.75);">847 / 1,000 verifications used this cycle &middot; Renews 1 Jul 2026</div>
+            </div>
+
+            <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:24px;">
+              <div style="font-size:12px; font-weight:700; letter-spacing:.05em; color:#6b7280; margin-bottom:16px;">MFI PROFILE</div>
+              <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Institution name</div>
+              <div style="border:1px solid #e6e7eb; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:14px;">CamFinance Microfinance</div>
+              <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Contact email</div>
+              <div style="border:1px solid #e6e7eb; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:14px;">contact@camfinance.cm</div>
+              <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Phone number</div>
+              <div style="border:1px solid #e6e7eb; border-radius:8px; padding:11px 14px; font-size:14px; margin-bottom:14px;">+237 6 99 00 11 22</div>
+              <div onClick="{{ saveSettings }}" style="display:inline-block; background:#c0392b; color:#fff; font-weight:600; font-size:14px; padding:11px 22px; border-radius:8px; cursor:pointer; margin-top:6px;">Save changes</div>
+              <sc-if value="{{ settingsSaved }}" hint-placeholder-val="{{ false }}">
+                <span style="margin-left:14px; color:#1ea672; font-size:13px; font-weight:600;">&#10003; Saved</span>
+              </sc-if>
+            </div>
+
+            <div style="background:#fff; border:1px solid #e6e7eb; border-radius:10px; padding:24px;">
+              <div style="font-size:12px; font-weight:700; letter-spacing:.05em; color:#6b7280; margin-bottom:16px;">NOTIFICATIONS</div>
+              <sc-for list="{{ notifToggles }}" as="n" hint-placeholder-count="4">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f0f1f3;">
+                  <div><div style="font-weight:600; font-size:14px;">{{ n.title }}</div><div style="font-size:12px; color:#6b7280; margin-top:2px;">{{ n.desc }}</div></div>
+                  <div onClick="{{ n.toggle }}" style="{{ n.style }}"><div style="{{ n.knobStyle }}"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- PRICING -->
+      <sc-if value="{{ isPricing }}">
+        <div style="text-align:center; margin-bottom:32px;">
+          <div style="color:#c0392b; font-size:12px; font-weight:700; letter-spacing:.06em; margin-bottom:8px;">KYC API FOR MICROFINANCE INSTITUTIONS</div>
+          <div style="font-size:28px; font-weight:700; margin-bottom:8px;">Subscription plans</div>
+          <div style="color:#6b7280; font-size:14px;">Choose the verification volume that matches your institution's size and growth</div>
+        </div>
+        <div style="display:flex; gap:20px; align-items:flex-start; justify-content:center; flex-wrap:wrap;">
+          <sc-for list="{{ plans }}" as="p" hint-placeholder-count="4">
+            <div style="{{ p.cardStyle }}">
+              <sc-if value="{{ p.popular }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:#3f2d68; color:#fff; font-size:11px; font-weight:700; padding:5px 14px; border-radius:20px; white-space:nowrap;">Most popular</div>
+              </sc-if>
+              <div style="font-weight:700; font-size:16px; margin-bottom:2px;">{{ p.name }}</div>
+              <div style="font-size:12px; color:#6b7280; margin-bottom:16px;">{{ p.tagline }}</div>
+              <div style="font-size:26px; font-weight:700;">{{ p.price }}<span style="font-size:13px; font-weight:500; color:#6b7280;"> {{ p.period }}</span></div>
+              <div style="display:inline-block; background:#eef0f2; font-size:12px; font-weight:600; padding:5px 12px; border-radius:20px; margin:12px 0 18px;">{{ p.volume }}</div>
+              <div onClick="{{ p.choose }}" style="{{ p.btnStyle }}">{{ p.btnLabel }}</div>
+              <div style="margin-top:20px; text-align:left;">
+                <sc-for list="{{ p.features }}" as="f" hint-placeholder-count="6">
+                  <div style="display:flex; gap:8px; font-size:13px; padding:6px 0; color:#374151;"><span style="color:#1ea672;">&#10003;</span>{{ f }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="text-align:center; margin-top:24px;">
+          <span onClick="{{ backToSettings }}" style="color:#c0392b; font-size:13px; font-weight:600; cursor:pointer;">&#8592; Back to Settings</span>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const DAY_DATA = [
+  { label:'4', v:60, p:8, r:6 }, { label:'5', v:72, p:6, r:5 }, { label:'6', v:52, p:9, r:7 },
+  { label:'7', v:82, p:7, r:5 }, { label:'8', v:65, p:8, r:6 }, { label:'9', v:78, p:6, r:5 },
+  { label:'10', v:56, p:9, r:7 }, { label:'11', v:83, p:5, r:4 }, { label:'12', v:76, p:6, r:5 },
+  { label:'13', v:70, p:8, r:6 }, { label:'14', v:60, p:7, r:6 }, { label:'15', v:80, p:6, r:4 },
+  { label:'16', v:68, p:8, r:6 }, { label:'17', v:79, p:6, r:5 }
+];
+const BRANCHES = [
+  { name:'Mvog-Ada', value:412, pct:100 },
+  { name:'Biyem-Assi', value:331, pct:80 },
+  { name:'Mokolo', value:271, pct:66 },
+  { name:'Bafoussam', value:210, pct:51 }
+];
+const QUEUE_CASES = [
+  { id:'CLT-00482', initials:'JF', name:'FOTSO Jean-Pierre', client:'CLT-00482', agent:'Jeanne Mbarga', reason:'Duplicate', score:'0.94', submitted:'2 min ago', faceMatch:'0.91 \u2014 match', ocr:'0.97', dupSim:'0.94 \u2014 high', hasDupWarning:true, dupWarning:'Matches existing client CLT-00119 (KAMGA Jean-Paul) registered 14 Feb 2026 at Mvog-Ada branch. Review before approving.' },
+  { id:'CLT-00481', initials:'MN', name:'NGO Marie', client:'CLT-00481', agent:'Pierre Onana', reason:'Low confidence', score:'0.71', submitted:'18 min ago', faceMatch:'0.71 \u2014 weak', ocr:'0.82', dupSim:'0.12 \u2014 low', hasDupWarning:false },
+  { id:'CLT-00479', initials:'PT', name:'TCHOUMI Paul', client:'CLT-00479', agent:'Roger Tabi', reason:'Duplicate', score:'0.89', submitted:'1h ago', faceMatch:'0.88 \u2014 match', ocr:'0.95', dupSim:'0.89 \u2014 high', hasDupWarning:true, dupWarning:'Similar to client CLT-00203 (TCHOUMI P.) registered 3 Mar 2026 at Mokolo branch. Review before approving.' },
+  { id:'CLT-00471', initials:'SA', name:'ABENA Sandrine', client:'CLT-00471', agent:'Sandrine Ekotto', reason:'Low confidence', score:'0.68', submitted:'3h ago', faceMatch:'0.68 \u2014 weak', ocr:'0.79', dupSim:'0.08 \u2014 low', hasDupWarning:false },
+  { id:'CLT-00468', initials:'RK', name:'KAMDEM Robert', client:'CLT-00468', agent:'Boris Nguele', reason:'Duplicate', score:'0.91', submitted:'5h ago', faceMatch:'0.90 \u2014 match', ocr:'0.93', dupSim:'0.91 \u2014 high', hasDupWarning:true, dupWarning:'Matches existing client CLT-00087 (KAMDEM R.) registered 2 Jan 2026 at Mvog-Ada branch. Review before approving.' }
+];
+const HISTORY_ROWS = [
+  { id:'CLT-00482', name:'FOTSO Jean-Pierre', date:'17 Jun, 14:32', branch:'Mvog-Ada', agent:'J. Mbarga', channel:'Dashboard', status:'Verified', score:'96%' },
+  { id:'CLT-00481', name:'NGO Marie-Claire', date:'17 Jun, 11:14', branch:'Biyem-Assi', agent:'P. Onana', channel:'API', status:'Verified', score:'93%' },
+  { id:'CLT-00480', name:'TABI Roger', date:'16 Jun, 15:08', branch:'Mokolo', agent:'R. Tabi', channel:'Dashboard', status:'Pending', score:'78%' },
+  { id:'CLT-00479', name:'MVOGO Pauline', date:'16 Jun, 14:55', branch:'Mvog-Ada', agent:'J. Mbarga', channel:'Dashboard', status:'Verified', score:'91%' },
+  { id:'CLT-00478', name:'EKOTTO Samuel', date:'15 Jun, 10:30', branch:'Bafoussam', agent:'S. Ekotto', channel:'API', status:'Rejected', score:'31%' },
+  { id:'CLT-00477', name:'ATEBA Christine', date:'15 Jun, 09:18', branch:'Biyem-Assi', agent:'P. Onana', channel:'Dashboard', status:'Approved', score:'88%' },
+  { id:'CLT-00476', name:'BEKONO Lionel', date:'14 Jun, 16:42', branch:'Mvog-Ada', agent:'J. Mbarga', channel:'Dashboard', status:'Verified', score:'94%' },
+  { id:'CLT-00475', name:'NKODO Sylvie', date:'14 Jun, 11:05', branch:'Mokolo', agent:'R. Tabi', channel:'API', status:'Verified', score:'97%' }
+];
+const AGENTS = [
+  { name:'Jeanne Mbarga', agentId:'AGT-014', initials:'JM', branch:'Mvog-Ada', submissions:142, lastActive:'Today, 14:28', active:true, rate:'94%', avgTime:'4.3s', email:'j.mbarga@camfinance.cm', added:'12 January 2026' },
+  { name:'Pierre Onana', agentId:'AGT-015', initials:'PO', branch:'Biyem-Assi', submissions:98, lastActive:'Today, 11:02', active:true, rate:'92%', avgTime:'4.6s', email:'p.onana@camfinance.cm', added:'18 January 2026' },
+  { name:'Roger Tabi', agentId:'AGT-016', initials:'RT', branch:'Mokolo', submissions:76, lastActive:'Yesterday', active:true, rate:'90%', avgTime:'4.9s', email:'r.tabi@camfinance.cm', added:'2 February 2026' },
+  { name:'Sandrine Ekotto', agentId:'AGT-017', initials:'SE', branch:'Bafoussam', submissions:54, lastActive:'16 Jun', active:true, rate:'89%', avgTime:'5.1s', email:'s.ekotto@camfinance.cm', added:'10 February 2026' },
+  { name:'Boris Nguele', agentId:'AGT-018', initials:'BN', branch:'Mvog-Ada', submissions:38, lastActive:'15 Jun', active:true, rate:'87%', avgTime:'5.3s', email:'b.nguele@camfinance.cm', added:'20 February 2026' },
+  { name:'Celine Ateba', agentId:'AGT-019', initials:'CA', branch:'Biyem-Assi', submissions:21, lastActive:'14 Jun', active:false, rate:'81%', avgTime:'5.8s', email:'c.ateba@camfinance.cm', added:'1 March 2026' },
+  { name:'Martin Kamga', agentId:'AGT-020', initials:'MK', branch:'Mokolo', submissions:12, lastActive:'10 Jun', active:false, rate:'78%', avgTime:'6.1s', email:'m.kamga@camfinance.cm', added:'15 March 2026' },
+  { name:'Diane Nkondo', agentId:'AGT-021', initials:'DN', branch:'Bafoussam', submissions:5, lastActive:'5 Jun', active:false, rate:'70%', avgTime:'6.5s', email:'d.nkondo@camfinance.cm', added:'2 April 2026' }
+];
+const API_KEYS_DATA = [
+  { name:'Production key', created:'12 Jan 2026', lastUsed:'today, 14:31', masked:'kxc_live_a7f3e2b19d84c6\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022', rateLimit:'100 req / min', reqToday:284, thisMonth:847, expires:'Never', quotaLabel:'847 / 1,000 verifications', quotaPct:84.7 },
+  { name:'Staging / test key', created:'20 Jan 2026', lastUsed:'10 Jun 2026', masked:'kxc_test_b9c1d5e28f71a4\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022', rateLimit:'20 req / min', reqToday:0, thisMonth:12, expires:'31 Dec 2026', quotaLabel:'12 / 1,000 verifications', quotaPct:1.2 }
+];
+const PLANS_DATA = [
+  { name:'Starter', tagline:'For single-branch MFIs and pilots', price:'25,000', period:'FCFA/mo', volume:'200 verifications / month', popular:false, features:['Dashboard for 1 branch','Up to 3 agent accounts','Face match + liveness + OCR','Duplicate detection','Monthly compliance report','Email support'] },
+  { name:'Growth', tagline:'For multi-branch MFIs', price:'65,000', period:'FCFA/mo', volume:'1,000 verifications / month', popular:false, features:['Dashboard for up to 5 branches','Up to 15 agent accounts','Everything in Starter','On-demand compliance reports','API access for integration','Priority email support'] },
+  { name:'Pro', tagline:'For established MFI networks', price:'150,000', period:'FCFA/mo', volume:'5,000 verifications / month', popular:true, features:['Unlimited branches','Unlimited agent accounts','Everything in Growth','Custom rate limits','Dedicated API key with higher throughput','Phone + email support, 24h response','Quarterly model performance review'] },
+  { name:'Enterprise', tagline:'For networks and federations', price:'Custom', period:'', volume:'10,000+ verifications / month', popular:false, features:['Everything in Pro','Volume-based custom pricing','Dedicated infrastructure option','Custom OCR tuning for partner documents','SLA-backed uptime guarantee','Dedicated account manager'] }
+];
+
+function reasonStyle(reason) {
+  return 'display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px; background:#fdf1e0; color:#b3720b;';
+}
+function statusStyle(status) {
+  const map = {
+    Verified: 'background:#e6f7ef;color:#178a5c;', Approved: 'background:#e6f7ef;color:#178a5c;',
+    Pending: 'background:#fdf1e0;color:#b3720b;', Rejected: 'background:#fde8e6;color:#c0392b;',
+    Active: 'background:#e6f7ef;color:#178a5c;', Inactive: 'background:#fdf1e0;color:#b3720b;', Disabled: 'background:#fde8e6;color:#c0392b;'
+  };
+  return 'display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;' + (map[status] || '');
+}
+const toggleOn = 'width:40px; height:22px; border-radius:12px; background:#1ea672; position:relative; cursor:pointer; flex:none;';
+const toggleOff = 'width:40px; height:22px; border-radius:12px; background:#d1d5db; position:relative; cursor:pointer; flex:none;';
+const knobOn = 'width:18px; height:18px; border-radius:50%; background:#fff; position:absolute; top:2px; left:20px; transition:.15s;';
+const knobOff = 'width:18px; height:18px; border-radius:50%; background:#fff; position:absolute; top:2px; left:2px; transition:.15s;';
+
+class Component extends DCLogic {
+  state = {
+    page: 'dashboard',
+    queue: QUEUE_CASES.map(c => c.id),
+    activeCaseId: QUEUE_CASES[0].id,
+    historyFilter: 'All',
+    agents: AGENTS.map(a => ({ ...a })),
+    activeAgentId: AGENTS[0].agentId,
+    keys: API_KEYS_DATA.map(k => ({ ...k, copied: false })),
+    settingsTab: 'Subscription',
+    settingsSaved: false,
+    reportGenerating: false,
+    reportGenerated: false,
+    notifs: { quota: true, pending: true, weekly: false, maintenance: true }
+  };
+
+  goPage(p) { this.setState({ page: p }); }
+  selectCase(id) { this.setState({ activeCaseId: id }); }
+  resolveCase(id) {
+    this.setState(s => {
+      const queue = s.queue.filter(q => q !== id);
+      return { queue, activeCaseId: queue[0] };
+    });
+  }
+  selectAgent(id) { this.setState({ activeAgentId: id }); }
+  toggleAgent(id) {
+    this.setState(s => ({ agents: s.agents.map(a => a.agentId === id ? { ...a, active: !a.active } : a) }));
+  }
+  copyKey(idx) {
+    this.setState(s => {
+      const keys = s.keys.map((k, i) => i === idx ? { ...k, copied: true } : k);
+      return { keys };
+    });
+    setTimeout(() => this.setState(s => ({ keys: s.keys.map((k, i) => i === idx ? { ...k, copied: false } : k) })), 1500);
+  }
+  generateReport() {
+    if (this.state.reportGenerating) return;
+    this.setState({ reportGenerating: true, reportGenerated: false });
+    setTimeout(() => this.setState({ reportGenerating: false, reportGenerated: true }), 900);
+  }
+  saveSettings() {
+    this.setState({ settingsSaved: true });
+    setTimeout(() => this.setState({ settingsSaved: false }), 2000);
+  }
+  toggleNotif(key) {
+    this.setState(s => ({ notifs: { ...s.notifs, [key]: !s.notifs[key] } }));
+  }
+
+  renderVals() {
+    const page = this.state.page;
+    const titles = {
+      dashboard: ['Verification statistics', 'CamFinance Microfinance \u00b7 All branches'],
+      review: ['Pending review cases', 'CamFinance Microfinance'],
+      history: ['Verification history', 'CamFinance Microfinance \u00b7 All branches'],
+      reports: ['Compliance reports', 'Generate COBAC-ready verification records'],
+      agents: ['Agent accounts', 'CamFinance Microfinance \u00b7 Growth plan \u00b7 ' + this.state.agents.length + ' / 15 agents'],
+      apikeys: ['API keys', 'CamFinance Microfinance \u00b7 Growth plan'],
+      settings: ['Settings', 'CamFinance Microfinance'],
+      pricing: ['Subscription plans', 'Choose the plan that fits your institution']
+    };
+    const [pageTitle, pageSubtitle] = titles[page];
+
+    const navBase = 'padding:10px 20px; font-size:14px; cursor:pointer; color:rgba(255,255,255,.65); border-left:3px solid transparent;';
+    const navActive = 'padding:10px 20px; font-size:14px; cursor:pointer; color:#fff; font-weight:600; background:#24252b; border-left:3px solid #c0392b;';
+    const navKeys = ['dashboard', 'review', 'history', 'reports', 'agents', 'apikeys', 'settings'];
+    const navVals = {};
+    navKeys.forEach(k => {
+      navVals['navItemStyle_' + k] = page === k ? navActive : navBase;
+      navVals['goPage_' + k] = () => this.goPage(k);
+    });
+
+    const maxDay = Math.max(...DAY_DATA.map(d => d.v + d.p + d.r));
+    const dayBars = DAY_DATA.map(d => ({
+      label: d.label,
+      verifiedStyle: 'height:' + (d.v / maxDay * 100) + '%; background:#1ea672; border-radius:3px 3px 0 0;',
+      pendingStyle: 'height:' + (d.p / maxDay * 100) + '%; background:#e2933a;',
+      rejectedStyle: 'height:' + (d.r / maxDay * 100) + '%; background:#c0392b; border-radius:0 0 3px 3px;'
+    }));
+    const branchBars = BRANCHES.map(b => ({ name: b.name, value: b.value, barStyle: 'width:' + b.pct + '%; height:100%; background:#c0392b;' }));
+
+    const queueCases = this.state.queue.map(id => {
+      const c = QUEUE_CASES.find(q => q.id === id);
+      return { ...c, select: () => this.selectCase(id), reasonStyle: reasonStyle(c.reason), rowStyle: 'display:grid; grid-template-columns:1.4fr 1fr 0.6fr 0.8fr; align-items:center; padding:14px 20px; border-bottom:1px solid #f0f1f3; cursor:pointer; background:' + (id === this.state.activeCaseId ? '#fafafb' : '#fff') + ';' };
+    });
+    const activeCase = QUEUE_CASES.find(c => c.id === this.state.activeCaseId);
+
+    const historyTabOptions = ['All', 'Verified', 'Pending', 'Rejected', 'Approved'];
+    const historyTabs = historyTabOptions.map(label => ({
+      label,
+      select: () => this.setState({ historyFilter: label }),
+      style: (this.state.historyFilter === label
+        ? 'padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; background:#17181d; color:#fff;'
+        : 'padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; background:#eef0f2; color:#374151;')
+    }));
+    const historyFiltered = this.state.historyFilter === 'All' ? HISTORY_ROWS : HISTORY_ROWS.filter(r => r.status === this.state.historyFilter);
+    const historyRows = historyFiltered.map(r => ({ ...r, statusStyle: statusStyle(r.status) }));
+
+    const reportRows = HISTORY_ROWS.slice(0, 5).map(r => ({ id: r.id, date: r.date, branch: r.branch, status: r.status, statusStyle: statusStyle(r.status) }));
+
+    const agentRows = this.state.agents.map(a => ({
+      ...a, select: () => this.selectAgent(a.agentId),
+      status: a.active ? (a.submissions < 25 ? 'Inactive' : 'Active') : 'Disabled',
+      statusStyle: statusStyle(a.active ? (a.submissions < 25 ? 'Inactive' : 'Active') : 'Disabled'),
+      rowStyle: 'display:grid; grid-template-columns:1.4fr 0.9fr 0.9fr 1fr 0.8fr; align-items:center; padding:14px 20px; border-bottom:1px solid #f0f1f3; cursor:pointer; background:' + (a.agentId === this.state.activeAgentId ? '#fafafb' : '#fff') + ';'
+    }));
+    const activeAgentRaw = this.state.agents.find(a => a.agentId === this.state.activeAgentId);
+    const activeAgent = activeAgentRaw;
+
+    const apiKeys = this.state.keys.map((k, i) => ({
+      ...k, copy: () => this.copyKey(i), copyLabel: k.copied ? 'Copied!' : 'Copy',
+      quotaBarStyle: 'width:' + k.quotaPct + '%; height:100%; background:' + (k.quotaPct > 50 ? '#e2933a' : '#1ea672') + ';'
+    }));
+
+    const settingsTabOptions = ['Subscription', 'MFI profile', 'Notifications', 'Security', 'Danger zone'];
+    const settingsTabs = settingsTabOptions.map(label => ({
+      label, select: () => this.setState({ settingsTab: label }),
+      style: (this.state.settingsTab === label
+        ? 'padding:12px 14px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; background:#fdf1ef; color:#17181d; border-left:3px solid #c0392b;'
+        : 'padding:12px 14px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; color:#6b7280;')
+    }));
+
+    const notifDefs = [
+      { key: 'quota', title: 'Quota warning alert', desc: 'Get notified when usage reaches 80% of monthly quota' },
+      { key: 'pending', title: 'New PENDING case', desc: 'Email alert when a verification requires your review' },
+      { key: 'weekly', title: 'Weekly summary report', desc: 'Receive a weekly digest of verification activity' },
+      { key: 'maintenance', title: 'System maintenance alerts', desc: 'Be informed of scheduled downtime or updates' }
+    ];
+    const notifToggles = notifDefs.map(n => {
+      const on = this.state.notifs[n.key];
+      return { title: n.title, desc: n.desc, toggle: () => this.toggleNotif(n.key), style: on ? toggleOn : toggleOff, knobStyle: on ? knobOn : knobOff };
+    });
+
+    const plans = PLANS_DATA.map(p => ({
+      ...p,
+      cardStyle: 'position:relative; width:250px; background:#fff; border-radius:12px; padding:26px; text-align:center; border:' + (p.popular ? '2px solid #3f2d68' : '1px solid #e6e7eb') + ';',
+      btnStyle: 'display:block; text-align:center; border-radius:8px; padding:11px; font-weight:600; font-size:14px; cursor:pointer; ' + (p.popular ? 'background:#c0392b; color:#fff;' : 'border:1px solid #c0392b; color:#c0392b;'),
+      btnLabel: p.name === 'Enterprise' ? 'Contact sales' : 'Choose ' + p.name,
+      choose: () => this.goPage('settings')
+    }));
+
+    return {
+      pageTitle, pageSubtitle,
+      isDashboard: page === 'dashboard', isReview: page === 'review', isHistory: page === 'history',
+      isReports: page === 'reports', isAgents: page === 'agents', isApiKeys: page === 'apikeys',
+      isSettings: page === 'settings', isPricing: page === 'pricing',
+      ...navVals,
+
+      dayBars, branchBars,
+
+      queueCount: queueCases.length, queueCases, queueEmpty: queueCases.length === 0,
+      hasCase: !!activeCase, activeCase: activeCase || {},
+      approveCase: () => this.resolveCase(this.state.activeCaseId),
+      rejectCase: () => this.resolveCase(this.state.activeCaseId),
+
+      historyTabs, historyRows, historyCount: historyFiltered.length,
+
+      generateReport: () => this.generateReport(),
+      generateLabel: this.state.reportGenerating ? 'Generating\u2026' : 'Generate report',
+      reportGenerated: this.state.reportGenerated,
+      reportRows,
+
+      openAddAgent: () => {}, agentRows, hasAgent: !!activeAgent, activeAgent: activeAgent || {},
+      agentCount: this.state.agents.length,
+      toggleStyle: activeAgent && activeAgent.active ? toggleOn : toggleOff,
+      toggleKnobStyle: activeAgent && activeAgent.active ? knobOn : knobOff,
+      toggleAgentActive: () => this.toggleAgent(this.state.activeAgentId),
+      disableLabel: activeAgent && activeAgent.active ? 'Disable' : 'Enable',
+
+      generateKey: () => {}, apiKeys,
+
+      settingsTabs, goPricing: () => this.goPage('pricing'),
+      saveSettings: () => this.saveSettings(), settingsSaved: this.state.settingsSaved,
+      notifToggles,
+
+      plans, backToSettings: () => this.goPage('settings')
+    };
+  }
+}
+
+</script>
+</body>
+</html>

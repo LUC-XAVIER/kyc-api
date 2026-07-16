@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import decode_access_token, hash_api_key
 from app.db.session import get_db
-from app.models import Agent, ApiKey, MfiAccount
+from app.models import ApiKey, MfiAccount, User
 from app.models.enums import ActorType, AgentRole, AgentStatus
 from app.services import subscription
 
@@ -62,7 +62,7 @@ def _mfi_from_key(api_key: str, db: Session) -> MfiAccount:
     return record.mfi_account
 
 
-def _agent_from_token(token: str, db: Session) -> Agent:
+def _agent_from_token(token: str, db: Session) -> User:
     """Validate a session JWT and return its active agent."""
     try:
         claims = decode_access_token(token)
@@ -70,7 +70,7 @@ def _agent_from_token(token: str, db: Session) -> Agent:
     except (jwt.InvalidTokenError, KeyError, ValueError):
         raise AuthenticationError("Invalid or expired token.") from None
 
-    agent = db.get(Agent, agent_id)
+    agent = db.get(User, agent_id)
     if agent is None or agent.status != AgentStatus.ACTIVE:
         raise AuthenticationError("Unknown or disabled account.")
     return agent
@@ -114,7 +114,7 @@ def get_metered_mfi(
 def get_current_agent(
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
     db: Session = Depends(get_db),
-) -> Agent:
+) -> User:
     """Authenticate a dashboard session token and return the agent.
 
     Args:
@@ -122,7 +122,7 @@ def get_current_agent(
         db: Request-scoped database session.
 
     Returns:
-        The authenticated, active :class:`Agent`.
+        The authenticated, active :class:`User`.
 
     Raises:
         AuthenticationError: If the token or the referenced account is
@@ -134,8 +134,8 @@ def get_current_agent(
 
 
 def require_manager(
-    agent: Agent = Depends(get_current_agent),
-) -> Agent:
+    agent: User = Depends(get_current_agent),
+) -> User:
     """Authorize a manager-only, bearer-authenticated action.
 
     Raises:
@@ -159,7 +159,7 @@ class Principal:
     """
 
     mfi_account: MfiAccount
-    agent: Agent | None
+    agent: User | None
     is_manager: bool
 
     @property
