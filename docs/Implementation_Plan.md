@@ -51,12 +51,19 @@ kyc-api/
 |-------|-------|--------|
 | **0** | **Scaffold** — config, Docker/Postgres, FastAPI skeleton + `/health`, tooling, passing smoke test | ✅ |
 | **1** | **Data layer** — the 12 ORM entities + subscription/usage fields, pgvector embedding column, Alembic migrations, seed the 4 subscription plans | ✅ |
-| **2** | **API gateway + subscriptions** — API-key auth (hashed), quota enforcement (80% warn / 100% block), request validation, `/kyc/verify` wired to a *stub* pipeline → fully demoable API | ⬜ |
-| **3** | **ML pipeline** — preprocess → OCR (CM NIC) → liveness → face match (ArcFace) → duplicate (FAISS/pgvector) → decision engine, wired into the orchestrator (early-exit per Design §6.3.1) | ⬜ |
-| **3b** | **Anti-spoofing classifier** *(academic contribution)* — LBP feature extraction, SVM training on NUAA + local data, MLflow tracking, evaluation report | ⬜ |
-| **4** | **Streamlit dashboard** — login, camera-only agent form, manager review queue, Plotly stats, ReportLab compliance PDF, subscription view, Openxtech theme | ⬜ |
-| **5** | **Compliance & monitoring** — immutable audit trail everywhere, report generation, Evidently drift monitoring | ⬜ |
-| **6** | **Hardening & deployment** — encryption at rest, Locust load test (<10 s, FAR<1% / FRR<5%), HTTPS, deploy to Railway/Render | ⬜ |
+| **2** | **API gateway + subscriptions** — API-key auth (hashed), quota enforcement (80% warn / 100% block), request validation, `/kyc/verify` wired to a *stub* pipeline → fully demoable API | ✅ |
+| **3** | **ML pipeline** — preprocess → OCR (CM NIC) → liveness → face match (ArcFace) → duplicate (FAISS/pgvector) → decision engine, wired into the orchestrator (early-exit per Design §6.3.1) | ✅ |
+| **3b** | **Anti-spoofing classifier** *(academic contribution)* — LBP feature extraction, SVM training on NUAA + local data, MLflow tracking, evaluation report | ✅ |
+| **4** | **Dashboard** — login, camera-only agent form, manager review queue, stats, ReportLab compliance PDF, subscription view | ✅ |
+| **5** | **Compliance & monitoring** — immutable audit trail everywhere, report generation, Evidently drift monitoring | ✅ |
+| **6** | **Hardening & deployment** — secrets guard, login throttle, PII encryption at rest, HTTPS, CI/CD, Locust load test (<10 s, FAR<1% / FRR<5%) | 🚧 |
+
+**Phase 4 note:** built as an **Angular 19 SPA** (`KYC-Frontend/`), not
+Streamlit. Streamlit could not deliver the camera capture flow or the
+role-separated agent/manager apps the spec needs. See `DASHBOARD-BACKEND.md`.
+
+**Phase 6 note:** deploying to a **VPS**, not Railway/Render — the ML image is
+too large and memory-hungry for their small tiers. See `DEPLOYMENT.md`.
 
 **Sequencing rationale:** Phases 0–2 deliver a working multi-tenant API with
 quota enforcement and a stub verifier — fully demoable — *before* any ML
@@ -95,5 +102,18 @@ uv run python -m scripts.seed_plans
   (truncated ZIP) and should be re-saved from the source editor.
 - The **Technical Requirements Document** referenced by both docs is not yet
   in the repository.
-- Biometric encryption-at-rest (NFR03/NFR04) is scheduled for Phase 6 but the
-  schema in Phase 1 is designed to accommodate it.
+- Encryption-at-rest (NFR03/NFR04) is **partly done**: the identifying
+  `extracted_data` fields are AES-GCM sealed in the column, but face
+  embeddings stay readable in pgvector on purpose and rely on host volume
+  encryption instead — sealing them would foreclose SQL-side ANN search,
+  which duplicate detection needs as tenants grow. The VPS must therefore be
+  provisioned with full-disk encryption. See `DASHBOARD-BACKEND.md` §10.
+- The **camera → verify path has never run end-to-end**: `getUserMedia`
+  requires a secure context, and the dev VM has no camera device at all. It
+  is only testable once the app is live on HTTPS — a required gate before
+  declaring Phase 6 done.
+- **Email delivery is broken** (SMTP send succeeds, mail never arrives).
+  Manager signup and PIN reset both depend on emailed links, so this blocks
+  launch regardless of everything else.
+- **NFR01's 10-second budget** has only ever been measured on a developer
+  machine; the Locust run against real VPS hardware is still outstanding.

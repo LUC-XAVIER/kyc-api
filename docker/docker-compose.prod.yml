@@ -1,0 +1,74 @@
+# Production stack for the VPS. Unlike docker-compose.yml (which mounts the
+# source tree for live reload), this runs the built image from GHCR and
+# mounts nothing from the repo.
+#
+# Expects a .env on the host, next to this file, holding SECRET_KEY,
+# API_KEY_PEPPER, ENCRYPTION_KEY, the SMTP credentials and POSTGRES_PASSWORD.
+# That file is the only place production secrets exist — never the image,
+# never the repo.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kyc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: kyc
+    volumes:
+      - kyc_pgdata:/var/lib/postgresql/data
+    # Deliberately no ports: — the database is reachable only over the
+    # compose network. Publishing 5432 on a public VPS exposes every
+    # embedding and every encrypted row to the internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kyc -d kyc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    # GITHUB_REPOSITORY must be all lower-case — GHCR rejects capitals.
+    image: ghcr.io/${GITHUB_REPOSITORY:?set GITHUB_REPOSITORY in .env}:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: >-
+        postgresql+psycopg://kyc:${POSTGRES_PASSWORD}@db:5432/kyc
+    volumes:
+      # DeepFace's downloaded weights (~150 MB). Without this every
+      # replacement container re-downloads them and the first verification
+      # of each deploy pays the cost — or fails outright if the host has no
+      # egress to the weight host.
+      - kyc_models:/home/kyc
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  proxy:
+    # Caddy rather than nginx+certbot: it obtains and renews Let's Encrypt
+    # certificates automatically from the domain in APP_DOMAIN. HTTPS is not
+    # optional here — the agent camera needs a secure context, so on plain
+    # HTTP getUserMedia does not exist and the capture screen cannot work.
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  kyc_pgdata:
+  kyc_models:
+  caddy_data:
+  caddy_config:
