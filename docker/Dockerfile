@@ -33,13 +33,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:3.11-slim AS runtime
 
-# Runtime libraries only. tesseract for the OCR stage, libGL/glib for
-# OpenCV, libpq for psycopg.
+# Runtime libraries only. tesseract for the OCR stage; libGL/glib for OpenCV;
+# libgles2 + libegl1 for MediaPipe's face detector (it dlopen's
+# libGLESv2.so.2 / libEGL.so.1 even on a headless CPU box); libpq for psycopg.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq5 \
         tesseract-ocr \
         libgl1 \
         libglib2.0-0 \
+        libgles2 \
+        libegl1 \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
