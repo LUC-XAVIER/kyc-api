@@ -23,19 +23,65 @@ a plain VPS is cheaper and less constrained.
 Postgres sits alongside them. A 4 GB box boots and then OOMs under concurrent
 verifications.
 
-**Enable full-disk encryption when provisioning the VPS.** Face embeddings are
-stored unencrypted in pgvector by deliberate choice (see
-`DASHBOARD-BACKEND.md` §10); volume encryption is what covers them at rest.
-Retrofitting it later means rebuilding the host.
+**Disk encryption for the face embeddings.** Embeddings are stored unencrypted
+in pgvector by deliberate choice (see `DASHBOARD-BACKEND.md` §10); encryption
+of the disk they sit on is what covers them at rest. On a VPS this is awkward:
+true root full-disk encryption must be chosen at OS install (and needs remote
+unlock on reboot), so it can't be retrofitted onto an already-installed plain
+Ubuntu without rebuilding. The realistic options, best first:
+
+1. **Confirm whether the provider encrypts block storage at rest.** Many do at
+   the infrastructure level, which covers the real threat here — a stolen or
+   copied disk. If yes, you're done; note it and move on.
+2. If not, put the Postgres data directory on a **LUKS-encrypted data volume**
+   (a separate block device or a file-backed container). This is fiddly on
+   reboot (the key must be supplied to unlock) but keeps the DB off plaintext
+   disk.
+3. Otherwise, record it as an **accepted residual risk**: the identifying PII
+   columns are still encrypted at the application layer (AES-GCM); only the
+   embeddings are exposed, and only to someone who obtains the raw disk.
 
 ## 2. Host setup (once)
 
 1. Point the domain's **A record at the VPS IP before first start** — Caddy
    solves an ACME challenge over port 80 on boot, and fails if DNS is wrong.
-2. Install Docker and the compose plugin.
-3. Create the app directory (this is `VPS_APP_DIR` below) and copy in
-   `docker/docker-compose.prod.yml` and `docker/Caddyfile`.
-4. Write `.env` **next to the compose file, on the host**:
+
+2. **Provision the host.** Copy and run the bootstrap script as root — it
+   installs Docker + compose, a firewall (ufw: 22/80/443 only), automatic
+   security updates, fail2ban, time sync, and a non-root `deploy` user:
+
+   ```bash
+   scp scripts/provision_vps.sh root@HOST:/root/
+   ssh root@HOST 'bash /root/provision_vps.sh'
+   ```
+
+   It is idempotent and deliberately does **not** disable SSH password auth —
+   that comes next, in the right order, so you can't lock yourself out.
+
+3. **Lock down SSH — in this exact order, or you risk a permanent lockout:**
+
+   1. On your laptop, if you don't already have one:
+      `ssh-keygen -t ed25519 -C kyc-admin`.
+   2. Install the public key for the `deploy` user (still using the root
+      password this once): `ssh-copy-id -i ~/.ssh/id_ed25519.pub deploy@HOST`.
+   3. **Open a new terminal and confirm `ssh deploy@HOST` works with the key —
+      do not skip this.** Keep this session open.
+   4. Only now, edit `/etc/ssh/sshd_config`: set `PermitRootLogin no`,
+      `PasswordAuthentication no`, `PubkeyAuthentication yes`, then
+      `sudo systemctl restart ssh`. Verify a fresh `ssh deploy@HOST` still
+      works before closing your known-good session.
+
+   Generate a **separate** key for CI (`ssh-keygen -t ed25519 -f deploy_ci`),
+   add its public half to `deploy`'s `authorized_keys`, and give the private
+   half to GitHub as `VPS_SSH_KEY` (§3) — never reuse your personal key there.
+
+4. As the `deploy` user, copy `docker/docker-compose.prod.yml` and
+   `docker/Caddyfile` into the app directory (`/home/deploy/kyc-api`, which is
+   `VPS_APP_DIR`).
+
+5. Write `.env` **next to the compose file, on the host**. Generate the keys
+   on your laptop (where the app is checked out) and paste the values in — the
+   `ENCRYPTION_KEY` generator needs the app code, which isn't on the VPS:
 
    ```
    ENVIRONMENT=production
@@ -60,7 +106,10 @@ Retrofitting it later means rebuilding the host.
    the only thing that can read the encrypted PII columns; losing it means
    losing every client's identity data irrecoverably.
 
-5. First run, to create the schema and seed reference data:
+6. First run — but the image must exist in GHCR first, which happens the first
+   time CI builds and the deploy workflow pushes it (§3–§4). Once it's there,
+   the deploy workflow does the steps below automatically; run them by hand
+   only for the very first bring-up:
 
    ```bash
    docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head

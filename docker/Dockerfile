@@ -12,6 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# The ML wheels are huge (torch, and tensorflow alone is ~600 MB). uv's
+# default per-download timeout is 30s, which a large wheel on a slow link
+# can exceed; raise it so the install doesn't abort mid-download.
+ENV UV_HTTP_TIMEOUT=600
+
 WORKDIR /app
 
 # Dependencies first, from the lock file, so the layer is cached until the
