@@ -4,12 +4,15 @@ Covers both the ``X-API-Key`` gateway (machine callers) and the dashboard
 staff login (email/password -> JWT) plus its role dependencies.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.security.http import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_current_agent, require_manager
+from app.core.config import settings
 from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import create_access_token, decode_access_token
 from app.models.enums import AgentRole, AgentStatus
@@ -147,6 +150,103 @@ def test_login_disabled_account_is_unauthorized(
         LOGIN_URL, json={"identifier": "699222333", "pin": "123456"}
     )
     assert resp.status_code == 401
+
+
+# --- Login brute-force throttle ------------------------------------------
+
+
+def _fail_login(api_client: TestClient, identifier: str, times: int) -> None:
+    """Submit ``times`` wrong-PIN logins for ``identifier``."""
+    for _ in range(times):
+        api_client.post(
+            LOGIN_URL, json={"identifier": identifier, "pin": "000000"}
+        )
+
+
+def test_failed_logins_accumulate_on_the_account(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """The counter persists in the row, not in process memory."""
+    mfi, _ = create_mfi_with_key(db_session)
+    agent = create_agent(db_session, mfi, phone="699100001", pin="123456")
+
+    _fail_login(api_client, "699100001", 2)
+
+    db_session.refresh(agent)
+    assert agent.failed_login_count == 2
+    assert agent.locked_until is None
+
+
+def test_account_locks_at_the_attempt_threshold(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Hitting the threshold locks the account for the cooling-off window."""
+    mfi, _ = create_mfi_with_key(db_session)
+    agent = create_agent(db_session, mfi, phone="699100002", pin="123456")
+
+    _fail_login(api_client, "699100002", settings.login_max_attempts)
+
+    db_session.refresh(agent)
+    assert agent.locked_until is not None
+    assert agent.locked_until > datetime.now(UTC)
+
+
+def test_locked_account_rejects_even_the_correct_pin(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """The whole point: guessing stops mattering once locked."""
+    mfi, _ = create_mfi_with_key(db_session)
+    create_agent(db_session, mfi, phone="699100003", pin="123456")
+
+    _fail_login(api_client, "699100003", settings.login_max_attempts)
+    resp = api_client.post(
+        LOGIN_URL, json={"identifier": "699100003", "pin": "123456"}
+    )
+
+    assert resp.status_code == 401
+    assert "Too many failed attempts" in resp.json()["error"]["message"]
+
+
+def test_lock_expires_and_login_succeeds_again(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A lapsed lock lets the real user back in.
+
+    Lockout is time-boxed so nobody can permanently deny an agent access
+    by spamming their identifier.
+    """
+    mfi, _ = create_mfi_with_key(db_session)
+    agent = create_agent(db_session, mfi, phone="699100004", pin="123456")
+
+    _fail_login(api_client, "699100004", settings.login_max_attempts)
+    agent.locked_until = datetime.now(UTC) - timedelta(seconds=1)
+    db_session.commit()
+
+    resp = api_client.post(
+        LOGIN_URL, json={"identifier": "699100004", "pin": "123456"}
+    )
+    assert resp.status_code == 200
+
+
+def test_successful_login_clears_the_failure_streak(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A good login resets the streak.
+
+    The counter tracks consecutive failures, so occasional typos spread
+    over time never accumulate into a lock.
+    """
+    mfi, _ = create_mfi_with_key(db_session)
+    agent = create_agent(db_session, mfi, phone="699100005", pin="123456")
+
+    _fail_login(api_client, "699100005", settings.login_max_attempts - 1)
+    resp = api_client.post(
+        LOGIN_URL, json={"identifier": "699100005", "pin": "123456"}
+    )
+
+    assert resp.status_code == 200
+    db_session.refresh(agent)
+    assert agent.failed_login_count == 0
 
 
 # --- Bearer-token dependencies (get_current_agent / require_manager) -----

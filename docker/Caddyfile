@@ -1,0 +1,33 @@
+# Caddy obtains and renews the Let's Encrypt certificate for APP_DOMAIN
+# automatically. Point the domain's A record at the VPS before first start,
+# or the ACME challenge fails and Caddy will back off.
+
+{$APP_DOMAIN} {
+	encode gzip
+
+	# Uploaded ID and selfie frames are a few megabytes; the default limit
+	# would reject them.
+	request_body {
+		max_size 20MB
+	}
+
+	# The API. Everything the dashboard and the agent app call lives here.
+	handle /api/* {
+		reverse_proxy api:8000 {
+			# Pass the real client address through. The per-account login
+			# throttle does not need it, but a per-IP limiter added later
+			# will — without this every request looks like it came from
+			# the proxy.
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle /health {
+		reverse_proxy api:8000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

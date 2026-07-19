@@ -1,0 +1,42 @@
+# Build context exclusions. This file is a security control, not just a
+# build-speed one: the image is pushed to a registry, so anything left here
+# ships with it.
+
+# Secrets. .env holds SECRET_KEY, ENCRYPTION_KEY and SMTP credentials; they
+# reach the container through the runtime environment, never the image.
+.env
+*.env
+!.env.example
+
+# Personal data. Real ID photographs used for pipeline testing — these must
+# never leave this machine, let alone land in a registry.
+docs/Identifiers/
+
+# Local virtualenv (4.5 GB) — the image builds its own from uv.lock.
+.venv/
+__pycache__/
+*.py[cod]
+
+# Frontend build inputs; the API image serves no frontend assets.
+KYC-Frontend/node_modules/
+KYC-Frontend/dist/
+KYC-Frontend/.angular/
+
+# VCS and CI metadata.
+.git/
+.github/
+.gitignore
+
+# Test and tooling artefacts.
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+tests/
+
+# Locally trained model / index artefacts. Nothing reads these paths today
+# (anti-spoofing moved to DeepFace, and the duplicate index is rebuilt from
+# pgvector in memory), but they are large and machine-specific if present.
+faiss_index/
+models/
+mlruns/

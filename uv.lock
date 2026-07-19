@@ -1173,6 +1173,7 @@ source = { editable = "." }
 dependencies = [
     { name = "alembic" },
     { name = "bcrypt" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "pgvector" },
     { name = "psycopg", extra = ["binary"] },
@@ -1218,6 +1219,7 @@ ml = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "bcrypt", specifier = ">=4.1" },
+    { name = "cryptography", specifier = ">=42.0" },
     { name = "deepface", marker = "extra == 'ml'", specifier = ">=0.0.92" },
     { name = "easyocr", marker = "extra == 'ml'", specifier = ">=1.7" },
     { name = "evidently", marker = "extra == 'ml'", specifier = ">=0.4" },

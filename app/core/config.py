@@ -6,8 +6,14 @@ from the environment and never hardcoded, per Design doc §4.2.2.
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Placeholder shipped as the dev default; must never survive into production.
+INSECURE_DEFAULT = "change-me-in-production"
+
+# RFC 7518 §3.2: an HMAC-SHA256 key must be at least as long as the digest.
+MIN_SECRET_BYTES = 32
 
 
 class Settings(BaseSettings):
@@ -29,6 +35,18 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     # Server-side pepper mixed into API-key hashing.
     api_key_pepper: str = Field(default="change-me-in-production")
+    # Login brute-force throttle. A 6-digit PIN is only 1e6 combinations, so
+    # unlimited guessing is the weakest link in staff auth. Lockout is always
+    # time-boxed: a permanent lock would let anyone who knows an agent's
+    # phone number deny them access at will.
+    login_max_attempts: int = 5
+    login_lockout_minutes: int = 15
+    # AES-256 key (base64 of 32 bytes) for the encrypted PII columns.
+    # Generate with app.core.crypto.generate_key. No default on purpose: a
+    # fallback key shared by every checkout would be no protection at all,
+    # and a dev database holds real ID data too. Rotating this makes existing
+    # encrypted rows unreadable — see docs §10 before doing so.
+    encryption_key: str = Field(default="")
 
     # --- Database ---
     database_url: str = Field(
@@ -69,6 +87,44 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+
+    @property
+    def is_production(self) -> bool:
+        """True when running under the production environment name."""
+        return self.environment.lower() == "production"
+
+    @model_validator(mode="after")
+    def _reject_weak_secrets(self) -> "Settings":
+        """Fail fast if production is running on dev-grade secrets.
+
+        Guards secret_key (signs dashboard JWTs), api_key_pepper (mixed into
+        the API-key digest), and encryption_key (seals the PII columns).
+        Outside production the weak defaults are allowed, so local dev and
+        tests keep working untouched.
+
+        Raises:
+            ValueError: if a guarded secret is the shipped placeholder or is
+                shorter than MIN_SECRET_BYTES, listing every offender at once
+                so a deploy isn't fixed one variable per restart.
+        """
+        if self.is_production:
+            guarded = (
+                ("SECRET_KEY", self.secret_key),
+                ("API_KEY_PEPPER", self.api_key_pepper),
+                ("ENCRYPTION_KEY", self.encryption_key),
+            )
+            weak = [
+                name
+                for name, value in guarded
+                if value == INSECURE_DEFAULT
+                or len(value.encode()) < MIN_SECRET_BYTES
+            ]
+            if weak:
+                raise ValueError(
+                    f"Insecure {', '.join(weak)} in production: set a "
+                    f"random value of at least {MIN_SECRET_BYTES} bytes."
+                )
+        return self
 
 
 @lru_cache

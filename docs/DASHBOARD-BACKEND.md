@@ -254,34 +254,72 @@ What's already in place:
   as an HMAC-SHA256 digest mixed with a server-side pepper
   (`settings.api_key_pepper`) plus a non-secret display prefix.
 - **Enumeration-resistant login** (single generic error).
+- **Brute-force throttle.** Consecutive failed PINs are counted on
+  `users.failed_login_count`; at `login_max_attempts` (5) the account is
+  locked for `login_lockout_minutes` (15) via `users.locked_until`. The lock
+  is checked *before* the PIN, so a locked account rejects even a correct
+  one. State is in Postgres, not process memory, so it survives restarts and
+  holds across uvicorn workers — an in-memory per-IP limiter would give N
+  workers N× the allowance and fall to IP rotation regardless. Lockout is
+  always time-boxed: a permanent lock would let anyone who knows an agent's
+  phone number deny them service at will.
+- **PII encrypted at rest (NFR03/NFR04).** `extracted_data.full_name`,
+  `id_number`, `date_of_birth` and `place_of_birth` are sealed with
+  AES-256-GCM (`app/core/crypto.py`) via the `EncryptedString` /
+  `EncryptedDate` column types, so a database dump or a leaked backup does
+  not expose a client's identity. Encryption is randomized per write, which
+  deliberately rules out equality search on those columns — nothing queries
+  them, and deterministic encryption would leak which rows share a value.
 - **Immediate lock-out.** An agent's `status` is checked on every request, so
   disabling an account rejects even an unexpired token.
 - **Stateless tokens** with a 60-minute expiry (`access_token_expire_minutes`).
   There is no refresh token or server-side revocation list yet — re-login on
   expiry; account disablement is the revocation mechanism.
 
-### ⚠️ `secret_key` hardening (do before production — Phase 6)
+### Required secrets (enforced at startup)
 
-JWTs are signed with `settings.secret_key` using **HS256**. The dev default
-(`"change-me-in-production"`) is **23 bytes**, below the **32-byte minimum**
-that RFC 7518 §3.2 mandates for an HMAC-SHA-256 key — the test suite emits
-`InsecureKeyLengthWarning` because of it. This is fine for local development
-but **must not** ship: a short/guessable signing key lets an attacker forge
-valid session tokens for any agent/role.
+`Settings._reject_weak_secrets` refuses to construct when
+`ENVIRONMENT=production` (case-insensitive) and any guarded secret is still
+the shipped `"change-me-in-production"` placeholder or is shorter than the
+32-byte HS256 floor (RFC 7518 §3.2). Every offender is reported at once, so a
+deploy isn't fixed one variable per restart. The check is a fail-fast at
+import: a misconfigured production process dies at startup rather than
+serving forgeable tokens. Non-production is untouched, so the local stack and
+the test suite keep their weak defaults.
 
-**Before deploying:**
+| Variable | Protects | Rotation cost |
+|---|---|---|
+| `SECRET_KEY` | Signs dashboard JWTs (HS256) | Invalidates all outstanding sessions — the intended kill-switch |
+| `API_KEY_PEPPER` | Mixed into the stored API-key digest | Invalidates every issued API key |
+| `ENCRYPTION_KEY` | Seals the PII columns (AES-256-GCM) | **Makes existing encrypted rows unreadable — re-encrypt before rotating** |
 
-- Set a strong, random `SECRET_KEY` (≥ 32 bytes, e.g.
-  `python -c "import secrets; print(secrets.token_urlsafe(48))"`) via the
-  environment / `.env` — never commit it.
-- Likewise set a strong `API_KEY_PEPPER` (the API-key digest depends on it; a
-  weak pepper weakens every stored key).
-- Rotating `secret_key` invalidates all outstanding JWTs (everyone re-logs in),
-  which is the intended kill-switch.
+Generate them with `python -c "import secrets; print(secrets.token_urlsafe(48))"`
+(`SECRET_KEY`, `API_KEY_PEPPER`) and
+`python -c "from app.core.crypto import generate_key; print(generate_key())"`
+(`ENCRYPTION_KEY`, which must decode to exactly 32 bytes). Set them via the
+environment / `.env`; never commit them. `ENCRYPTION_KEY` must also be present
+when running `alembic upgrade`, since the migration that introduced the
+encrypted columns re-encrypts existing rows in Python.
 
-Also queued for Phase-6 hardening: HTTPS/TLS termination, rate-limiting the
-login endpoint, and (optionally) token revocation / shorter-lived tokens with
-refresh.
+### Face embeddings are covered by volume encryption, not column encryption
+
+`face_embeddings.vector` is deliberately left in a pgvector column. Sealing it
+would force it to opaque `BYTEA` and permanently foreclose SQL-side ANN
+search — which matters, because `PgVectorDuplicateStore.build_index` currently
+loads *every* embedding for an MFI on *every* verify request, and the natural
+fix at scale is an IVFFlat/HNSW index doing the search in Postgres. Full-disk
+/ volume encryption on the host covers the realistic threat here (stolen disk,
+leaked backup) without closing that door. This is an accepted trade-off, not
+an oversight — revisit it if the threat model grows to include a live database
+compromise.
+
+### Still queued for Phase 6
+
+HTTPS/TLS termination (which also unblocks `getUserMedia`, since the agent
+camera needs a secure context), per-IP rate limiting as a second layer in
+front of the per-account throttle, encryption of the host volume, Locust load
+testing against the NFR01 10-second budget, and optionally token revocation /
+shorter-lived tokens with refresh.
 
 ---
 
