@@ -26,6 +26,15 @@
 		reverse_proxy api:8000
 	}
 
+	# Everything else is the Angular dashboard: serve the built static files,
+	# and fall back to index.html so client-side routes (e.g. /login,
+	# /manager) resolve instead of 404ing.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
 	log {
 		output stdout
 		format console

@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+#
+# The public web tier: builds the Angular dashboard and serves it with Caddy,
+# which also terminates TLS and proxies /api to the backend. Replaces the
+# plain caddy image so the site's static files ship inside the proxy.
+
+FROM node:20-alpine AS build
+WORKDIR /app
+# Lockfile first for cached installs.
+COPY KYC-Frontend/package.json KYC-Frontend/package-lock.json ./
+RUN npm ci
+COPY KYC-Frontend/ ./
+# Angular's `application` builder writes the static site to browser/.
+RUN npm run build
+
+
+FROM caddy:2-alpine
+# The built site Caddy will serve at /.
+COPY --from=build /app/dist/kyc-dashboard/browser /srv
+COPY docker/Caddyfile /etc/caddy/Caddyfile

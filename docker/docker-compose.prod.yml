@@ -49,11 +49,14 @@ services:
       - "8000"
 
   proxy:
-    # Caddy rather than nginx+certbot: it obtains and renews Let's Encrypt
-    # certificates automatically from the domain in APP_DOMAIN. HTTPS is not
-    # optional here — the agent camera needs a secure context, so on plain
-    # HTTP getUserMedia does not exist and the capture screen cannot work.
-    image: caddy:2-alpine
+    # Builds the Angular dashboard and serves it with Caddy, which also
+    # terminates TLS (automatic Let's Encrypt from APP_DOMAIN) and proxies
+    # /api to the backend. HTTPS is not optional — the agent camera needs a
+    # secure context, so on plain HTTP getUserMedia does not exist and the
+    # capture screen cannot work.
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
     restart: unless-stopped
     ports:
       - "80:80"
@@ -61,7 +64,8 @@ services:
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Caddyfile and the site are baked into the image; only Caddy's
+      # certificate/state stays on named volumes.
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
