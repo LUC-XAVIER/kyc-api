@@ -168,7 +168,7 @@ export class AgentComponent {
       return;
     }
     try {
-      this.stream = await this.requestCamera(key);
+      this.stream = await this.requestCamera();
       this.cameraOpen.set(key);
     } catch (err) {
       this.cameraOpen.set(key);
@@ -176,13 +176,18 @@ export class AgentComponent {
     }
   }
 
-  /** Ask for the rear camera for IDs / front for selfies, falling back to any. */
-  private async requestCamera(key: DocKey): Promise<MediaStream> {
+  /** Ask for the rear camera, falling back to any available one.
+   *
+   * Rear for every slot, selfie included: the agent holds the device and
+   * photographs the client standing opposite them, so the client is always
+   * behind the phone, never in front of it.
+   */
+  private async requestCamera(): Promise<MediaStream> {
     const media = navigator.mediaDevices;
     try {
       return await media.getUserMedia({
         video: {
-          facingMode: key === 'selfie' ? 'user' : 'environment',
+          facingMode: 'environment',
           // Hint for a large frame (the default 640x480 is coarse for the
           // portrait printed on a card). Width only, deliberately: pinning
           // height too would force 16:9 and stretch a portrait-shaped source,
