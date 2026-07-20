@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import { API_URL } from './config';
+import { skipLoading } from './loading.interceptor';
 import {
   AccountSummary,
   AgentProfile,
@@ -61,7 +62,11 @@ export class ApiService {
 
   // ---- Verify (agent capture) ----
   verify(form: FormData): Observable<VerifyResponse> {
-    return this.http.post<VerifyResponse>(`${this.base}/kyc/verify`, form);
+    // Runs the whole ML pipeline — tens of seconds. The agent screen shows
+    // its own progress for it, so keep the global overlay out of the way.
+    return this.http.post<VerifyResponse>(`${this.base}/kyc/verify`, form, {
+      context: skipLoading(),
+    });
   }
 
   // ---- Profile ----

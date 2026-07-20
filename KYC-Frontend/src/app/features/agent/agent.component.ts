@@ -10,6 +10,7 @@ import {
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { LoadingService } from '../../core/loading.service';
 import {
   AgentProfile,
   DocumentType,
@@ -87,6 +88,7 @@ function cameraErrorMessage(err: unknown): string {
 export class AgentComponent {
   private readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
+  private readonly loading = inject(LoadingService);
   readonly user = this.auth.principal;
   readonly userInitials = computed(() =>
     initialsOf(this.user()?.full_name ?? 'A'),
@@ -454,7 +456,11 @@ export class AgentComponent {
   setPage(p: AgentPage): void {
     this.page.set(p);
     this.result.set(null);
+    // Bracket the switch so a page that fetches nothing still gets the
+    // transition; a load, when there is one, nests inside this pair.
+    this.loading.start();
     if (p === 'submissions') this.loadSubmissions();
+    this.loading.stop();
   }
 
   badgeClass(status: string): string {

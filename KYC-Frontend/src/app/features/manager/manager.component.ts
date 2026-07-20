@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
+import { LoadingService } from '../../core/loading.service';
 import {
   AccountSummary,
   AgentSummary,
@@ -192,6 +193,7 @@ const SETTINGS_TABS: SettingsTab[] = [
 export class ManagerComponent {
   private readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
+  private readonly loading = inject(LoadingService);
   readonly user = this.auth.principal;
 
   constructor() {
@@ -488,12 +490,17 @@ export class ManagerComponent {
 
   setPage(p: ManagerPage): void {
     this.page.set(p);
+    // Bracket the switch so a page that fetches nothing (Dashboard) still
+    // gets the transition. When a load does run, its request nests inside
+    // this pair and the overlay stays up until the data lands.
+    this.loading.start();
     if (p === 'review') this.loadReviews();
     if (p === 'history') this.loadHistory();
     if (p === 'reports') this.loadHistory();
     if (p === 'agents') this.loadAgents();
     if (p === 'apikeys') this.loadKeys();
     if (p === 'settings') this.loadAccount();
+    this.loading.stop();
   }
 
   selectCase(id: string): void {
