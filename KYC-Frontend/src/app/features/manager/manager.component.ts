@@ -115,6 +115,9 @@ interface HistoryRow {
 
 const HISTORY_PAGE_SIZE = 6;
 
+/** Smallest top-of-scale for the per-day chart, in verifications. */
+const CHART_MIN_SCALE = 5;
+
 /** Initials from a name, e.g. "FOTSO Jean" → "FJ". */
 function initialsOf(name: string): string {
   return (
@@ -314,8 +317,11 @@ export class ManagerComponent {
   // ---- Dashboard chart geometry (from real stats) ----
   readonly dayBars = computed(() => {
     const days = this.stats()?.per_day ?? [];
+    // Floor the scale at CHART_MIN_SCALE. Scaling purely to the busiest day
+    // means the first-ever verification draws a full-height bar that then
+    // shrinks as other days fill in — the chart appears to go backwards.
     const max = Math.max(
-      1,
+      CHART_MIN_SCALE,
       ...days.map((d) => d.verified + d.pending + d.rejected),
     );
     return days.map((d) => ({

@@ -94,7 +94,9 @@
 }
 .bars { display: flex; align-items: flex-end; gap: 8px; height: 150px; }
 .bars__col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
-.bars__stack { width: 100%; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+/* max-width, not width: a slim bar reads as a bar. Without the cap a short
+   range (or a range with few days) stretches each column into a slab. */
+.bars__stack { width: 100%; max-width: 22px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
 .bars__label { font-size: 10px; color: #9ca3af; margin-top: 6px; }
 .seg--v { background: var(--ox-green); border-radius: 3px 3px 0 0; }
 .seg--p { background: var(--ox-orange); }

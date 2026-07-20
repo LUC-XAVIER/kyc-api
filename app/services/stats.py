@@ -54,9 +54,7 @@ def compute_verification_stats(
     day_col = func.date(Verification.created_at)
 
     # Per-day, per-status counts (also the source of totals/by-status).
-    day_q = db.query(day_col, Verification.status, func.count()).filter(
-        *base
-    )
+    day_q = db.query(day_col, Verification.status, func.count()).filter(*base)
     if branch is not None:
         day_q = (
             day_q.join(User, Verification.agent_id == User.id)
@@ -79,8 +77,16 @@ def compute_verification_stats(
         elif status is VerificationStatus.REJECTED:
             bucket["rejected"] += count
 
+    # Every day in the range, including the empty ones. Returning only the
+    # days that happen to have rows makes the dashboard chart lie: a single
+    # verification would render as one column spanning the whole width.
+    _empty = {"verified": 0, "pending": 0, "rejected": 0}
+    span = (period_end - period_start).days
     per_day = [
-        DayBucket(date=day, **days[day]) for day in sorted(days)
+        DayBucket(date=day, **days.get(day, _empty))
+        for day in (
+            period_start + timedelta(days=offset) for offset in range(span + 1)
+        )
     ]
 
     # By-branch counts (outer join so unattributed rows still total).

@@ -82,25 +82,36 @@ def _seed(
     )
     db.add(verification)
     db.flush()
-    db.add_all([
-        ExtractedData(
-            verification_id=verification.id, full_name="JANE DOE",
-            id_number="ID9", date_of_birth=date(1990, 1, 1), sex=Sex.F,
-            occupation="ENGINEER",
-        ),
-        LivenessResult(
-            verification_id=verification.id, passed=True, method="lbp-svm",
-            anti_spoof_score=0.9, landmarks_detected=True,
-        ),
-        FaceMatchResult(
-            verification_id=verification.id, match_score=0.8,
-            verified=True, threshold=0.4,
-        ),
-        DuplicateFlag(
-            verification_id=verification.id, matched_client_id="C-9",
-            similarity_score=0.9,
-        ),
-    ])
+    db.add_all(
+        [
+            ExtractedData(
+                verification_id=verification.id,
+                full_name="JANE DOE",
+                id_number="ID9",
+                date_of_birth=date(1990, 1, 1),
+                sex=Sex.F,
+                occupation="ENGINEER",
+            ),
+            LivenessResult(
+                verification_id=verification.id,
+                passed=True,
+                method="lbp-svm",
+                anti_spoof_score=0.9,
+                landmarks_detected=True,
+            ),
+            FaceMatchResult(
+                verification_id=verification.id,
+                match_score=0.8,
+                verified=True,
+                threshold=0.4,
+            ),
+            DuplicateFlag(
+                verification_id=verification.id,
+                matched_client_id="C-9",
+                similarity_score=0.9,
+            ),
+        ]
+    )
     db.flush()
     return verification
 
@@ -182,19 +193,51 @@ def _seed_stats_fixture(db: Session, account) -> None:
     biy = create_agent(db, account, email="biy@mfi.cm", branch="Biyem-Assi")
     # In period: 2 VERIFIED + 1 REJECTED on Mvog-Ada; 1 PENDING + 1 APPROVED
     # on Biyem-Assi. Only the two VERIFIED carry a processing span (4s, 6s).
-    _seed_stat(db, account.id, status=VerificationStatus.VERIFIED,
-               when=_DAY, agent_id=ada.id, proc_seconds=4)
-    _seed_stat(db, account.id, status=VerificationStatus.VERIFIED,
-               when=_DAY, agent_id=ada.id, proc_seconds=6)
-    _seed_stat(db, account.id, status=VerificationStatus.REJECTED,
-               when=_DAY, agent_id=ada.id)
-    _seed_stat(db, account.id, status=VerificationStatus.PENDING,
-               when=_DAY, agent_id=biy.id)
-    _seed_stat(db, account.id, status=VerificationStatus.APPROVED,
-               when=_DAY, agent_id=biy.id)
+    _seed_stat(
+        db,
+        account.id,
+        status=VerificationStatus.VERIFIED,
+        when=_DAY,
+        agent_id=ada.id,
+        proc_seconds=4,
+    )
+    _seed_stat(
+        db,
+        account.id,
+        status=VerificationStatus.VERIFIED,
+        when=_DAY,
+        agent_id=ada.id,
+        proc_seconds=6,
+    )
+    _seed_stat(
+        db,
+        account.id,
+        status=VerificationStatus.REJECTED,
+        when=_DAY,
+        agent_id=ada.id,
+    )
+    _seed_stat(
+        db,
+        account.id,
+        status=VerificationStatus.PENDING,
+        when=_DAY,
+        agent_id=biy.id,
+    )
+    _seed_stat(
+        db,
+        account.id,
+        status=VerificationStatus.APPROVED,
+        when=_DAY,
+        agent_id=biy.id,
+    )
     # Outside the period -> must be excluded entirely.
-    _seed_stat(db, account.id, status=VerificationStatus.VERIFIED,
-               when=datetime(2026, 5, 20, 12, 0, tzinfo=UTC), agent_id=ada.id)
+    _seed_stat(
+        db,
+        account.id,
+        status=VerificationStatus.VERIFIED,
+        when=datetime(2026, 5, 20, 12, 0, tzinfo=UTC),
+        agent_id=ada.id,
+    )
 
 
 def test_stats_aggregate_period_status_branch_and_time(
@@ -216,11 +259,26 @@ def test_stats_aggregate_period_status_branch_and_time(
     assert body["pending"] == 1
     assert body["rejected"] == 1
     assert body["by_status"] == {
-        "VERIFIED": 2, "APPROVED": 1, "PENDING": 1, "REJECTED": 1
+        "VERIFIED": 2,
+        "APPROVED": 1,
+        "PENDING": 1,
+        "REJECTED": 1,
     }
-    assert body["per_day"] == [
-        {"date": "2026-06-15", "verified": 3, "pending": 1, "rejected": 1}
-    ]
+    # One bucket per day of the requested range (June 1-30), empty days
+    # included, so the dashboard chart keeps a stable x-axis.
+    per_day = body["per_day"]
+    assert len(per_day) == 30
+    assert per_day[0]["date"] == "2026-06-01"
+    assert per_day[-1]["date"] == "2026-06-30"
+    assert {
+        "date": "2026-06-15",
+        "verified": 3,
+        "pending": 1,
+        "rejected": 1,
+    } in per_day
+    assert (
+        sum(d["verified"] + d["pending"] + d["rejected"] for d in per_day) == 5
+    )
     assert body["by_branch"] == [
         {"branch": "Mvog-Ada", "count": 3},
         {"branch": "Biyem-Assi", "count": 2},

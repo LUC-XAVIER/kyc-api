@@ -167,7 +167,9 @@ Manager-only. Query params `start`, `end` (inclusive dates), optional
 - `total`, and the display bands `verified` (VERIFIED + APPROVED), `pending`,
   `rejected`;
 - `by_status` — raw counts per status value;
-- `per_day` — `{date, verified, pending, rejected}` buckets;
+- `per_day` — `{date, verified, pending, rejected}` buckets, one for **every**
+  day of the requested range including the empty ones, so a chart plotted from
+  it keeps a fixed x-axis;
 - `by_branch` — counts via the `Verification → Agent` outer join (branch lives
   on the agent; unattributed rows fall under "Unassigned");
 - `avg_processing_seconds` — mean of `processed_at − created_at`.
