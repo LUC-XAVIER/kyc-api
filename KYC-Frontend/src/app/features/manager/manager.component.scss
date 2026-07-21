@@ -244,10 +244,11 @@
 /* ---- User footer + logout ---- */
 .sidebar__userinfo { flex: 1; min-width: 0; }
 .logout-btn {
-  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 0 16px 14px; padding: 9px 12px;
   background: transparent; border: 1px solid rgba(255, 255, 255, 0.18);
   color: rgba(255, 255, 255, 0.75); font-size: 13px; font-weight: 600;
-  font-family: inherit; cursor: pointer; padding: 6px 12px; border-radius: 7px;
+  font-family: inherit; cursor: pointer; border-radius: 8px;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   &:hover {
     background: rgba(255, 255, 255, 0.08); color: #fff;
@@ -274,7 +275,8 @@
     border-bottom: 2px solid transparent;
     &.is-active { background: transparent; border-left: none; border-bottom-color: var(--ox-red); }
   }
-  .sidebar__user { border-top: none; padding: 0 0 0 6px; margin-left: auto; }
+  .logout-btn { margin: 0 8px 0 auto; padding: 6px 10px; }
+  .sidebar__user { border-top: none; padding: 0 0 0 6px; margin-left: 0; }
   .sidebar__userinfo { display: none; }
 
   .topbar { flex-wrap: wrap; gap: 12px; padding: 16px 18px; }
