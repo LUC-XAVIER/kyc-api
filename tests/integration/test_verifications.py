@@ -13,9 +13,11 @@ from app.models import (
     FaceMatchResult,
     LivenessResult,
     Verification,
+    VerificationImage,
 )
 from app.models.enums import (
     AgentRole,
+    ImageKind,
     Sex,
     SubmissionMethod,
     VerificationStatus,
@@ -173,6 +175,85 @@ def test_detail_of_another_mfi_is_404(
     foreign = _seed(db_session, other.id, "C-OTHER")
 
     resp = api_client.get(f"{BASE}/{foreign.id}", headers=_auth(key))
+    assert resp.status_code == 404
+
+
+def _add_image(
+    db: Session,
+    verification_id,
+    kind: ImageKind = ImageKind.ID_FRONT,
+    body: bytes = b"\xff\xd8\xff-jpeg-body",
+) -> bytes:
+    """Attach one stored image to a verification and return its bytes."""
+    db.add(
+        VerificationImage(
+            verification_id=verification_id,
+            kind=kind,
+            content_type="image/jpeg",
+            image=body,
+        )
+    )
+    db.flush()
+    return body
+
+
+def test_detail_lists_available_images(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """The detail advertises which images exist, without their bytes."""
+    account, key = create_mfi_with_key(db_session, usage=0)
+    verification = _seed(db_session, account.id)
+    _add_image(db_session, verification.id, ImageKind.ID_FRONT)
+    _add_image(db_session, verification.id, ImageKind.SELFIE)
+
+    resp = api_client.get(f"{BASE}/{verification.id}", headers=_auth(key))
+
+    assert resp.status_code == 200
+    assert set(resp.json()["available_images"]) == {"ID_FRONT", "SELFIE"}
+
+
+def test_get_image_returns_the_decrypted_bytes(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """The owning MFI can fetch a stored image, decrypted, as image/jpeg."""
+    account, key = create_mfi_with_key(db_session, usage=0)
+    verification = _seed(db_session, account.id)
+    body = _add_image(db_session, verification.id, ImageKind.ID_FRONT)
+
+    resp = api_client.get(
+        f"{BASE}/{verification.id}/images/ID_FRONT", headers=_auth(key)
+    )
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert resp.content == body
+
+
+def test_get_image_of_another_mfi_is_404(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """One MFI cannot read another MFI's client images."""
+    _, key = create_mfi_with_key(db_session, usage=0)
+    other, _ = create_mfi_with_key(db_session, usage=0, email="o2@x.com")
+    foreign = _seed(db_session, other.id, "C-OTHER2")
+    _add_image(db_session, foreign.id, ImageKind.ID_FRONT)
+
+    resp = api_client.get(
+        f"{BASE}/{foreign.id}/images/ID_FRONT", headers=_auth(key)
+    )
+    assert resp.status_code == 404
+
+
+def test_get_missing_image_is_404(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A kind that was never stored (e.g. a passport's back) is a 404."""
+    account, key = create_mfi_with_key(db_session, usage=0)
+    verification = _seed(db_session, account.id)
+
+    resp = api_client.get(
+        f"{BASE}/{verification.id}/images/SELFIE", headers=_auth(key)
+    )
     assert resp.status_code == 404
 
 

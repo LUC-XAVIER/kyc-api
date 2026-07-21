@@ -5,11 +5,13 @@ exercise the multipart endpoint, persistence, and quota against the real
 database without loading models.
 """
 
+import io
 import uuid
 from datetime import date
 
 import numpy as np
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy.orm import Session
 
 from app.api.v1.routes import verify as verify_route
@@ -20,8 +22,9 @@ from app.models import (
     FaceEmbedding,
     FaceMatchResult,
     LivenessResult,
+    VerificationImage,
 )
-from app.models.enums import ActorType, VerificationStatus
+from app.models.enums import ActorType, ImageKind, VerificationStatus
 from app.pipeline.contracts import (
     DuplicateOutcome,
     FaceMatchOutcome,
@@ -49,6 +52,21 @@ def _files(*, with_back: bool = True) -> dict:
 
 def _data(client_id: str, document_type: str = "NIC") -> dict[str, str]:
     return {"client_id": client_id, "document_type": document_type}
+
+
+def _png() -> bytes:
+    """A small, valid PNG the image-storage path can actually re-compress."""
+    buf = io.BytesIO()
+    Image.new("RGB", (60, 40), (200, 40, 40)).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def _real_files(*, with_back: bool = True) -> dict:
+    image = ("img.png", _png(), "image/png")
+    files = {"id_front": image, "selfie": image}
+    if with_back:
+        files["id_back"] = image
+    return files
 
 
 def _stub_pipeline(monkeypatch, output: VerificationOutput) -> None:
@@ -267,3 +285,88 @@ def test_verify_nic_without_back_is_rejected(
     )
 
     assert resp.status_code == 400
+
+
+def test_verify_stores_captured_images(
+    api_client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """A NIC verification keeps all three images as compressed JPEGs."""
+    _stub_pipeline(monkeypatch, _verified())
+    _, key = create_mfi_with_key(db_session, usage=0)
+
+    resp = api_client.post(
+        VERIFY_URL,
+        data=_data("CLIENT-IMG"),
+        files=_real_files(),
+        headers=_auth(key),
+    )
+
+    assert resp.status_code == 201
+    vid = uuid.UUID(resp.json()["verification_id"])
+    images = (
+        db_session.query(VerificationImage)
+        .filter_by(verification_id=vid)
+        .all()
+    )
+    assert {i.kind for i in images} == {
+        ImageKind.ID_FRONT,
+        ImageKind.ID_BACK,
+        ImageKind.SELFIE,
+    }
+    for image in images:
+        assert image.content_type == "image/jpeg"
+        # The column decrypts on read; the bytes are a real JPEG.
+        assert image.image[:3] == b"\xff\xd8\xff"
+
+
+def test_verify_passport_stores_front_and_selfie_only(
+    api_client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """A passport has no back, so only two images are stored."""
+    _stub_pipeline(monkeypatch, _verified())
+    _, key = create_mfi_with_key(db_session, usage=0)
+
+    resp = api_client.post(
+        VERIFY_URL,
+        data=_data("CLIENT-PP", "PASSPORT"),
+        files=_real_files(with_back=False),
+        headers=_auth(key),
+    )
+
+    assert resp.status_code == 201
+    vid = uuid.UUID(resp.json()["verification_id"])
+    kinds = {
+        i.kind
+        for i in db_session.query(VerificationImage)
+        .filter_by(verification_id=vid)
+        .all()
+    }
+    assert kinds == {ImageKind.ID_FRONT, ImageKind.SELFIE}
+
+
+def test_verify_with_unreadable_image_still_succeeds(
+    api_client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """A non-image upload is skipped, not fatal.
+
+    Storing a review image is best-effort, so the verification still
+    completes even when the bytes can't be re-compressed.
+    """
+    _stub_pipeline(monkeypatch, _verified())
+    _, key = create_mfi_with_key(db_session, usage=0)
+
+    resp = api_client.post(
+        VERIFY_URL,
+        data=_data("CLIENT-BAD"),
+        files=_files(),  # b"fake-image-bytes" — not a real image
+        headers=_auth(key),
+    )
+
+    assert resp.status_code == 201
+    vid = uuid.UUID(resp.json()["verification_id"])
+    assert (
+        db_session.query(VerificationImage)
+        .filter_by(verification_id=vid)
+        .count()
+        == 0
+    )
