@@ -14,6 +14,7 @@ EXPECTED_TABLES = {
     "pin_resets",
     "api_keys",
     "verifications",
+    "verification_images",
     "extracted_data",
     "face_embeddings",
     "liveness_results",
