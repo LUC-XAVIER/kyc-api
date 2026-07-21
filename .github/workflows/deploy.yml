@@ -75,13 +75,24 @@ jobs:
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
+        env:
+          # The commit being deployed, forwarded to the remote shell so the
+          # host checks out the same source the api image was built from.
+          DEPLOY_SHA: ${{ inputs.ref || github.event.workflow_run.head_sha || github.sha }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DEPLOY_SHA
           script: |
             set -euo pipefail
             cd ${{ secrets.VPS_APP_DIR }}
+            # The api ships as a prebuilt GHCR image, but the proxy (Angular
+            # dashboard + Caddy) is built from source on the host. Move the
+            # working tree onto the exact deployed commit first, or the
+            # rebuilt frontend would bake whatever stale source was there.
+            git -C .. fetch --quiet origin
+            git -C .. checkout --quiet --force "$DEPLOY_SHA"
             echo "${{ secrets.GITHUB_TOKEN }}" | \
               docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose -f docker-compose.prod.yml pull api
@@ -95,6 +106,10 @@ jobs:
             docker compose -f docker-compose.prod.yml run --rm api \
               python -m scripts.seed_plans
             docker compose -f docker-compose.prod.yml up -d --no-deps api
+            # Rebuild the dashboard from the freshly checked-out source and
+            # roll it out. Without this the api updates but the UI (camera
+            # facing, loading overlay, charts) stays on the previous build.
+            docker compose -f docker-compose.prod.yml up -d --no-deps --build proxy
             docker image prune -f
 
       - name: Verify the deployment is serving
