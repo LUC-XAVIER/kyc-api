@@ -303,14 +303,22 @@ export class ManagerComponent {
   ];
 
   readonly title = computed<[string, string]>(() => {
+    // Subtitles carry the logged-in MFI's own name and plan, never a
+    // hardcoded one. Falls back gracefully while the account is loading.
+    const org = this.account()?.name ?? 'Your institution';
+    const plan = this.account()?.plan_name;
+    // "GROWTH" -> " · Growth plan"; empty until the account has loaded.
+    const planLabel = plan
+      ? ` · ${plan.charAt(0) + plan.slice(1).toLowerCase()} plan`
+      : '';
     const map: Record<ManagerPage, [string, string]> = {
-      dashboard: ['Verification statistics', 'CamFinance Microfinance · All branches'],
-      review: ['Pending review cases', 'CamFinance Microfinance'],
-      history: ['Verification history', 'CamFinance Microfinance · All branches'],
+      dashboard: ['Verification statistics', `${org} · All branches`],
+      review: ['Pending review cases', org],
+      history: ['Verification history', `${org} · All branches`],
       reports: ['Compliance reports', 'Generate COBAC-ready verification records'],
-      agents: ['Agent accounts', 'CamFinance Microfinance · Growth plan'],
-      apikeys: ['API keys', 'CamFinance Microfinance · Growth plan'],
-      settings: ['Settings', 'CamFinance Microfinance'],
+      agents: ['Agent accounts', `${org}${planLabel}`],
+      apikeys: ['API keys', `${org}${planLabel}`],
+      settings: ['Settings', org],
       pricing: ['Subscription plans', 'Choose the plan that fits your institution'],
     };
     return map[this.page()];
