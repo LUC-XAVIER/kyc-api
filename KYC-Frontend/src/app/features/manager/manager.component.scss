@@ -185,6 +185,10 @@
 
 /* ---- Shared form bits (reports / settings / modal) ---- */
 .input--block { display: block; width: 100%; background: #fff; padding: 11px 14px; font-size: 14px; margin-bottom: 14px; min-width: 0; }
+/* +237 prefix stays the same height as the number input: move the field's
+   bottom margin to the wrapper so the stretch row doesn't shrink only it. */
+.phone-input { margin-bottom: 14px; }
+.phone-input__field { margin-bottom: 0; }
 .input-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; color: var(--ox-muted); margin-bottom: 16px; &--danger { color: var(--ox-red); } }
 .card--pad { padding: 24px; }

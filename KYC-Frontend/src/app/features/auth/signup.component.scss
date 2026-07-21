@@ -2,3 +2,13 @@
 :host {
   display: block;
 }
+
+/* +237 prefix and the number input share a stretch row; the field's bottom
+   margin would shrink only the input and leave the prefix taller. Carry the
+   spacing on the wrapper and zero it on the field so both stay equal height. */
+.phone-input {
+  margin-bottom: 14px;
+}
+.phone-input__field {
+  margin-bottom: 0;
+}
