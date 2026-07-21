@@ -47,6 +47,15 @@ export class ApiService {
     );
   }
 
+  /** One captured image (front/back/selfie) as a blob, auth-scoped. */
+  getVerificationImage(id: string, kind: string): Observable<Blob> {
+    // Skip the global overlay — the images pop into the already-open popup.
+    return this.http.get(
+      `${this.base}/kyc/verifications/${id}/images/${kind}`,
+      { responseType: 'blob', context: skipLoading() },
+    );
+  }
+
   stats(
     start: string,
     end: string,

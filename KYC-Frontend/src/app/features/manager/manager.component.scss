@@ -257,6 +257,15 @@
 }
 /* History rows open a read-only detail popup. */
 .table__row--history.is-clickable { cursor: pointer; &:hover { background: var(--ox-bg); } }
+.detail-images {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px;
+  &__label { font-size: 12px; font-weight: 700; color: var(--ox-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 16px; }
+  &__item {
+    margin: 0; text-align: center;
+    img { width: 100%; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid var(--ox-border); background: var(--ox-bg); }
+    figcaption { font-size: 11.5px; color: var(--ox-muted); margin-top: 4px; }
+  }
+}
 
 /* ---- User footer + logout ---- */
 .sidebar__userinfo { flex: 1; min-width: 0; }

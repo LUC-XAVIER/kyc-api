@@ -61,12 +61,16 @@ export interface DuplicateFlag {
   resolution: DuplicateResolution;
 }
 
+/** Which captured images exist for a verification. */
+export type ImageKind = 'ID_FRONT' | 'ID_BACK' | 'SELFIE';
+
 export interface VerificationDetail extends VerificationSummary {
   processed_at: string | null;
   extracted_data: ExtractedData | null;
   liveness_result: LivenessResult | null;
   face_match_result: FaceMatchResult | null;
   duplicate_flags: DuplicateFlag[];
+  available_images: ImageKind[];
 }
 
 export interface VerifyResponse {
