@@ -35,6 +35,11 @@ export class LoginComponent {
       this.router.navigateByUrl(this.auth.homeRoute());
     }
     const params = this.route.snapshot.queryParamMap;
+    // Deep-links and the agent logout arrive with ?actor=agent so the agent
+    // form shows first instead of the manager default.
+    if (params.get('actor') === 'agent') {
+      this.actor.set('agent');
+    }
     if (params.has('created')) {
       this.notice.set('Account created — please sign in.');
     } else if (params.has('reset')) {
