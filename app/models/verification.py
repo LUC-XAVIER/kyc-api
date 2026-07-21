@@ -92,6 +92,16 @@ class Verification(UUIDMixin, TimestampMixin, Base):
         """Whether the pipeline raised any duplicate-face flag."""
         return bool(self.duplicate_flags)
 
+    @property
+    def available_images(self) -> list["ImageKind"]:
+        """Kinds of captured image stored for this verification.
+
+        Reads only the rows' ``kind`` (the bytes are deferred), so the
+        detail view can offer exactly the images that exist — e.g. no back
+        for a passport.
+        """
+        return [image.kind for image in self.images]
+
 
 class ExtractedData(UUIDMixin, Base):
     """OCR output extracted from the NIC card.
@@ -211,7 +221,9 @@ class VerificationImage(UUIDMixin, TimestampMixin, Base):
     )
     kind: Mapped[ImageKind] = mapped_column(Enum(ImageKind, name="image_kind"))
     content_type: Mapped[str] = mapped_column(String(32))
-    image: Mapped[bytes] = mapped_column(EncryptedBytes)
+    # Deferred: the detail endpoint lists which images exist (by kind) without
+    # dragging the encrypted bytes along; they load only when actually served.
+    image: Mapped[bytes] = mapped_column(EncryptedBytes, deferred=True)
 
     verification: Mapped["Verification"] = relationship(
         back_populates="images"
