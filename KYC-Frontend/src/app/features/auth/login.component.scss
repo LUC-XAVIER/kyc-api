@@ -120,6 +120,15 @@
     border-color: var(--ox-red);
   }
 }
+/* The +237 prefix and the number input sit in one stretch row. The field's
+   bottom margin would shrink only the input and leave the prefix taller, so
+   carry that spacing on the wrapper and zero it on the field. */
+.phone-input {
+  margin-bottom: 16px;
+}
+.phone-input__field {
+  margin-bottom: 0;
+}
 .login-error {
   background: var(--ox-reject-soft);
   color: var(--ox-reject-text);
