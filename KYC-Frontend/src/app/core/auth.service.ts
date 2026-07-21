@@ -52,9 +52,16 @@ export class AuthService {
   }
 
   logout(): void {
+    // Remember the role before clearing it, so an agent lands back on the
+    // agent sign-in (the login page defaults to the manager form otherwise).
+    const wasAgent = this._principal()?.role === 'AGENT';
     this._principal.set(null);
     localStorage.removeItem(STORAGE_KEY);
-    this.router.navigateByUrl('/login');
+    if (wasAgent) {
+      this.router.navigate(['/login'], { queryParams: { actor: 'agent' } });
+    } else {
+      this.router.navigateByUrl('/login');
+    }
   }
 
   forgotPin(

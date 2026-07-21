@@ -39,6 +39,7 @@
           <div class="plan__name">{{ p.name }}</div>
           <div class="plan__tag">{{ p.tagline }}</div>
           <div class="plan__price">{{ p.price }}<span>{{ p.period }}</span></div>
+          @if (p.yearly) { <div class="plan__year">{{ p.yearly }}</div> }
           <div class="plan__vol">{{ p.volume }}</div>
           <button
             class="ox-btn plan__btn"
