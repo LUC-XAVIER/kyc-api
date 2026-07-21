@@ -80,6 +80,18 @@ class DocumentType(enum.StrEnum):
     PASSPORT = "PASSPORT"
 
 
+class ImageKind(enum.StrEnum):
+    """Which captured image a stored verification photo is.
+
+    A passport verification has no back, so ``ID_BACK`` is simply absent
+    for those.
+    """
+
+    ID_FRONT = "ID_FRONT"
+    ID_BACK = "ID_BACK"
+    SELFIE = "SELFIE"
+
+
 class ActorType(enum.StrEnum):
     """Type of actor recorded in an audit-log entry."""
 

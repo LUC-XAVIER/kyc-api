@@ -41,6 +41,34 @@ class EncryptedString(TypeDecorator):
         return decrypt(bytes(value)).decode()
 
 
+class EncryptedBytes(TypeDecorator):
+    """A binary column sealed with AES-GCM at rest.
+
+    For opaque blobs (e.g. captured ID/selfie images) that must never sit in
+    the database — or a leaked backup — in the clear. Unlike the string/date
+    variants there is no text round-trip: the raw bytes are sealed as-is.
+    """
+
+    impl = LargeBinary
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: bytes | None, dialect: object
+    ) -> bytes | None:
+        """Seal raw bytes on the way to the database."""
+        if value is None:
+            return None
+        return encrypt(value)
+
+    def process_result_value(
+        self, value: bytes | None, dialect: object
+    ) -> bytes | None:
+        """Open stored bytes on the way back out."""
+        if value is None:
+            return None
+        return decrypt(bytes(value))
+
+
 class EncryptedDate(TypeDecorator):
     """A date column sealed with AES-GCM at rest.
 
