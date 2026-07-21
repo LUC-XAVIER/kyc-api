@@ -444,6 +444,15 @@ client** → `PENDING` (duplicate caught across clients).
   (scoped per MFI, excluding the querying client).
 - The endpoint persists `Verification` + (on a clean pass) `FaceEmbedding`
   and consumes one unit of quota in a single transaction.
+- **Captured images are retained for manager review.** Each upload
+  (`id_front`, `id_back`, `selfie`) is re-compressed to a ≤1280px JPEG
+  (`app/services/images.py`) and stored on `verification_images`, sealed at
+  rest with AES-GCM via the `EncryptedBytes` column type — the same
+  discipline as the OCR PII fields. Storage is **best-effort**
+  (`safe_compress_to_jpeg`): a corrupt/non-image upload is skipped, never
+  fatal to the verification. The blob column is `deferred`, so listing which
+  images exist doesn't drag the bytes along. Retention/deletion policy is a
+  future item.
 
 **Problem / solution:** the project Postgres wasn't running, so integration
 tests couldn't execute. Brought up the pgvector/pg16 container
