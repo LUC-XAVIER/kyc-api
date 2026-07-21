@@ -51,6 +51,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install MediaPipe's graphics libraries
+        # The face detector dlopen's libGLESv2.so.2 / libEGL.so.1 at import,
+        # even headless on CPU. The Docker runtime image installs these
+        # (see docker/Dockerfile); the bare test runner needs them too, or
+        # every test that imports the ML stack fails with a missing .so.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglib2.0-0 libgles2 libegl1
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
