@@ -243,7 +243,18 @@
 
 /* ---- User footer + logout ---- */
 .sidebar__userinfo { flex: 1; min-width: 0; }
-.logout-btn { background: transparent; border: none; color: rgba(255, 255, 255, 0.5); font-size: 16px; cursor: pointer; padding: 4px 8px; &:hover { color: #fff; } }
+.logout-btn {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  background: transparent; border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.75); font-size: 13px; font-weight: 600;
+  font-family: inherit; cursor: pointer; padding: 6px 12px; border-radius: 7px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  &:hover {
+    background: rgba(255, 255, 255, 0.08); color: #fff;
+    border-color: rgba(255, 255, 255, 0.35);
+  }
+  &__icon { flex: none; }
+}
 
 /* ---- Responsive ---- */
 @media (max-width: 1024px) {
