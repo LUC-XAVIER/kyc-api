@@ -448,6 +448,7 @@
               <div class="plan-card__name">{{ p.name }}</div>
               <div class="plan-card__tag">{{ p.tagline }}</div>
               <div class="plan-card__price">{{ p.price }}<span>{{ p.period }}</span></div>
+              @if (p.yearly) { <div class="plan-card__year">{{ p.yearly }}</div> }
               <div class="plan-card__vol">{{ p.volume }}</div>
               <button class="ox-btn plan-card__btn" [class.ox-btn--primary]="p.popular" [class.ox-btn--outline-red]="!p.popular">
                 {{ p.name === 'Enterprise' ? 'Contact sales' : 'Choose ' + p.name }}
