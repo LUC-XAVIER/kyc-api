@@ -95,7 +95,10 @@ interface QueueRow {
 
 /** A history row shaped for the template (built from VerificationSummary). */
 interface HistoryRow {
+  /** The MFI's client reference, shown in the table. */
   id: string;
+  /** The verification's own UUID — used to open its detail. */
+  verificationId: string;
   name: string;
   date: string;
   branch: string;
@@ -208,6 +211,8 @@ export class ManagerComponent {
   readonly reviewError = signal(false);
   readonly activeCaseId = signal<string | null>(null);
   readonly activeDetail = signal<VerificationDetail | null>(null);
+  // The read-only detail popup opened from a History row (any status).
+  readonly detailModalOpen = signal(false);
   readonly reviewReason = signal<'all' | ReviewReason>('all');
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
@@ -424,6 +429,17 @@ export class ManagerComponent {
       : '';
     return { sim: `${top.similarity_score.toFixed(2)} — ${level}`, warning };
   });
+  /** Overall verification score as a percentage, for the detail popup. */
+  readonly detailOverall = computed(() =>
+    scoreLabel(this.activeDetail()?.confidence_score ?? null),
+  );
+  readonly detailStatus = computed(() =>
+    statusLabel(this.activeDetail()?.status ?? ''),
+  );
+  readonly detailWhen = computed(() => {
+    const d = this.activeDetail();
+    return d ? dateLabel(d.created_at) : '';
+  });
 
   // ---- History ----
   loadHistory(): void {
@@ -444,6 +460,7 @@ export class ManagerComponent {
   readonly historyRows = computed<HistoryRow[]>(() =>
     this.historyData().map((r) => ({
       id: r.client_id,
+      verificationId: r.id,
       name: r.client_name ?? '—',
       date: dateLabel(r.created_at),
       branch: r.branch_name ?? '—',
@@ -504,6 +521,18 @@ export class ManagerComponent {
       },
       error: () => undefined,
     });
+  }
+
+  /** Open the read-only detail popup for a History row (any status). */
+  openHistoryDetail(verificationId: string): void {
+    this.selectCase(verificationId);
+    this.detailModalOpen.set(true);
+  }
+
+  closeDetailModal(): void {
+    this.detailModalOpen.set(false);
+    this.activeCaseId.set(null);
+    this.activeDetail.set(null);
   }
 
   /** Approve or reject the active case, then drop it from the queue. */
