@@ -7,8 +7,11 @@ The stored bytes are sealed at rest by :class:`app.db.types.EncryptedBytes`.
 """
 
 import io
+import logging
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, UnidentifiedImageError
+
+logger = logging.getLogger("app.images")
 
 # A NIC's small print stays readable at ~1280px on the long edge, and a
 # quality-80 JPEG is visually clean while a fraction of the original size.
@@ -35,3 +38,17 @@ def compress_to_jpeg(
         out = io.BytesIO()
         img.save(out, format="JPEG", quality=quality, optimize=True)
         return out.getvalue()
+
+
+def safe_compress_to_jpeg(raw: bytes) -> bytes | None:
+    """Like :func:`compress_to_jpeg`, but ``None`` instead of raising.
+
+    Keeping a review image is best-effort: a corrupt or non-image upload
+    must never fail the verification itself, so decode/encode errors are
+    swallowed and logged.
+    """
+    try:
+        return compress_to_jpeg(raw)
+    except (UnidentifiedImageError, OSError, ValueError):
+        logger.warning("Skipping an image that could not be re-compressed.")
+        return None

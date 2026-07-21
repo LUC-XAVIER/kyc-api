@@ -29,7 +29,7 @@ from app.pipeline.orchestrator import VerificationOutput, run_verification
 from app.schemas.verification import VerifyResponse
 from app.services import audit, subscription
 from app.services.duplicate_store import PgVectorDuplicateStore
-from app.services.images import compress_to_jpeg
+from app.services.images import safe_compress_to_jpeg
 
 router = APIRouter(prefix="/kyc", tags=["verification"])
 
@@ -140,12 +140,15 @@ def _persist_images(
     for kind, raw in pieces:
         if not raw:
             continue
+        jpeg = safe_compress_to_jpeg(raw)
+        if jpeg is None:
+            continue
         db.add(
             VerificationImage(
                 verification_id=verification_id,
                 kind=kind,
                 content_type="image/jpeg",
-                image=compress_to_jpeg(raw),
+                image=jpeg,
             )
         )
 
