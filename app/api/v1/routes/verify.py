@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import Principal, get_metered_principal
-from app.core.exceptions import ValidationError
+from app.core.exceptions import ConflictError, ValidationError
 from app.db.session import get_db
 from app.models import (
     DuplicateFlag,
@@ -123,6 +123,25 @@ def _persist_stage_results(
         )
 
 
+def _ensure_unique_client_id(
+    db: Session, mfi_account_id: uuid.UUID, client_id: str
+) -> None:
+    """Reject a client ID already used by this MFI.
+
+    Client IDs are unique per MFI: an agent may type any ID, but a repeat is
+    refused so the same reference never points at two different people.
+    """
+    exists = (
+        db.query(Verification.id)
+        .filter_by(mfi_account_id=mfi_account_id, client_id=client_id)
+        .first()
+    )
+    if exists is not None:
+        raise ConflictError(
+            f"Client ID '{client_id}' already exists. Use a different one."
+        )
+
+
 def _persist_images(
     db: Session, verification_id: uuid.UUID, pipeline_input: PipelineInput
 ) -> None:
@@ -176,6 +195,7 @@ def verify(
     to the acting agent; a machine (API-key) call is recorded as such.
     """
     mfi = principal.mfi_account
+    _ensure_unique_client_id(db, mfi.id, client_id)
     pipeline_input = build_pipeline_input(
         client_id=client_id,
         mfi_account_id=mfi.id,

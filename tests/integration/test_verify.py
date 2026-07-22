@@ -344,6 +344,57 @@ def test_verify_passport_stores_front_and_selfie_only(
     assert kinds == {ImageKind.ID_FRONT, ImageKind.SELFIE}
 
 
+def test_verify_rejects_a_duplicate_client_id(
+    api_client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """A client ID already used by this MFI is refused with 409."""
+    _stub_pipeline(monkeypatch, _verified())
+    account, key = create_mfi_with_key(db_session, usage=0)
+
+    first = api_client.post(
+        VERIFY_URL,
+        data=_data("CLIENT-DUP"),
+        files=_files(),
+        headers=_auth(key),
+    )
+    assert first.status_code == 201
+
+    second = api_client.post(
+        VERIFY_URL,
+        data=_data("CLIENT-DUP"),
+        files=_files(),
+        headers=_auth(key),
+    )
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "CONFLICT"
+    # The rejected request consumed nothing.
+    assert account.current_period_usage == 1
+
+
+def test_verify_same_client_id_across_mfis_is_allowed(
+    api_client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    """Uniqueness is per MFI: two MFIs may each use the same client ID."""
+    _stub_pipeline(monkeypatch, _verified())
+    _, key_a = create_mfi_with_key(db_session, usage=0)
+    _, key_b = create_mfi_with_key(db_session, usage=0, email="b@x.com")
+
+    a = api_client.post(
+        VERIFY_URL,
+        data=_data("SHARED-1"),
+        files=_files(),
+        headers=_auth(key_a),
+    )
+    b = api_client.post(
+        VERIFY_URL,
+        data=_data("SHARED-1"),
+        files=_files(),
+        headers=_auth(key_b),
+    )
+    assert a.status_code == 201
+    assert b.status_code == 201
+
+
 def test_verify_with_unreadable_image_still_succeeds(
     api_client: TestClient, db_session: Session, monkeypatch
 ) -> None:
