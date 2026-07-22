@@ -224,6 +224,8 @@ export class ManagerComponent {
   readonly detailModalOpen = signal(false);
   // Captured images for the open popup, as object URLs (revoked on close).
   readonly detailImages = signal<{ kind: ImageKind; url: string }[]>([]);
+  // Whether the OCR-extracted client data is revealed in the popup.
+  readonly ocrOpen = signal(false);
   readonly reviewReason = signal<'all' | ReviewReason>('all');
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
@@ -464,6 +466,23 @@ export class ManagerComponent {
     const d = this.activeDetail();
     return d ? dateLabel(d.created_at) : '';
   });
+  /** The OCR-extracted client fields that were actually captured. */
+  readonly ocrFields = computed(() => {
+    const e = this.activeDetail()?.extracted_data;
+    if (!e) return [] as { label: string; value: string }[];
+    const rows: { label: string; value: string }[] = [];
+    const add = (label: string, value: string | null) => {
+      if (value) rows.push({ label, value });
+    };
+    add('Full name', e.full_name);
+    add('ID number', e.id_number);
+    add('Date of birth', e.date_of_birth);
+    add('Place of birth', e.place_of_birth);
+    add('Sex', e.sex);
+    add('Occupation', e.occupation);
+    add('Expiry date', e.expiry_date);
+    return rows;
+  });
 
   // ---- History ----
   loadHistory(): void {
@@ -552,12 +571,14 @@ export class ManagerComponent {
 
   /** Open the read-only detail popup for a History row (any status). */
   openHistoryDetail(verificationId: string): void {
+    this.ocrOpen.set(false);
     this.selectCase(verificationId);
     this.detailModalOpen.set(true);
   }
 
   closeDetailModal(): void {
     this.detailModalOpen.set(false);
+    this.ocrOpen.set(false);
     this.revokeDetailImages();
     this.activeCaseId.set(null);
     this.activeDetail.set(null);

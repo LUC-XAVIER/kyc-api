@@ -257,7 +257,29 @@
                 @if (d.reject_reason) {
                   <div class="detail-reject">Rejected — {{ rejectLabel(d.reject_reason) }}</div>
                 }
-                <div class="kv"><span>OCR confidence</span><b>{{ detailOcr() }}</b></div>
+                <div class="kv">
+                  <span>OCR confidence</span>
+                  <span class="ocr-right">
+                    <b>{{ detailOcr() }}</b>
+                    @if (ocrFields().length) {
+                      <button type="button" class="reveal-btn" (click)="ocrOpen.set(!ocrOpen())"
+                              [title]="ocrOpen() ? 'Hide extracted data' : 'View extracted client data'">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" />
+                          <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
+                      </button>
+                    }
+                  </span>
+                </div>
+                @if (ocrOpen()) {
+                  <div class="ocr-data">
+                    @for (f of ocrFields(); track f.label) {
+                      <div class="ocr-data__row"><span>{{ f.label }}</span><b>{{ f.value }}</b></div>
+                    }
+                  </div>
+                }
                 <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
                 <div class="kv"><span>Face match score</span><b>{{ detailFaceMatch() }}</b></div>
                 <div class="kv kv--last"><span>Duplicate similarity</span><b>{{ detailDup().sim }}</b></div>
