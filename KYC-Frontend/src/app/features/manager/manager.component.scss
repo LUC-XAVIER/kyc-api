@@ -262,6 +262,19 @@
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   &__to { display: inline-flex; align-items: center; gap: 4px; color: var(--ox-muted); font-size: 12px; }
 }
+.reports-track {
+  margin-top: 16px;
+  &__head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-weight: 700; font-size: 15px; margin-bottom: 12px;
+  }
+}
+.report-track__row {
+  display: grid; grid-template-columns: 1.6fr 1.2fr 1fr 0.8fr; align-items: center;
+  font-size: 13px; padding: 10px 0; border-bottom: 1px solid var(--ox-line);
+  &--head { font-size: 11px; font-weight: 700; color: var(--ox-muted); }
+  &:last-child { border-bottom: none; }
+}
 .row-action { display: flex; justify-content: center; }
 .dots-btn {
   border: none; background: transparent; cursor: pointer; border-radius: 6px;

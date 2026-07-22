@@ -502,7 +502,10 @@ export class ManagerComponent {
     this.loading.start();
     if (p === 'review') this.loadReviews();
     if (p === 'history') this.loadHistory();
-    if (p === 'reports') this.loadHistory();
+    if (p === 'reports') {
+      this.loadHistory();
+      this.loadReportsList();
+    }
     if (p === 'agents') this.loadAgents();
     if (p === 'apikeys') this.loadKeys();
     if (p === 'settings') this.loadAccount();
@@ -678,6 +681,47 @@ export class ManagerComponent {
   readonly reportRows = computed(() => this.historyRows().slice(0, 5));
   readonly reportGenerated = computed(() => this.generatedReport() !== null);
 
+  // Track of previously generated reports, each re-downloadable.
+  readonly reportsList = signal<ReportSummary[]>([]);
+  readonly reportsLoading = signal(false);
+  readonly downloadingId = signal<string | null>(null);
+  readonly reportTrackRows = computed(() =>
+    this.reportsList().map((r) => ({
+      id: r.id,
+      period: `${r.period_start} – ${r.period_end}`,
+      when: dateLabel(r.generated_at),
+      total: r.total_verifications,
+      raw: r,
+    })),
+  );
+
+  loadReportsList(): void {
+    this.reportsLoading.set(true);
+    this.api.listReports().subscribe({
+      next: (rows) => {
+        this.reportsList.set(rows);
+        this.reportsLoading.set(false);
+      },
+      error: () => this.reportsLoading.set(false),
+    });
+  }
+
+  /** Re-download any tracked report's PDF (regenerated on the server). */
+  downloadReportFile(r: ReportSummary): void {
+    if (this.downloadingId()) return;
+    this.downloadingId.set(r.id);
+    this.api.downloadReportPdf(r.id).subscribe({
+      next: (blob) => {
+        this.saveBlob(
+          blob,
+          `compliance-report-${r.period_start}_${r.period_end}.pdf`,
+        );
+        this.downloadingId.set(null);
+      },
+      error: () => this.downloadingId.set(null),
+    });
+  }
+
   readonly reportKpis = computed(() => {
     const r = this.generatedReport();
     const sb = r?.status_breakdown ?? {};
@@ -698,6 +742,8 @@ export class ManagerComponent {
       next: (r) => {
         this.generatedReport.set(r);
         this.reportGenerating.set(false);
+        // Show it immediately in the tracked list below.
+        this.loadReportsList();
       },
       error: () => {
         this.reportError.set('Could not generate the report.');

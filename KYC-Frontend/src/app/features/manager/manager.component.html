@@ -353,6 +353,32 @@
             </div>
           </div>
         </div>
+
+        <div class="ox-card reports-track">
+          <div class="reports-track__head">
+            <span>Generated reports</span>
+            <button class="ox-btn ox-btn--outline refresh-btn" (click)="loadReportsList()" title="Refresh">⟳</button>
+          </div>
+          @if (reportsLoading()) {
+            <div class="state-msg">Loading…</div>
+          } @else {
+            <div class="report-track__row report-track__row--head"><div>PERIOD</div><div>GENERATED</div><div>VERIFICATIONS</div><div></div></div>
+            @for (r of reportTrackRows(); track r.id) {
+              <div class="report-track__row">
+                <div>{{ r.period }}</div>
+                <div class="cell-muted">{{ r.when }}</div>
+                <div>{{ r.total }}</div>
+                <div class="row-action">
+                  <button class="ox-btn ox-btn--outline" [disabled]="downloadingId() === r.id" (click)="downloadReportFile(r.raw)">
+                    {{ downloadingId() === r.id ? 'Preparing…' : 'Download' }}
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <div class="table__empty">No reports generated yet.</div>
+            }
+          }
+        </div>
       }
 
       <!-- AGENTS -->
