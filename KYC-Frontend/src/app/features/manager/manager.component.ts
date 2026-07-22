@@ -4,6 +4,7 @@ import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { LoadingService } from '../../core/loading.service';
 import { PLANS } from '../../core/plans';
+import { VerificationScoresComponent } from '../../shared/verification-scores.component';
 import {
   AccountSummary,
   AgentSummary,
@@ -183,6 +184,7 @@ const SETTINGS_TABS: SettingsTab[] = [
  */
 @Component({
   selector: 'app-manager',
+  imports: [VerificationScoresComponent],
   templateUrl: './manager.component.html',
   styleUrl: './manager.component.scss',
 })
@@ -224,8 +226,6 @@ export class ManagerComponent {
   readonly detailModalOpen = signal(false);
   // Captured images for the open popup, as object URLs (revoked on close).
   readonly detailImages = signal<{ kind: ImageKind; url: string }[]>([]);
-  // Whether the OCR-extracted client data is revealed in the popup.
-  readonly ocrOpen = signal(false);
   readonly reviewReason = signal<'all' | ReviewReason>('all');
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
@@ -412,76 +412,14 @@ export class ManagerComponent {
       this.queueCases()[0],
   );
 
-  // Detail pane, derived from the fetched VerificationDetail.
-  readonly detailFaceMatch = computed(() => {
-    const fm = this.activeDetail()?.face_match_result;
-    if (!fm) return '—';
-    return `${fm.match_score.toFixed(2)} — ${fm.verified ? 'match' : 'weak'}`;
-  });
-  readonly detailLiveness = computed(() => {
-    const lv = this.activeDetail()?.liveness_result;
-    if (!lv) return '—';
-    return lv.passed ? 'Passed' : 'Failed';
-  });
-  readonly detailOcr = computed(() => {
-    const conf = this.activeDetail()?.extracted_data?.field_confidences;
-    if (!conf) return '—';
-    const vals = Object.values(conf).filter((v) => typeof v === 'number');
-    if (!vals.length) return '—';
-    return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
-  });
-  readonly detailDup = computed(() => {
-    const detail = this.activeDetail();
-    const flags = detail?.duplicate_flags ?? [];
-    if (!flags.length) {
-      // The duplicate check runs after face matching on a clean pass. If a
-      // face-match record exists, the check ran and simply found no match —
-      // distinct from "—" (the stage never ran, e.g. OCR failed early).
-      const checked = detail?.face_match_result != null;
-      return { sim: checked ? 'No match' : '—', warning: '' };
-    }
-    const top = flags.reduce((a, b) =>
-      b.similarity_score > a.similarity_score ? b : a,
-    );
-    const level = top.similarity_score >= 0.7 ? 'high' : 'low';
-    const warning = top.matched_client_id
-      ? `Matches existing client ${top.matched_client_id}. Review before approving.`
-      : '';
-    return { sim: `${top.similarity_score.toFixed(2)} — ${level}`, warning };
-  });
-
-  /** Human-readable rejection reason, e.g. LIVENESS_FAILED → "Liveness failed". */
-  rejectLabel(reason: string): string {
-    const text = reason.replace(/_/g, ' ').toLowerCase();
-    return text.charAt(0).toUpperCase() + text.slice(1);
-  }
-  /** Overall verification score as a percentage, for the detail popup. */
-  readonly detailOverall = computed(() =>
-    scoreLabel(this.activeDetail()?.confidence_score ?? null),
-  );
+  // Detail header fields; the score breakdown itself lives in
+  // <app-verification-scores>, shared with the review pane and agent view.
   readonly detailStatus = computed(() =>
     statusLabel(this.activeDetail()?.status ?? ''),
   );
   readonly detailWhen = computed(() => {
     const d = this.activeDetail();
     return d ? dateLabel(d.created_at) : '';
-  });
-  /** The OCR-extracted client fields that were actually captured. */
-  readonly ocrFields = computed(() => {
-    const e = this.activeDetail()?.extracted_data;
-    if (!e) return [] as { label: string; value: string }[];
-    const rows: { label: string; value: string }[] = [];
-    const add = (label: string, value: string | null) => {
-      if (value) rows.push({ label, value });
-    };
-    add('Full name', e.full_name);
-    add('ID number', e.id_number);
-    add('Date of birth', e.date_of_birth);
-    add('Place of birth', e.place_of_birth);
-    add('Sex', e.sex);
-    add('Occupation', e.occupation);
-    add('Expiry date', e.expiry_date);
-    return rows;
   });
 
   // ---- History ----
@@ -571,14 +509,12 @@ export class ManagerComponent {
 
   /** Open the read-only detail popup for a History row (any status). */
   openHistoryDetail(verificationId: string): void {
-    this.ocrOpen.set(false);
     this.selectCase(verificationId);
     this.detailModalOpen.set(true);
   }
 
   closeDetailModal(): void {
     this.detailModalOpen.set(false);
-    this.ocrOpen.set(false);
     this.revokeDetailImages();
     this.activeCaseId.set(null);
     this.activeDetail.set(null);

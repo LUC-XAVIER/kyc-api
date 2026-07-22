@@ -19,6 +19,7 @@ import {
   VerifyResponse,
 } from '../../core/models';
 import { isValidPin } from '../../core/validators';
+import { VerificationScoresComponent } from '../../shared/verification-scores.component';
 
 type AgentPage = 'new' | 'submissions' | 'profile';
 type SubStatus = 'Verified' | 'Pending' | 'Rejected' | 'Approved';
@@ -82,6 +83,7 @@ function cameraErrorMessage(err: unknown): string {
  */
 @Component({
   selector: 'app-agent',
+  imports: [VerificationScoresComponent],
   templateUrl: './agent.component.html',
   styleUrl: './agent.component.scss',
 })
@@ -362,16 +364,6 @@ export class AgentComponent {
       this.filtered().find((s) => s.id === this.selectedId()) ??
       this.filtered()[0],
   );
-
-  readonly detailFaceMatch = computed(() => {
-    const fm = this.selectedDetail()?.face_match_result;
-    if (!fm) return '—';
-    return `${fm.match_score.toFixed(2)} — ${fm.verified ? 'match' : 'no match'}`;
-  });
-  readonly detailLiveness = computed(() => {
-    const lv = this.selectedDetail()?.liveness_result;
-    return lv ? (lv.passed ? 'Passed' : 'Failed') : '—';
-  });
 
   selectSubmission(id: string): void {
     this.selectedId.set(id);
