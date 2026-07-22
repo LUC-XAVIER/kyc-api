@@ -218,7 +218,7 @@
         </div>
 
         <div class="ox-card table">
-          <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div></div>
+          <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div><div></div></div>
           @for (r of historyPaged(); track r.verificationId) {
             <div class="table__row table__row--history is-clickable"
                  (click)="openHistoryDetail(r.verificationId)"
@@ -227,6 +227,7 @@
               <div><span class="chip">{{ r.channel }}</span></div>
               <div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div>
               <div class="cell-strong">{{ r.score }}</div>
+              <div class="row-action"><button class="dots-btn" (click)="$event.stopPropagation(); openHistoryDetail(r.verificationId)" title="View details">⋮</button></div>
             </div>
           } @empty {
             <div class="table__empty">No records match this filter.</div>
