@@ -51,6 +51,18 @@ function scoreLabel(score: number | null): string {
   return score == null ? '—' : `${Math.round(score * 100)}%`;
 }
 
+const SEEN_DECISIONS_KEY = 'kyc_agent_seen_decisions';
+
+/** Verification IDs whose decision the agent has already seen. */
+function readSeenDecisions(): string[] {
+  try {
+    const raw = localStorage.getItem(SEEN_DECISIONS_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function dateLabel(iso: string): string {
   const d = new Date(iso);
   const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -305,6 +317,15 @@ export class AgentComponent {
   readonly search = signal('');
   readonly selectedId = signal<string | null>(null);
   readonly selectedDetail = signal<VerificationDetail | null>(null);
+  // IDs of decided cases the agent has already seen (persisted).
+  readonly acknowledged = signal<string[]>(readSeenDecisions());
+  // Sidebar badge: cases decided by a manager since the agent last looked.
+  readonly newlyDecidedCount = computed(
+    () =>
+      this.rows().filter(
+        (r) => r.reviewed && !this.acknowledged().includes(r.id),
+      ).length,
+  );
 
   loadSubmissions(): void {
     this.subsLoading.set(true);
@@ -316,12 +337,26 @@ export class AgentComponent {
         if (!this.subData().some((s) => s.id === this.selectedId())) {
           this.selectedId.set(this.subData()[0]?.id ?? null);
         }
+        // Viewing submissions clears the "new decision" badge.
+        if (this.page() === 'submissions') this.acknowledgeDecisions();
       },
       error: () => {
         this.subsError.set(true);
         this.subsLoading.set(false);
       },
     });
+  }
+
+  private acknowledgeDecisions(): void {
+    const seen = new Set(this.acknowledged());
+    for (const r of this.rows()) if (r.reviewed) seen.add(r.id);
+    const ids = [...seen];
+    this.acknowledged.set(ids);
+    try {
+      localStorage.setItem(SEEN_DECISIONS_KEY, JSON.stringify(ids));
+    } catch {
+      /* localStorage unavailable — the badge just won't persist */
+    }
   }
 
   readonly rows = computed(() =>

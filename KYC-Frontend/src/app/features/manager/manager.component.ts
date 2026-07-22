@@ -196,9 +196,20 @@ export class ManagerComponent {
   private readonly loading = inject(LoadingService);
   readonly user = this.auth.principal;
 
+  // Sidebar badge: how many cases await review, kept fresh across pages.
+  readonly pendingCount = signal(0);
+
   constructor() {
     this.loadStats();
     this.loadAccount();
+    this.loadPendingCount();
+  }
+
+  loadPendingCount(): void {
+    this.api.listReviews().subscribe({
+      next: (items) => this.pendingCount.set(items.length),
+      error: () => undefined,
+    });
   }
   readonly userInitials = computed(() => {
     const name = this.user()?.full_name ?? '';
@@ -390,6 +401,7 @@ export class ManagerComponent {
     this.api.listReviews().subscribe({
       next: (items) => {
         this.reviewData.set(items);
+        this.pendingCount.set(items.length);
         this.reviewLoading.set(false);
         const first = this.queueCases()[0]?.id ?? null;
         if (first && !this.reviewData().some((r) => r.id === this.activeCaseId())) {
@@ -627,6 +639,7 @@ export class ManagerComponent {
       next: () => {
         const next = this.reviewData().filter((r) => r.id !== id);
         this.reviewData.set(next);
+        this.pendingCount.set(next.length);
         this.activeDetail.set(null);
         this.deciding.set(false);
         this.decisionAction.set(null);

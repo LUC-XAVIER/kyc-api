@@ -8,7 +8,10 @@
 
     <div class="sidebar__section">OVERVIEW</div>
     <button class="nav-item" [class.is-active]="page() === 'dashboard'" (click)="setPage('dashboard')">Dashboard</button>
-    <button class="nav-item" [class.is-active]="page() === 'review'" (click)="setPage('review')">Review queue</button>
+    <button class="nav-item" [class.is-active]="page() === 'review'" (click)="setPage('review')">
+      Review queue
+      @if (pendingCount() > 0) { <span class="nav-badge">{{ pendingCount() }}</span> }
+    </button>
     <button class="nav-item" [class.is-active]="page() === 'history'" (click)="setPage('history')">History</button>
     <button class="nav-item" [class.is-active]="page() === 'reports'" (click)="setPage('reports')">Reports</button>
 
