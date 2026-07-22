@@ -429,8 +429,15 @@ export class ManagerComponent {
     return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
   });
   readonly detailDup = computed(() => {
-    const flags = this.activeDetail()?.duplicate_flags ?? [];
-    if (!flags.length) return { sim: '—', warning: '' };
+    const detail = this.activeDetail();
+    const flags = detail?.duplicate_flags ?? [];
+    if (!flags.length) {
+      // The duplicate check runs after face matching on a clean pass. If a
+      // face-match record exists, the check ran and simply found no match —
+      // distinct from "—" (the stage never ran, e.g. OCR failed early).
+      const checked = detail?.face_match_result != null;
+      return { sim: checked ? 'No match' : '—', warning: '' };
+    }
     const top = flags.reduce((a, b) =>
       b.similarity_score > a.similarity_score ? b : a,
     );
@@ -440,6 +447,12 @@ export class ManagerComponent {
       : '';
     return { sim: `${top.similarity_score.toFixed(2)} — ${level}`, warning };
   });
+
+  /** Human-readable rejection reason, e.g. LIVENESS_FAILED → "Liveness failed". */
+  rejectLabel(reason: string): string {
+    const text = reason.replace(/_/g, ' ').toLowerCase();
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
   /** Overall verification score as a percentage, for the detail popup. */
   readonly detailOverall = computed(() =>
     scoreLabel(this.activeDetail()?.confidence_score ?? null),

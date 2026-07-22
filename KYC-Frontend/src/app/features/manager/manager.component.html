@@ -253,9 +253,12 @@
                   <span [class]="badgeClass(d.status)">● {{ detailStatus() }}</span>
                 </div>
                 <div class="detail-overall"><span>Overall score</span><b>{{ detailOverall() }}</b></div>
-                <div class="kv"><span>Face match score</span><b>{{ detailFaceMatch() }}</b></div>
-                <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
+                @if (d.reject_reason) {
+                  <div class="detail-reject">Rejected — {{ rejectLabel(d.reject_reason) }}</div>
+                }
                 <div class="kv"><span>OCR confidence</span><b>{{ detailOcr() }}</b></div>
+                <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
+                <div class="kv"><span>Face match score</span><b>{{ detailFaceMatch() }}</b></div>
                 <div class="kv kv--last"><span>Duplicate similarity</span><b>{{ detailDup().sim }}</b></div>
                 @if (detailDup().warning) {
                   <div class="warn-box">⚠ {{ detailDup().warning }}</div>
