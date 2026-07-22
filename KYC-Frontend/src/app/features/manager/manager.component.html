@@ -242,7 +242,16 @@
                  title="View verification details">
               <div class="cell-link">{{ r.id }}</div><div>{{ r.name }}</div><div class="cell-muted">{{ r.date }}</div><div class="cell-muted">{{ r.branch }}</div><div class="cell-muted">{{ r.agent }}</div>
               <div><span class="chip">{{ r.channel }}</span></div>
-              <div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div>
+              <div>
+                @if (r.reviewed) {
+                  <div class="transition">
+                    <span class="ox-badge ox-badge--pending">● Pending</span>
+                    <span class="transition__to">↳ <span [class]="badgeClass(r.status)">● {{ r.status }}</span></span>
+                  </div>
+                } @else {
+                  <span [class]="badgeClass(r.status)">● {{ r.status }}</span>
+                }
+              </div>
               <div class="cell-strong">{{ r.score }}</div>
               <div class="row-action"><button class="dots-btn" (click)="$event.stopPropagation(); openHistoryDetail(r.verificationId)" title="View details">⋮</button></div>
             </div>

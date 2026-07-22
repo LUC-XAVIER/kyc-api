@@ -3,6 +3,9 @@
   @if (d.reject_reason) {
     <div class="detail-reject">Rejected — {{ rejectLabel(d.reject_reason) }}</div>
   }
+  @if (d.reviewed && d.review_reason) {
+    <div class="review-note"><span>Manager's note</span><p>{{ d.review_reason }}</p></div>
+  }
   <div class="kv">
     <span>OCR confidence</span>
     <span class="ocr-right">

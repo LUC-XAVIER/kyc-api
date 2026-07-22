@@ -258,6 +258,10 @@
   transition: transform 0.3s ease;
   &:hover { transform: rotate(90deg); }
 }
+.transition {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  &__to { display: inline-flex; align-items: center; gap: 4px; color: var(--ox-muted); font-size: 12px; }
+}
 .row-action { display: flex; justify-content: center; }
 .dots-btn {
   border: none; background: transparent; cursor: pointer; border-radius: 6px;

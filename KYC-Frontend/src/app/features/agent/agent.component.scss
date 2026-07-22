@@ -540,6 +540,10 @@
 }
 
 /* ---- User footer + logout ---- */
+.transition {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  &__to { display: inline-flex; align-items: center; gap: 4px; color: var(--ox-muted); font-size: 12px; }
+}
 .sidebar__userinfo { flex: 1; min-width: 0; }
 .logout-btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;

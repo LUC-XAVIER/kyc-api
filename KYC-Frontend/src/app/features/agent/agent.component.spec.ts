@@ -22,6 +22,8 @@ function summary(over: Partial<VerificationSummary>): VerificationSummary {
     agent_name: 'Agent A',
     branch_name: 'Central',
     created_at: new Date().toISOString(),
+    reviewed: false,
+    review_reason: null,
     ...over,
   };
 }

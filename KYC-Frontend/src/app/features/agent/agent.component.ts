@@ -333,6 +333,7 @@ export class AgentComponent {
       date: dateLabel(s.created_at),
       status: statusLabel(s.status),
       score: scoreLabel(s.confidence_score),
+      reviewed: s.reviewed,
     })),
   );
 

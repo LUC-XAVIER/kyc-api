@@ -146,7 +146,16 @@
                   <span class="cell-client__id">{{ s.client }}</span>
                 </div>
                 <div class="cell-muted">{{ s.date }}</div>
-                <div><span [class]="badgeClass(s.status)">● {{ s.status }}</span></div>
+                <div>
+                  @if (s.reviewed) {
+                    <div class="transition">
+                      <span class="ox-badge ox-badge--pending">● Pending</span>
+                      <span class="transition__to">↳ <span [class]="badgeClass(s.status)">● {{ s.status }}</span></span>
+                    </div>
+                  } @else {
+                    <span [class]="badgeClass(s.status)">● {{ s.status }}</span>
+                  }
+                </div>
                 <div class="cell-strong">{{ s.score }}</div>
               </div>
             } @empty {

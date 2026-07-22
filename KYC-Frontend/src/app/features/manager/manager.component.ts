@@ -108,6 +108,7 @@ interface HistoryRow {
   channel: 'Dashboard' | 'API';
   status: HistoryStatus;
   score: string;
+  reviewed: boolean;
 }
 
 const HISTORY_PAGE_SIZE = 6;
@@ -463,6 +464,7 @@ export class ManagerComponent {
       channel: r.submission_method === 'API' ? 'API' : 'Dashboard',
       status: statusLabel(r.status),
       score: scoreLabel(r.confidence_score),
+      reviewed: r.reviewed,
     })),
   );
 
