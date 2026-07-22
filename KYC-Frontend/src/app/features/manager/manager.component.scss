@@ -252,6 +252,11 @@
 }
 /* History rows open a read-only detail popup. */
 .table__row--history.is-clickable { cursor: pointer; &:hover { background: var(--ox-bg); } }
+.refresh-btn {
+  font-size: 16px; line-height: 1; padding: 8px 12px;
+  transition: transform 0.3s ease;
+  &:hover { transform: rotate(90deg); }
+}
 .row-action { display: flex; justify-content: center; }
 .dots-btn {
   border: none; background: transparent; cursor: pointer; border-radius: 6px;

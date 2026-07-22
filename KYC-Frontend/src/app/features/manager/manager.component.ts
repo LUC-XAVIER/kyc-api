@@ -336,12 +336,23 @@ export class ManagerComponent {
       CHART_MIN_SCALE,
       ...days.map((d) => d.verified + d.pending + d.rejected),
     );
-    return days.map((d) => ({
-      label: String(new Date(d.date).getDate()),
-      v: (d.verified / max) * 100,
-      p: (d.pending / max) * 100,
-      r: (d.rejected / max) * 100,
-    }));
+    return days.map((d) => {
+      const total = d.verified + d.pending + d.rejected;
+      const when = new Date(d.date).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+      });
+      return {
+        label: String(new Date(d.date).getDate()),
+        v: (d.verified / max) * 100,
+        p: (d.pending / max) * 100,
+        r: (d.rejected / max) * 100,
+        // Shown on hover so a bare bar still reveals its exact counts.
+        tip:
+          `${when} — ${total} verification${total === 1 ? '' : 's'}` +
+          ` (${d.verified} verified, ${d.pending} pending, ${d.rejected} rejected)`,
+      };
+    });
   });
 
   readonly donutBg = computed(() => {
@@ -491,6 +502,26 @@ export class ManagerComponent {
     if (p === 'apikeys') this.loadKeys();
     if (p === 'settings') this.loadAccount();
     this.loading.stop();
+  }
+
+  /** Reload the data behind the current page on demand. */
+  refresh(): void {
+    switch (this.page()) {
+      case 'dashboard':
+        this.loadStats();
+        break;
+      case 'review':
+        this.loadReviews();
+        break;
+      case 'history':
+        this.loadHistory();
+        break;
+      case 'agents':
+        this.loadAgents();
+        break;
+      default:
+        break;
+    }
   }
 
   selectCase(id: string): void {

@@ -50,23 +50,27 @@
       @if (page() === 'dashboard') {
         <div class="topbar__actions">
           <div class="pill-static">📅 {{ dashRangeLabel() }}</div>
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
           <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export</button>
         </div>
       }
       @if (page() === 'review') {
         <div class="topbar__actions">
           <input class="input" placeholder="Search client ID or name" [value]="reviewSearch()" (input)="reviewSearch.set($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
         </div>
       }
       @if (page() === 'history') {
         <div class="topbar__actions">
           <input class="input" placeholder="Search client ID or name" [value]="historySearch()" (input)="onHistorySearch($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
           <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export CSV</button>
         </div>
       }
       @if (page() === 'agents') {
         <div class="topbar__actions">
           <input class="input" placeholder="Search agent" [value]="agentSearch()" (input)="agentSearch.set($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
           <button class="ox-btn ox-btn--primary" (click)="openAddAgent()">+ Add agent</button>
         </div>
       }
@@ -101,7 +105,7 @@
             <div class="chart-card__sub">Last 14 days, by status</div>
             <div class="bars">
               @for (d of dayBars(); track d.label) {
-                <div class="bars__col">
+                <div class="bars__col" [title]="d.tip">
                   <div class="bars__stack">
                     <div class="seg seg--v" [style.height.%]="d.v"></div>
                     <div class="seg seg--p" [style.height.%]="d.p"></div>
