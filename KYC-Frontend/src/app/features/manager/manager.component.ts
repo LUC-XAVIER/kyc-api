@@ -4,6 +4,7 @@ import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { LoadingService } from '../../core/loading.service';
 import { PLANS } from '../../core/plans';
+import { VerificationScoresComponent } from '../../shared/verification-scores.component';
 import {
   AccountSummary,
   AgentSummary,
@@ -107,6 +108,7 @@ interface HistoryRow {
   channel: 'Dashboard' | 'API';
   status: HistoryStatus;
   score: string;
+  reviewed: boolean;
 }
 
 const HISTORY_PAGE_SIZE = 6;
@@ -183,6 +185,7 @@ const SETTINGS_TABS: SettingsTab[] = [
  */
 @Component({
   selector: 'app-manager',
+  imports: [VerificationScoresComponent],
   templateUrl: './manager.component.html',
   styleUrl: './manager.component.scss',
 })
@@ -227,6 +230,9 @@ export class ManagerComponent {
   readonly reviewReason = signal<'all' | ReviewReason>('all');
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
+  // The pending approve/reject awaiting confirmation, and its reason note.
+  readonly decisionAction = signal<'approve' | 'reject' | null>(null);
+  readonly decisionReason = signal('');
 
   // History (real data)
   readonly historyData = signal<VerificationSummary[]>([]);
@@ -334,12 +340,23 @@ export class ManagerComponent {
       CHART_MIN_SCALE,
       ...days.map((d) => d.verified + d.pending + d.rejected),
     );
-    return days.map((d) => ({
-      label: String(new Date(d.date).getDate()),
-      v: (d.verified / max) * 100,
-      p: (d.pending / max) * 100,
-      r: (d.rejected / max) * 100,
-    }));
+    return days.map((d) => {
+      const total = d.verified + d.pending + d.rejected;
+      const when = new Date(d.date).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+      });
+      return {
+        label: String(new Date(d.date).getDate()),
+        v: (d.verified / max) * 100,
+        p: (d.pending / max) * 100,
+        r: (d.rejected / max) * 100,
+        // Shown on hover so a bare bar still reveals its exact counts.
+        tip:
+          `${when} — ${total} verification${total === 1 ? '' : 's'}` +
+          ` (${d.verified} verified, ${d.pending} pending, ${d.rejected} rejected)`,
+      };
+    });
   });
 
   readonly donutBg = computed(() => {
@@ -410,40 +427,8 @@ export class ManagerComponent {
       this.queueCases()[0],
   );
 
-  // Detail pane, derived from the fetched VerificationDetail.
-  readonly detailFaceMatch = computed(() => {
-    const fm = this.activeDetail()?.face_match_result;
-    if (!fm) return '—';
-    return `${fm.match_score.toFixed(2)} — ${fm.verified ? 'match' : 'weak'}`;
-  });
-  readonly detailLiveness = computed(() => {
-    const lv = this.activeDetail()?.liveness_result;
-    if (!lv) return '—';
-    return lv.passed ? 'Passed' : 'Failed';
-  });
-  readonly detailOcr = computed(() => {
-    const conf = this.activeDetail()?.extracted_data?.field_confidences;
-    if (!conf) return '—';
-    const vals = Object.values(conf).filter((v) => typeof v === 'number');
-    if (!vals.length) return '—';
-    return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
-  });
-  readonly detailDup = computed(() => {
-    const flags = this.activeDetail()?.duplicate_flags ?? [];
-    if (!flags.length) return { sim: '—', warning: '' };
-    const top = flags.reduce((a, b) =>
-      b.similarity_score > a.similarity_score ? b : a,
-    );
-    const level = top.similarity_score >= 0.7 ? 'high' : 'low';
-    const warning = top.matched_client_id
-      ? `Matches existing client ${top.matched_client_id}. Review before approving.`
-      : '';
-    return { sim: `${top.similarity_score.toFixed(2)} — ${level}`, warning };
-  });
-  /** Overall verification score as a percentage, for the detail popup. */
-  readonly detailOverall = computed(() =>
-    scoreLabel(this.activeDetail()?.confidence_score ?? null),
-  );
+  // Detail header fields; the score breakdown itself lives in
+  // <app-verification-scores>, shared with the review pane and agent view.
   readonly detailStatus = computed(() =>
     statusLabel(this.activeDetail()?.status ?? ''),
   );
@@ -479,6 +464,7 @@ export class ManagerComponent {
       channel: r.submission_method === 'API' ? 'API' : 'Dashboard',
       status: statusLabel(r.status),
       score: scoreLabel(r.confidence_score),
+      reviewed: r.reviewed,
     })),
   );
 
@@ -521,6 +507,26 @@ export class ManagerComponent {
     if (p === 'apikeys') this.loadKeys();
     if (p === 'settings') this.loadAccount();
     this.loading.stop();
+  }
+
+  /** Reload the data behind the current page on demand. */
+  refresh(): void {
+    switch (this.page()) {
+      case 'dashboard':
+        this.loadStats();
+        break;
+      case 'review':
+        this.loadReviews();
+        break;
+      case 'history':
+        this.loadHistory();
+        break;
+      case 'agents':
+        this.loadAgents();
+        break;
+      default:
+        break;
+    }
   }
 
   selectCase(id: string): void {
@@ -584,16 +590,32 @@ export class ManagerComponent {
   }
 
   /** Approve or reject the active case, then drop it from the queue. */
-  resolveCase(action: 'approve' | 'reject'): void {
+  /** Open the confirm-with-reason dialog for the active case. */
+  promptDecision(action: 'approve' | 'reject'): void {
+    if (!this.activeCaseId()) return;
+    this.decisionReason.set('');
+    this.decisionAction.set(action);
+  }
+
+  cancelDecision(): void {
+    this.decisionAction.set(null);
+  }
+
+  /** Apply the confirmed decision with its reason, then advance the queue. */
+  confirmDecision(): void {
     const id = this.activeCaseId();
-    if (!id || this.deciding()) return;
+    const action = this.decisionAction();
+    if (!id || !action || this.deciding()) return;
     this.deciding.set(true);
-    this.api.decideReview(id, action).subscribe({
+    const reason = this.decisionReason().trim() || undefined;
+    this.api.decideReview(id, action, reason).subscribe({
       next: () => {
         const next = this.reviewData().filter((r) => r.id !== id);
         this.reviewData.set(next);
         this.activeDetail.set(null);
         this.deciding.set(false);
+        this.decisionAction.set(null);
+        this.decisionReason.set('');
         const following = this.queueCases()[0]?.id ?? null;
         this.activeCaseId.set(null);
         if (following) this.selectCase(following);

@@ -146,7 +146,16 @@
                   <span class="cell-client__id">{{ s.client }}</span>
                 </div>
                 <div class="cell-muted">{{ s.date }}</div>
-                <div><span [class]="badgeClass(s.status)">● {{ s.status }}</span></div>
+                <div>
+                  @if (s.reviewed) {
+                    <div class="transition">
+                      <span class="ox-badge ox-badge--pending">● Pending</span>
+                      <span class="transition__to">↳ <span [class]="badgeClass(s.status)">● {{ s.status }}</span></span>
+                    </div>
+                  } @else {
+                    <span [class]="badgeClass(s.status)">● {{ s.status }}</span>
+                  }
+                </div>
                 <div class="cell-strong">{{ s.score }}</div>
               </div>
             } @empty {
@@ -161,10 +170,7 @@
                 <span [class]="badgeClass(sel.status)">● {{ sel.status }}</span>
               </div>
               <div class="detail__sub">Submitted {{ sel.date }}</div>
-              <div class="kv"><span>Client name (OCR)</span><b>{{ sel.name }}</b></div>
-              <div class="kv"><span>Face match score</span><b class="text-green">{{ detailFaceMatch() }}</b></div>
-              <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
-              <div class="kv kv--last"><span>Confidence</span><b>{{ sel.score }}</b></div>
+              <app-verification-scores [detail]="selectedDetail()" />
             </aside>
           }
         </div>

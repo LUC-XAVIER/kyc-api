@@ -19,6 +19,7 @@ import {
   VerifyResponse,
 } from '../../core/models';
 import { isValidPin } from '../../core/validators';
+import { VerificationScoresComponent } from '../../shared/verification-scores.component';
 
 type AgentPage = 'new' | 'submissions' | 'profile';
 type SubStatus = 'Verified' | 'Pending' | 'Rejected' | 'Approved';
@@ -82,6 +83,7 @@ function cameraErrorMessage(err: unknown): string {
  */
 @Component({
   selector: 'app-agent',
+  imports: [VerificationScoresComponent],
   templateUrl: './agent.component.html',
   styleUrl: './agent.component.scss',
 })
@@ -241,12 +243,17 @@ export class AgentComponent {
     this.stream = null;
   }
 
-  resetForm(): void {
+  /** Drop the captured images and client ID, freeing their object URLs. */
+  private clearCapture(): void {
     Object.values(this.captured()).forEach(
       (c) => c && URL.revokeObjectURL(c.url),
     );
     this.captured.set({ front: null, back: null, selfie: null });
     this.clientId.set('');
+  }
+
+  resetForm(): void {
+    this.clearCapture();
     this.result.set(null);
     this.verifyError.set('');
     this.verifying.set(false);
@@ -270,6 +277,9 @@ export class AgentComponent {
       next: (r) => {
         this.result.set(r);
         this.verifying.set(false);
+        // Clear the capture so the very same images/ID can't be resubmitted;
+        // the result stays on screen.
+        this.clearCapture();
         this.loadSubmissions();
       },
       error: (err) => {
@@ -323,6 +333,7 @@ export class AgentComponent {
       date: dateLabel(s.created_at),
       status: statusLabel(s.status),
       score: scoreLabel(s.confidence_score),
+      reviewed: s.reviewed,
     })),
   );
 
@@ -354,16 +365,6 @@ export class AgentComponent {
       this.filtered().find((s) => s.id === this.selectedId()) ??
       this.filtered()[0],
   );
-
-  readonly detailFaceMatch = computed(() => {
-    const fm = this.selectedDetail()?.face_match_result;
-    if (!fm) return '—';
-    return `${fm.match_score.toFixed(2)} — ${fm.verified ? 'match' : 'no match'}`;
-  });
-  readonly detailLiveness = computed(() => {
-    const lv = this.selectedDetail()?.liveness_result;
-    return lv ? (lv.passed ? 'Passed' : 'Failed') : '—';
-  });
 
   selectSubmission(id: string): void {
     this.selectedId.set(id);

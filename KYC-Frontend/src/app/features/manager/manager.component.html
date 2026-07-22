@@ -50,23 +50,27 @@
       @if (page() === 'dashboard') {
         <div class="topbar__actions">
           <div class="pill-static">📅 {{ dashRangeLabel() }}</div>
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
           <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export</button>
         </div>
       }
       @if (page() === 'review') {
         <div class="topbar__actions">
           <input class="input" placeholder="Search client ID or name" [value]="reviewSearch()" (input)="reviewSearch.set($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
         </div>
       }
       @if (page() === 'history') {
         <div class="topbar__actions">
           <input class="input" placeholder="Search client ID or name" [value]="historySearch()" (input)="onHistorySearch($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
           <button class="ox-btn ox-btn--outline" (click)="exportHistoryCsv()">Export CSV</button>
         </div>
       }
       @if (page() === 'agents') {
         <div class="topbar__actions">
           <input class="input" placeholder="Search agent" [value]="agentSearch()" (input)="agentSearch.set($any($event.target).value)" />
+          <button class="ox-btn ox-btn--outline refresh-btn" (click)="refresh()" title="Refresh">⟳</button>
           <button class="ox-btn ox-btn--primary" (click)="openAddAgent()">+ Add agent</button>
         </div>
       }
@@ -101,7 +105,7 @@
             <div class="chart-card__sub">Last 14 days, by status</div>
             <div class="bars">
               @for (d of dayBars(); track d.label) {
-                <div class="bars__col">
+                <div class="bars__col" [title]="d.tip">
                   <div class="bars__stack">
                     <div class="seg seg--v" [style.height.%]="d.v"></div>
                     <div class="seg seg--p" [style.height.%]="d.p"></div>
@@ -182,20 +186,33 @@
                 <div class="thumb">📷<span>Selfie capture</span></div>
                 <div class="thumb">📄<span>NIC photo</span></div>
               </div>
-              <div class="kv"><span>Face match score</span><b class="text-green">{{ detailFaceMatch() }}</b></div>
-              <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
-              <div class="kv"><span>OCR confidence</span><b>{{ detailOcr() }}</b></div>
-              <div class="kv kv--last"><span>Duplicate similarity</span><b class="text-red">{{ detailDup().sim }}</b></div>
-              @if (detailDup().warning) {
-                <div class="warn-box">⚠ {{ detailDup().warning }}</div>
-              }
+              <app-verification-scores [detail]="activeDetail()" />
               <div class="review-actions">
-                <button class="ox-btn btn-approve" [disabled]="deciding()" (click)="resolveCase('approve')">Approve</button>
-                <button class="ox-btn btn-reject" [disabled]="deciding()" (click)="resolveCase('reject')">Reject</button>
+                <button class="ox-btn btn-approve" [disabled]="deciding()" (click)="promptDecision('approve')">Approve</button>
+                <button class="ox-btn btn-reject" [disabled]="deciding()" (click)="promptDecision('reject')">Reject</button>
               </div>
             </aside>
           }
         </div>
+
+        @if (decisionAction(); as action) {
+          <div class="modal-overlay" (click)="cancelDecision()">
+            <div class="modal" (click)="$event.stopPropagation()">
+              <div class="modal__title">{{ action === 'approve' ? 'Approve this verification?' : 'Reject this verification?' }}</div>
+              <p class="modal__sub">Add a reason for the agent (optional — they'll see it on the case).</p>
+              <textarea class="input input--block decision-reason" rows="3"
+                [placeholder]="action === 'approve' ? 'e.g. Documents verified in person' : 'e.g. ID photo does not match the selfie'"
+                [value]="decisionReason()" (input)="decisionReason.set($any($event.target).value)"></textarea>
+              <div class="modal__actions">
+                <button type="button" class="ox-btn ox-btn--outline" (click)="cancelDecision()">Cancel</button>
+                <button type="button" class="ox-btn" [class.btn-approve]="action === 'approve'" [class.btn-reject]="action === 'reject'"
+                        [disabled]="deciding()" (click)="confirmDecision()">
+                  {{ deciding() ? 'Saving…' : (action === 'approve' ? 'Approve' : 'Reject') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        }
       }
 
       <!-- HISTORY -->
@@ -218,15 +235,25 @@
         </div>
 
         <div class="ox-card table">
-          <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div></div>
+          <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div><div></div></div>
           @for (r of historyPaged(); track r.verificationId) {
             <div class="table__row table__row--history is-clickable"
                  (click)="openHistoryDetail(r.verificationId)"
                  title="View verification details">
               <div class="cell-link">{{ r.id }}</div><div>{{ r.name }}</div><div class="cell-muted">{{ r.date }}</div><div class="cell-muted">{{ r.branch }}</div><div class="cell-muted">{{ r.agent }}</div>
               <div><span class="chip">{{ r.channel }}</span></div>
-              <div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div>
+              <div>
+                @if (r.reviewed) {
+                  <div class="transition">
+                    <span class="ox-badge ox-badge--pending">● Pending</span>
+                    <span class="transition__to">↳ <span [class]="badgeClass(r.status)">● {{ r.status }}</span></span>
+                  </div>
+                } @else {
+                  <span [class]="badgeClass(r.status)">● {{ r.status }}</span>
+                }
+              </div>
               <div class="cell-strong">{{ r.score }}</div>
+              <div class="row-action"><button class="dots-btn" (click)="$event.stopPropagation(); openHistoryDetail(r.verificationId)" title="View details">⋮</button></div>
             </div>
           } @empty {
             <div class="table__empty">No records match this filter.</div>
@@ -252,14 +279,7 @@
                   </div>
                   <span [class]="badgeClass(d.status)">● {{ detailStatus() }}</span>
                 </div>
-                <div class="detail-overall"><span>Overall score</span><b>{{ detailOverall() }}</b></div>
-                <div class="kv"><span>Face match score</span><b>{{ detailFaceMatch() }}</b></div>
-                <div class="kv"><span>Liveness check</span><b>{{ detailLiveness() }}</b></div>
-                <div class="kv"><span>OCR confidence</span><b>{{ detailOcr() }}</b></div>
-                <div class="kv kv--last"><span>Duplicate similarity</span><b>{{ detailDup().sim }}</b></div>
-                @if (detailDup().warning) {
-                  <div class="warn-box">⚠ {{ detailDup().warning }}</div>
-                }
+                <app-verification-scores [detail]="d" />
                 @if (detailImages().length) {
                   <div class="detail-images__label">Captured images</div>
                   <div class="detail-images">

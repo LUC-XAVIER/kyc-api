@@ -29,6 +29,8 @@ export interface VerificationSummary {
   agent_name: string | null;
   branch_name: string | null;
   created_at: string;
+  reviewed: boolean;
+  review_reason: string | null;
 }
 
 export interface ExtractedData {

@@ -59,6 +59,16 @@ class NotFoundError(KycError):
     code = "NOT_FOUND"
 
 
+class ConflictError(KycError):
+    """Raised when a request collides with existing state.
+
+    For example, a client ID already used by this MFI.
+    """
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "CONFLICT"
+
+
 class EmailError(KycError):
     """Raised when an outbound email could not be sent (SMTP failure)."""
 

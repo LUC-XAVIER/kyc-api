@@ -37,7 +37,7 @@ class ReviewDecisionRequest(BaseModel):
     """Manager decision on a PENDING verification."""
 
     action: ReviewAction
-    reason: str | None = Field(default=None, max_length=64)
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class ReviewDecisionResponse(BaseModel):

@@ -7,6 +7,7 @@ on the verification are resolved to match the decision.
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -80,10 +81,14 @@ def decide_review(
         resolution = DuplicateResolution.DISMISSED
     else:
         verification.status = VerificationStatus.REJECTED
-        verification.reject_reason = (
-            payload.reason or RejectReason.MANUAL_REJECT
-        )
+        # Short reason code stays in reject_reason; the manager's free-text
+        # note (up to 500 chars) goes to review_reason below.
+        verification.reject_reason = RejectReason.MANUAL_REJECT
         resolution = DuplicateResolution.CONFIRMED
+
+    # The manager's note is kept for both decisions and shown to the agent.
+    verification.review_reason = payload.reason
+    verification.reviewed_at = datetime.now(UTC)
 
     for flag in verification.duplicate_flags:
         flag.resolution = resolution
@@ -96,7 +101,7 @@ def decide_review(
         actor_type=principal.actor_type,
         actor_id=principal.actor_id,
         verification_id=verification.id,
-        details=None if approved else {"reason": verification.reject_reason},
+        details={"reason": payload.reason},
     )
     db.flush()
     return ReviewDecisionResponse(
