@@ -47,6 +47,8 @@ class VerificationSummary(BaseModel):
     agent_name: str | None
     branch_name: str | None
     created_at: datetime
+    reviewed: bool
+    review_reason: str | None
 
 
 class ExtractedDataSchema(BaseModel):

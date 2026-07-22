@@ -79,7 +79,7 @@ def test_approve_moves_to_approved(
 
     resp = api_client.post(
         f"{REVIEWS_URL}/{verification.id}/decision",
-        json={"action": "approve"},
+        json={"action": "approve", "reason": "Docs verified in person"},
         headers=_auth(key),
     )
 
@@ -87,6 +87,8 @@ def test_approve_moves_to_approved(
     assert resp.json()["status"] == VerificationStatus.APPROVED.value
     db_session.refresh(verification)
     assert verification.status is VerificationStatus.APPROVED
+    assert verification.reviewed is True
+    assert verification.review_reason == "Docs verified in person"
 
 
 def test_reject_sets_status_and_reason(
@@ -105,7 +107,10 @@ def test_reject_sets_status_and_reason(
     assert resp.status_code == 200
     db_session.refresh(verification)
     assert verification.status is VerificationStatus.REJECTED
-    assert verification.reject_reason == "BAD_DOCS"
+    # The short code stays in reject_reason; the note goes to review_reason.
+    assert verification.reject_reason == "MANUAL_REJECT"
+    assert verification.review_reason == "BAD_DOCS"
+    assert verification.reviewed is True
 
 
 def test_approve_resolves_duplicate_flags(

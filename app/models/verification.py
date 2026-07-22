@@ -10,6 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import (
     Boolean,
+    DateTime,
     Enum,
     Float,
     ForeignKey,
@@ -52,6 +53,12 @@ class Verification(UUIDMixin, TimestampMixin, Base):
     reject_reason: Mapped[str | None] = mapped_column(String(64))
     confidence_score: Mapped[float | None] = mapped_column(Float)
     processed_at: Mapped[datetime | None] = mapped_column()
+    # Set when a manager approves/rejects a PENDING case: the free-text note
+    # shown back to the agent, and when the decision was made.
+    review_reason: Mapped[str | None] = mapped_column(String(500))
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     extracted_data: Mapped["ExtractedData | None"] = relationship(
         back_populates="verification", uselist=False
@@ -91,6 +98,11 @@ class Verification(UUIDMixin, TimestampMixin, Base):
     def flagged_duplicate(self) -> bool:
         """Whether the pipeline raised any duplicate-face flag."""
         return bool(self.duplicate_flags)
+
+    @property
+    def reviewed(self) -> bool:
+        """Whether a manager has decided this (formerly PENDING) case."""
+        return self.reviewed_at is not None
 
     @property
     def available_images(self) -> list["ImageKind"]:
