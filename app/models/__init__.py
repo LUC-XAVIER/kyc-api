@@ -21,6 +21,7 @@ from app.models.verification import (
     FaceMatchResult,
     LivenessResult,
     Verification,
+    VerificationImage,
 )
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "Branch",
     "ApiKey",
     "Verification",
+    "VerificationImage",
     "ExtractedData",
     "FaceEmbedding",
     "LivenessResult",

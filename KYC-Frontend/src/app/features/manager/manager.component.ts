@@ -9,6 +9,7 @@ import {
   AgentSummary,
   ApiKeyCreated,
   BranchSummary,
+  ImageKind,
   ReportSummary,
   ReviewItem,
   VerificationDetail,
@@ -95,7 +96,10 @@ interface QueueRow {
 
 /** A history row shaped for the template (built from VerificationSummary). */
 interface HistoryRow {
+  /** The MFI's client reference, shown in the table. */
   id: string;
+  /** The verification's own UUID — used to open its detail. */
+  verificationId: string;
   name: string;
   date: string;
   branch: string;
@@ -106,6 +110,14 @@ interface HistoryRow {
 }
 
 const HISTORY_PAGE_SIZE = 6;
+
+/** Display order and labels for the captured images in the detail popup. */
+const IMAGE_ORDER: ImageKind[] = ['ID_FRONT', 'ID_BACK', 'SELFIE'];
+const IMAGE_LABELS: Record<ImageKind, string> = {
+  ID_FRONT: 'ID front',
+  ID_BACK: 'ID back',
+  SELFIE: 'Selfie',
+};
 
 /** Smallest top-of-scale for the per-day chart, in verifications. */
 const CHART_MIN_SCALE = 5;
@@ -208,6 +220,10 @@ export class ManagerComponent {
   readonly reviewError = signal(false);
   readonly activeCaseId = signal<string | null>(null);
   readonly activeDetail = signal<VerificationDetail | null>(null);
+  // The read-only detail popup opened from a History row (any status).
+  readonly detailModalOpen = signal(false);
+  // Captured images for the open popup, as object URLs (revoked on close).
+  readonly detailImages = signal<{ kind: ImageKind; url: string }[]>([]);
   readonly reviewReason = signal<'all' | ReviewReason>('all');
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
@@ -424,6 +440,17 @@ export class ManagerComponent {
       : '';
     return { sim: `${top.similarity_score.toFixed(2)} — ${level}`, warning };
   });
+  /** Overall verification score as a percentage, for the detail popup. */
+  readonly detailOverall = computed(() =>
+    scoreLabel(this.activeDetail()?.confidence_score ?? null),
+  );
+  readonly detailStatus = computed(() =>
+    statusLabel(this.activeDetail()?.status ?? ''),
+  );
+  readonly detailWhen = computed(() => {
+    const d = this.activeDetail();
+    return d ? dateLabel(d.created_at) : '';
+  });
 
   // ---- History ----
   loadHistory(): void {
@@ -444,6 +471,7 @@ export class ManagerComponent {
   readonly historyRows = computed<HistoryRow[]>(() =>
     this.historyData().map((r) => ({
       id: r.client_id,
+      verificationId: r.id,
       name: r.client_name ?? '—',
       date: dateLabel(r.created_at),
       branch: r.branch_name ?? '—',
@@ -500,10 +528,59 @@ export class ManagerComponent {
     this.activeDetail.set(null);
     this.api.getVerification(id).subscribe({
       next: (d) => {
-        if (this.activeCaseId() === id) this.activeDetail.set(d);
+        if (this.activeCaseId() !== id) return;
+        this.activeDetail.set(d);
+        // Only the History popup renders images; the review pane doesn't.
+        if (this.detailModalOpen()) this.loadDetailImages(id, d);
       },
       error: () => undefined,
     });
+  }
+
+  /** Open the read-only detail popup for a History row (any status). */
+  openHistoryDetail(verificationId: string): void {
+    this.selectCase(verificationId);
+    this.detailModalOpen.set(true);
+  }
+
+  closeDetailModal(): void {
+    this.detailModalOpen.set(false);
+    this.revokeDetailImages();
+    this.activeCaseId.set(null);
+    this.activeDetail.set(null);
+  }
+
+  imageLabel(kind: ImageKind): string {
+    return IMAGE_LABELS[kind];
+  }
+
+  /** Fetch each stored image as a blob and expose it as an object URL. */
+  private loadDetailImages(id: string, detail: VerificationDetail): void {
+    this.revokeDetailImages();
+    const kinds = IMAGE_ORDER.filter((k) =>
+      detail.available_images.includes(k),
+    );
+    for (const kind of kinds) {
+      this.api.getVerificationImage(id, kind).subscribe({
+        next: (blob) => {
+          // Drop a late response for a popup that has since closed/changed.
+          if (this.activeCaseId() !== id) return;
+          const url = URL.createObjectURL(blob);
+          this.detailImages.update((imgs) =>
+            [...imgs, { kind, url }].sort(
+              (a, b) =>
+                IMAGE_ORDER.indexOf(a.kind) - IMAGE_ORDER.indexOf(b.kind),
+            ),
+          );
+        },
+        error: () => undefined,
+      });
+    }
+  }
+
+  private revokeDetailImages(): void {
+    for (const img of this.detailImages()) URL.revokeObjectURL(img.url);
+    this.detailImages.set([]);
   }
 
   /** Approve or reject the active case, then drop it from the queue. */

@@ -8,7 +8,7 @@ manager can see *why* a case landed where it did before acting on it.
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.v1.deps import (
@@ -18,8 +18,8 @@ from app.api.v1.deps import (
 )
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
-from app.models import Verification
-from app.models.enums import VerificationStatus
+from app.models import Verification, VerificationImage
+from app.models.enums import ImageKind, VerificationStatus
 from app.schemas.stats import VerificationStats
 from app.schemas.verification import VerificationDetail, VerificationSummary
 from app.services import stats
@@ -73,13 +73,15 @@ def verification_stats(
     )
 
 
-@router.get("/{verification_id}", response_model=VerificationDetail)
-def get_verification(
-    verification_id: uuid.UUID,
-    principal: Principal = Depends(get_principal),
-    db: Session = Depends(get_db),
+def _scoped_verification(
+    db: Session, verification_id: uuid.UUID, principal: Principal
 ) -> Verification:
-    """Return one verification with its per-stage records (scoped)."""
+    """Fetch a verification the caller is allowed to see, or 404.
+
+    Scoped to the caller's MFI; an agent additionally only sees the cases
+    they submitted, while a manager sees them all. Shared by the detail and
+    image endpoints so the access rule lives in one place.
+    """
     verification = (
         db.query(Verification)
         .filter_by(
@@ -96,3 +98,40 @@ def get_verification(
     if verification is None or hidden_from_agent:
         raise NotFoundError("Verification not found.")
     return verification
+
+
+@router.get("/{verification_id}", response_model=VerificationDetail)
+def get_verification(
+    verification_id: uuid.UUID,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> Verification:
+    """Return one verification with its per-stage records (scoped)."""
+    return _scoped_verification(db, verification_id, principal)
+
+
+@router.get("/{verification_id}/images/{kind}")
+def get_verification_image(
+    verification_id: uuid.UUID,
+    kind: ImageKind,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Stream one captured image (ID front/back or selfie), decrypted.
+
+    Same access scope as the detail endpoint. The bytes are biometric, so
+    they are marked ``no-store`` to keep them out of any shared/disk cache.
+    """
+    _scoped_verification(db, verification_id, principal)
+    image = (
+        db.query(VerificationImage)
+        .filter_by(verification_id=verification_id, kind=kind)
+        .one_or_none()
+    )
+    if image is None:
+        raise NotFoundError("Image not found.")
+    return Response(
+        content=image.image,
+        media_type=image.content_type,
+        headers={"Cache-Control": "private, no-store"},
+    )

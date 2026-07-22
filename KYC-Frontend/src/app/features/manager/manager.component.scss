@@ -244,6 +244,28 @@
 /* ---- Modal ---- */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .modal { background: #fff; border-radius: 12px; padding: 26px; width: 380px; max-width: 90vw; &__title { font-weight: 700; font-size: 17px; margin-bottom: 18px; } &__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; } }
+.modal--detail { width: 440px; }
+.detail-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px;
+  &__name { font-weight: 700; font-size: 17px; }
+  &__meta { color: var(--ox-muted); font-size: 12.5px; margin-top: 2px; }
+}
+.detail-overall {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--ox-bg); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+  font-weight: 600; font-size: 14px; b { font-size: 18px; }
+}
+/* History rows open a read-only detail popup. */
+.table__row--history.is-clickable { cursor: pointer; &:hover { background: var(--ox-bg); } }
+.detail-images {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px;
+  &__label { font-size: 12px; font-weight: 700; color: var(--ox-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 16px; }
+  &__item {
+    margin: 0; text-align: center;
+    img { width: 100%; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid var(--ox-border); background: var(--ox-bg); }
+    figcaption { font-size: 11.5px; color: var(--ox-muted); margin-top: 4px; }
+  }
+}
 
 /* ---- User footer + logout ---- */
 .sidebar__userinfo { flex: 1; min-width: 0; }

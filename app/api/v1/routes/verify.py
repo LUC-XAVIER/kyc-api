@@ -21,13 +21,15 @@ from app.models import (
     FaceMatchResult,
     LivenessResult,
     Verification,
+    VerificationImage,
 )
-from app.models.enums import DocumentType, SubmissionMethod
+from app.models.enums import DocumentType, ImageKind, SubmissionMethod
 from app.pipeline.contracts import PipelineInput
 from app.pipeline.orchestrator import VerificationOutput, run_verification
 from app.schemas.verification import VerifyResponse
 from app.services import audit, subscription
 from app.services.duplicate_store import PgVectorDuplicateStore
+from app.services.images import safe_compress_to_jpeg
 
 router = APIRouter(prefix="/kyc", tags=["verification"])
 
@@ -121,6 +123,36 @@ def _persist_stage_results(
         )
 
 
+def _persist_images(
+    db: Session, verification_id: uuid.UUID, pipeline_input: PipelineInput
+) -> None:
+    """Store the captured images (compressed + encrypted) for later review.
+
+    Kept for every verification regardless of outcome, so a manager can see
+    what a rejected or pending client submitted. ``id_back`` is absent for a
+    passport.
+    """
+    pieces = [
+        (ImageKind.ID_FRONT, pipeline_input.id_front_image),
+        (ImageKind.SELFIE, pipeline_input.selfie_image),
+        (ImageKind.ID_BACK, pipeline_input.id_back_image),
+    ]
+    for kind, raw in pieces:
+        if not raw:
+            continue
+        jpeg = safe_compress_to_jpeg(raw)
+        if jpeg is None:
+            continue
+        db.add(
+            VerificationImage(
+                verification_id=verification_id,
+                kind=kind,
+                content_type="image/jpeg",
+                image=jpeg,
+            )
+        )
+
+
 @router.post(
     "/verify",
     response_model=VerifyResponse,
@@ -183,6 +215,7 @@ def verify(
             )
         )
     _persist_stage_results(db, verification.id, output)
+    _persist_images(db, verification.id, pipeline_input)
     audit.record(
         db,
         mfi_account_id=mfi.id,

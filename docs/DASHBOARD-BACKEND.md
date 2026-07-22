@@ -134,7 +134,8 @@ caller is manager-level. Audit-log entries now record the real actor
 | `GET /account` | **any authenticated** | account + subscription/quota summary |
 | `POST /kyc/verify` | any authenticated (metered) | run a verification |
 | `GET /kyc/verifications` | API key *(see §9)* | history list |
-| `GET /kyc/verifications/{id}` | API key *(see §9)* | verification detail |
+| `GET /kyc/verifications/{id}` | API key *(see §9)* | verification detail (incl. `available_images`) |
+| `GET /kyc/verifications/{id}/images/{kind}` | API key *(see §9)* | one captured image (`ID_FRONT`/`ID_BACK`/`SELFIE`), decrypted |
 | `GET /kyc/verifications/stats` | **manager** | dashboard statistics |
 | `GET /kyc/reviews` | **manager** | pending review queue |
 | `POST /kyc/reviews/{id}/decision` | **manager** | approve / reject |
@@ -144,6 +145,15 @@ caller is manager-level. Audit-log entries now record the real actor
 | `GET /kyc/monitoring/drift` | API key *(see §9)* | face-match drift report |
 | `GET /agents` · `POST /agents` · `PATCH /agents/{id}` | **manager** | staff management |
 | `GET /api-keys` · `POST /api-keys` · `DELETE /api-keys/{id}` | **manager** | key management |
+
+### Verification images
+The detail response carries `available_images` — the kinds actually stored
+(`ID_FRONT`/`ID_BACK`/`SELFIE`, no back for a passport) — so a client fetches
+only images that exist. `GET …/{id}/images/{kind}` streams one decrypted image
+under the **same scope as the detail endpoint** (the caller's MFI; an agent
+only their own submissions). The bytes are biometric, so the response is sent
+`Cache-Control: private, no-store`. The dashboard loads them as authenticated
+blobs and shows them inside the History detail popup.
 
 ### Login (`POST /auth/login`)
 Body `{email, password}`. On success returns `{access_token, token_type,

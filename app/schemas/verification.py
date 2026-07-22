@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import (
     DuplicateResolution,
+    ImageKind,
     Sex,
     SubmissionMethod,
     VerificationStatus,
@@ -102,3 +103,4 @@ class VerificationDetail(VerificationSummary):
     liveness_result: LivenessResultSchema | None
     face_match_result: FaceMatchResultSchema | None
     duplicate_flags: list[DuplicateFlagSchema]
+    available_images: list[ImageKind]

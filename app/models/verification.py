@@ -18,9 +18,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import EMBEDDING_DIM, Base, TimestampMixin, UUIDMixin
-from app.db.types import EncryptedDate, EncryptedString
+from app.db.types import EncryptedBytes, EncryptedDate, EncryptedString
 from app.models.enums import (
     DuplicateResolution,
+    ImageKind,
     Sex,
     SubmissionMethod,
     VerificationStatus,
@@ -64,6 +65,9 @@ class Verification(UUIDMixin, TimestampMixin, Base):
     duplicate_flags: Mapped[list["DuplicateFlag"]] = relationship(
         back_populates="verification"
     )
+    images: Mapped[list["VerificationImage"]] = relationship(
+        back_populates="verification"
+    )
     agent: Mapped["User | None"] = relationship("User")
 
     # --- Derived attributes surfaced on list/summary rows (read via
@@ -87,6 +91,16 @@ class Verification(UUIDMixin, TimestampMixin, Base):
     def flagged_duplicate(self) -> bool:
         """Whether the pipeline raised any duplicate-face flag."""
         return bool(self.duplicate_flags)
+
+    @property
+    def available_images(self) -> list["ImageKind"]:
+        """Kinds of captured image stored for this verification.
+
+        Reads only the rows' ``kind`` (the bytes are deferred), so the
+        detail view can offer exactly the images that exist — e.g. no back
+        for a passport.
+        """
+        return [image.kind for image in self.images]
 
 
 class ExtractedData(UUIDMixin, Base):
@@ -188,4 +202,29 @@ class DuplicateFlag(UUIDMixin, TimestampMixin, Base):
 
     verification: Mapped["Verification"] = relationship(
         back_populates="duplicate_flags"
+    )
+
+
+class VerificationImage(UUIDMixin, TimestampMixin, Base):
+    """A captured image (ID front/back or selfie) kept for manager review.
+
+    The bytes are a re-compressed JPEG sealed with AES-GCM at rest — these
+    are the most sensitive data in the system, so a database dump or leaked
+    backup never exposes a client's face or document. Access is always
+    MFI-scoped at the route layer.
+    """
+
+    __tablename__ = "verification_images"
+
+    verification_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("verifications.id"), index=True
+    )
+    kind: Mapped[ImageKind] = mapped_column(Enum(ImageKind, name="image_kind"))
+    content_type: Mapped[str] = mapped_column(String(32))
+    # Deferred: the detail endpoint lists which images exist (by kind) without
+    # dragging the encrypted bytes along; they load only when actually served.
+    image: Mapped[bytes] = mapped_column(EncryptedBytes, deferred=True)
+
+    verification: Mapped["Verification"] = relationship(
+        back_populates="images"
     )
