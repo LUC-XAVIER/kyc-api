@@ -262,6 +262,16 @@
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   &__to { display: inline-flex; align-items: center; gap: 4px; color: var(--ox-muted); font-size: 12px; }
 }
+.review-tabs {
+  display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--ox-line);
+}
+.review-tab {
+  border: none; background: transparent; cursor: pointer; font-family: inherit;
+  font-size: 14px; font-weight: 600; color: var(--ox-muted); padding: 10px 16px;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  &.is-active { color: var(--ox-text); border-bottom-color: var(--ox-red); }
+  .count-pill { margin-left: 4px; }
+}
 .reports-track {
   margin-top: 16px;
   &__head {

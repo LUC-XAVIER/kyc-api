@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { ApiService } from '../../core/api.service';
@@ -185,7 +186,7 @@ const SETTINGS_TABS: SettingsTab[] = [
  */
 @Component({
   selector: 'app-manager',
-  imports: [VerificationScoresComponent],
+  imports: [VerificationScoresComponent, NgTemplateOutlet],
   templateUrl: './manager.component.html',
   styleUrl: './manager.component.scss',
 })
@@ -228,6 +229,17 @@ export class ManagerComponent {
   // Captured images for the open popup, as object URLs (revoked on close).
   readonly detailImages = signal<{ kind: ImageKind; url: string }[]>([]);
   readonly reviewReason = signal<'all' | ReviewReason>('all');
+  // Review page tabs: the live pending queue vs. resolved cases (traceability).
+  readonly reviewTab = signal<'pending' | 'reviewed'>('pending');
+  readonly reviewedRows = computed(() =>
+    this.historyRows().filter((r) => r.reviewed),
+  );
+
+  setReviewTab(tab: 'pending' | 'reviewed'): void {
+    this.reviewTab.set(tab);
+    // Reviewed cases come from the verifications list (carrying `reviewed`).
+    if (tab === 'reviewed') this.loadHistory();
+  }
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
   // The pending approve/reject awaiting confirmation, and its reason note.
