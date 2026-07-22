@@ -252,6 +252,7 @@
 }
 /* History rows open a read-only detail popup. */
 .table__row--history.is-clickable { cursor: pointer; &:hover { background: var(--ox-bg); } }
+.decision-reason { font-family: inherit; resize: vertical; margin: 8px 0 4px; }
 .refresh-btn {
   font-size: 16px; line-height: 1; padding: 8px 12px;
   transition: transform 0.3s ease;

@@ -229,6 +229,9 @@ export class ManagerComponent {
   readonly reviewReason = signal<'all' | ReviewReason>('all');
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
+  // The pending approve/reject awaiting confirmation, and its reason note.
+  readonly decisionAction = signal<'approve' | 'reject' | null>(null);
+  readonly decisionReason = signal('');
 
   // History (real data)
   readonly historyData = signal<VerificationSummary[]>([]);
@@ -585,16 +588,32 @@ export class ManagerComponent {
   }
 
   /** Approve or reject the active case, then drop it from the queue. */
-  resolveCase(action: 'approve' | 'reject'): void {
+  /** Open the confirm-with-reason dialog for the active case. */
+  promptDecision(action: 'approve' | 'reject'): void {
+    if (!this.activeCaseId()) return;
+    this.decisionReason.set('');
+    this.decisionAction.set(action);
+  }
+
+  cancelDecision(): void {
+    this.decisionAction.set(null);
+  }
+
+  /** Apply the confirmed decision with its reason, then advance the queue. */
+  confirmDecision(): void {
     const id = this.activeCaseId();
-    if (!id || this.deciding()) return;
+    const action = this.decisionAction();
+    if (!id || !action || this.deciding()) return;
     this.deciding.set(true);
-    this.api.decideReview(id, action).subscribe({
+    const reason = this.decisionReason().trim() || undefined;
+    this.api.decideReview(id, action, reason).subscribe({
       next: () => {
         const next = this.reviewData().filter((r) => r.id !== id);
         this.reviewData.set(next);
         this.activeDetail.set(null);
         this.deciding.set(false);
+        this.decisionAction.set(null);
+        this.decisionReason.set('');
         const following = this.queueCases()[0]?.id ?? null;
         this.activeCaseId.set(null);
         if (following) this.selectCase(following);

@@ -188,12 +188,31 @@
               </div>
               <app-verification-scores [detail]="activeDetail()" />
               <div class="review-actions">
-                <button class="ox-btn btn-approve" [disabled]="deciding()" (click)="resolveCase('approve')">Approve</button>
-                <button class="ox-btn btn-reject" [disabled]="deciding()" (click)="resolveCase('reject')">Reject</button>
+                <button class="ox-btn btn-approve" [disabled]="deciding()" (click)="promptDecision('approve')">Approve</button>
+                <button class="ox-btn btn-reject" [disabled]="deciding()" (click)="promptDecision('reject')">Reject</button>
               </div>
             </aside>
           }
         </div>
+
+        @if (decisionAction(); as action) {
+          <div class="modal-overlay" (click)="cancelDecision()">
+            <div class="modal" (click)="$event.stopPropagation()">
+              <div class="modal__title">{{ action === 'approve' ? 'Approve this verification?' : 'Reject this verification?' }}</div>
+              <p class="modal__sub">Add a reason for the agent (optional — they'll see it on the case).</p>
+              <textarea class="input input--block decision-reason" rows="3"
+                [placeholder]="action === 'approve' ? 'e.g. Documents verified in person' : 'e.g. ID photo does not match the selfie'"
+                [value]="decisionReason()" (input)="decisionReason.set($any($event.target).value)"></textarea>
+              <div class="modal__actions">
+                <button type="button" class="ox-btn ox-btn--outline" (click)="cancelDecision()">Cancel</button>
+                <button type="button" class="ox-btn" [class.btn-approve]="action === 'approve'" [class.btn-reject]="action === 'reject'"
+                        [disabled]="deciding()" (click)="confirmDecision()">
+                  {{ deciding() ? 'Saving…' : (action === 'approve' ? 'Approve' : 'Reject') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        }
       }
 
       <!-- HISTORY -->
