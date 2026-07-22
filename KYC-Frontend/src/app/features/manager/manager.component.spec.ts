@@ -68,6 +68,8 @@ describe('ManagerComponent', () => {
           r.url.endsWith('/account'),
       )
       .forEach((r) => r.flush({}, { status: 200, statusText: 'OK' }));
+    // The constructor also fetches the pending count for the sidebar badge.
+    http.match((r) => r.url.endsWith('/kyc/reviews')).forEach((r) => r.flush([]));
   });
 
   it('starts on the dashboard', () => {

@@ -8,7 +8,10 @@
 
     <div class="sidebar__section">OVERVIEW</div>
     <button class="nav-item" [class.is-active]="page() === 'dashboard'" (click)="setPage('dashboard')">Dashboard</button>
-    <button class="nav-item" [class.is-active]="page() === 'review'" (click)="setPage('review')">Review queue</button>
+    <button class="nav-item" [class.is-active]="page() === 'review'" (click)="setPage('review')">
+      Review queue
+      @if (pendingCount() > 0) { <span class="nav-badge">{{ pendingCount() }}</span> }
+    </button>
     <button class="nav-item" [class.is-active]="page() === 'history'" (click)="setPage('history')">History</button>
     <button class="nav-item" [class.is-active]="page() === 'reports'" (click)="setPage('reports')">Reports</button>
 
@@ -82,6 +85,28 @@
     </header>
 
     <div class="content">
+      <!-- Shared verification row (History + Reviewed tab). -->
+      <ng-template #verifRow let-r>
+        <div class="table__row table__row--history is-clickable"
+             (click)="openHistoryDetail(r.verificationId)"
+             title="View verification details">
+          <div class="cell-link">{{ r.id }}</div><div>{{ r.name }}</div><div class="cell-muted">{{ r.date }}</div><div class="cell-muted">{{ r.branch }}</div><div class="cell-muted">{{ r.agent }}</div>
+          <div><span class="chip">{{ r.channel }}</span></div>
+          <div>
+            @if (r.reviewed) {
+              <div class="transition">
+                <span class="ox-badge ox-badge--pending">● Pending</span>
+                <span class="transition__to">↳ <span [class]="badgeClass(r.status)">● {{ r.status }}</span></span>
+              </div>
+            } @else {
+              <span [class]="badgeClass(r.status)">● {{ r.status }}</span>
+            }
+          </div>
+          <div class="cell-strong">{{ r.score }}</div>
+          <div class="row-action"><button class="dots-btn" (click)="$event.stopPropagation(); openHistoryDetail(r.verificationId)" title="View details">⋮</button></div>
+        </div>
+      </ng-template>
+
       <!-- DASHBOARD -->
       @if (page() === 'dashboard') {
         @if (statsLoading()) {
@@ -149,6 +174,12 @@
 
       <!-- REVIEW QUEUE -->
       @if (page() === 'review') {
+        <div class="review-tabs">
+          <button class="review-tab" [class.is-active]="reviewTab() === 'pending'" (click)="setReviewTab('pending')">Pending <span class="count-pill">{{ queueCount() }}</span></button>
+          <button class="review-tab" [class.is-active]="reviewTab() === 'reviewed'" (click)="setReviewTab('reviewed')">Reviewed</button>
+        </div>
+
+        @if (reviewTab() === 'pending') {
         @if (reviewLoading()) {
           <div class="state-msg">Loading review queue…</div>
         } @else if (reviewError()) {
@@ -213,6 +244,16 @@
             </div>
           </div>
         }
+        } @else {
+          <div class="ox-card table">
+            <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div><div></div></div>
+            @for (r of reviewedRows(); track r.verificationId) {
+              <ng-container [ngTemplateOutlet]="verifRow" [ngTemplateOutletContext]="{ $implicit: r }" />
+            } @empty {
+              <div class="table__empty">No reviewed cases yet.</div>
+            }
+          </div>
+        }
       }
 
       <!-- HISTORY -->
@@ -237,24 +278,7 @@
         <div class="ox-card table">
           <div class="table__head table__row--history"><div>CLIENT ID</div><div>NAME</div><div>DATE &amp; TIME</div><div>BRANCH</div><div>AGENT</div><div>CHANNEL</div><div>STATUS</div><div>SCORE</div><div></div></div>
           @for (r of historyPaged(); track r.verificationId) {
-            <div class="table__row table__row--history is-clickable"
-                 (click)="openHistoryDetail(r.verificationId)"
-                 title="View verification details">
-              <div class="cell-link">{{ r.id }}</div><div>{{ r.name }}</div><div class="cell-muted">{{ r.date }}</div><div class="cell-muted">{{ r.branch }}</div><div class="cell-muted">{{ r.agent }}</div>
-              <div><span class="chip">{{ r.channel }}</span></div>
-              <div>
-                @if (r.reviewed) {
-                  <div class="transition">
-                    <span class="ox-badge ox-badge--pending">● Pending</span>
-                    <span class="transition__to">↳ <span [class]="badgeClass(r.status)">● {{ r.status }}</span></span>
-                  </div>
-                } @else {
-                  <span [class]="badgeClass(r.status)">● {{ r.status }}</span>
-                }
-              </div>
-              <div class="cell-strong">{{ r.score }}</div>
-              <div class="row-action"><button class="dots-btn" (click)="$event.stopPropagation(); openHistoryDetail(r.verificationId)" title="View details">⋮</button></div>
-            </div>
+            <ng-container [ngTemplateOutlet]="verifRow" [ngTemplateOutletContext]="{ $implicit: r }" />
           } @empty {
             <div class="table__empty">No records match this filter.</div>
           }
@@ -352,6 +376,32 @@
               <div class="report-doc__foot"><span>Confidential — for COBAC audit purposes only</span><span>Page 1 of 24</span></div>
             </div>
           </div>
+        </div>
+
+        <div class="ox-card reports-track">
+          <div class="reports-track__head">
+            <span>Generated reports</span>
+            <button class="ox-btn ox-btn--outline refresh-btn" (click)="loadReportsList()" title="Refresh">⟳</button>
+          </div>
+          @if (reportsLoading()) {
+            <div class="state-msg">Loading…</div>
+          } @else {
+            <div class="report-track__row report-track__row--head"><div>PERIOD</div><div>GENERATED</div><div>VERIFICATIONS</div><div></div></div>
+            @for (r of reportTrackRows(); track r.id) {
+              <div class="report-track__row">
+                <div>{{ r.period }}</div>
+                <div class="cell-muted">{{ r.when }}</div>
+                <div>{{ r.total }}</div>
+                <div class="row-action">
+                  <button class="ox-btn ox-btn--outline" [disabled]="downloadingId() === r.id" (click)="downloadReportFile(r.raw)">
+                    {{ downloadingId() === r.id ? 'Preparing…' : 'Download' }}
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <div class="table__empty">No reports generated yet.</div>
+            }
+          }
         </div>
       }
 

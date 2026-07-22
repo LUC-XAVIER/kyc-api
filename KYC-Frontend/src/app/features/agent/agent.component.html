@@ -8,7 +8,10 @@
 
     <div class="sidebar__section">VERIFICATION</div>
     <button class="nav-item" [class.is-active]="page() === 'new'" (click)="setPage('new')">New Verification</button>
-    <button class="nav-item" [class.is-active]="page() === 'submissions'" (click)="setPage('submissions')">My Submissions</button>
+    <button class="nav-item" [class.is-active]="page() === 'submissions'" (click)="setPage('submissions')">
+      My Submissions
+      @if (newlyDecidedCount() > 0) { <span class="nav-badge">{{ newlyDecidedCount() }}</span> }
+    </button>
 
     <div class="sidebar__section sidebar__section--spaced">ACCOUNT</div>
     <button class="nav-item" [class.is-active]="page() === 'profile'" (click)="setPage('profile')">Profile</button>

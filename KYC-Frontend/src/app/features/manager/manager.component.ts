@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 
 import { ApiService } from '../../core/api.service';
@@ -185,7 +186,7 @@ const SETTINGS_TABS: SettingsTab[] = [
  */
 @Component({
   selector: 'app-manager',
-  imports: [VerificationScoresComponent],
+  imports: [VerificationScoresComponent, NgTemplateOutlet],
   templateUrl: './manager.component.html',
   styleUrl: './manager.component.scss',
 })
@@ -195,9 +196,20 @@ export class ManagerComponent {
   private readonly loading = inject(LoadingService);
   readonly user = this.auth.principal;
 
+  // Sidebar badge: how many cases await review, kept fresh across pages.
+  readonly pendingCount = signal(0);
+
   constructor() {
     this.loadStats();
     this.loadAccount();
+    this.loadPendingCount();
+  }
+
+  loadPendingCount(): void {
+    this.api.listReviews().subscribe({
+      next: (items) => this.pendingCount.set(items.length),
+      error: () => undefined,
+    });
   }
   readonly userInitials = computed(() => {
     const name = this.user()?.full_name ?? '';
@@ -228,6 +240,17 @@ export class ManagerComponent {
   // Captured images for the open popup, as object URLs (revoked on close).
   readonly detailImages = signal<{ kind: ImageKind; url: string }[]>([]);
   readonly reviewReason = signal<'all' | ReviewReason>('all');
+  // Review page tabs: the live pending queue vs. resolved cases (traceability).
+  readonly reviewTab = signal<'pending' | 'reviewed'>('pending');
+  readonly reviewedRows = computed(() =>
+    this.historyRows().filter((r) => r.reviewed),
+  );
+
+  setReviewTab(tab: 'pending' | 'reviewed'): void {
+    this.reviewTab.set(tab);
+    // Reviewed cases come from the verifications list (carrying `reviewed`).
+    if (tab === 'reviewed') this.loadHistory();
+  }
   readonly reviewSearch = signal('');
   readonly deciding = signal(false);
   // The pending approve/reject awaiting confirmation, and its reason note.
@@ -378,6 +401,7 @@ export class ManagerComponent {
     this.api.listReviews().subscribe({
       next: (items) => {
         this.reviewData.set(items);
+        this.pendingCount.set(items.length);
         this.reviewLoading.set(false);
         const first = this.queueCases()[0]?.id ?? null;
         if (first && !this.reviewData().some((r) => r.id === this.activeCaseId())) {
@@ -502,7 +526,10 @@ export class ManagerComponent {
     this.loading.start();
     if (p === 'review') this.loadReviews();
     if (p === 'history') this.loadHistory();
-    if (p === 'reports') this.loadHistory();
+    if (p === 'reports') {
+      this.loadHistory();
+      this.loadReportsList();
+    }
     if (p === 'agents') this.loadAgents();
     if (p === 'apikeys') this.loadKeys();
     if (p === 'settings') this.loadAccount();
@@ -612,6 +639,7 @@ export class ManagerComponent {
       next: () => {
         const next = this.reviewData().filter((r) => r.id !== id);
         this.reviewData.set(next);
+        this.pendingCount.set(next.length);
         this.activeDetail.set(null);
         this.deciding.set(false);
         this.decisionAction.set(null);
@@ -678,6 +706,47 @@ export class ManagerComponent {
   readonly reportRows = computed(() => this.historyRows().slice(0, 5));
   readonly reportGenerated = computed(() => this.generatedReport() !== null);
 
+  // Track of previously generated reports, each re-downloadable.
+  readonly reportsList = signal<ReportSummary[]>([]);
+  readonly reportsLoading = signal(false);
+  readonly downloadingId = signal<string | null>(null);
+  readonly reportTrackRows = computed(() =>
+    this.reportsList().map((r) => ({
+      id: r.id,
+      period: `${r.period_start} – ${r.period_end}`,
+      when: dateLabel(r.generated_at),
+      total: r.total_verifications,
+      raw: r,
+    })),
+  );
+
+  loadReportsList(): void {
+    this.reportsLoading.set(true);
+    this.api.listReports().subscribe({
+      next: (rows) => {
+        this.reportsList.set(rows);
+        this.reportsLoading.set(false);
+      },
+      error: () => this.reportsLoading.set(false),
+    });
+  }
+
+  /** Re-download any tracked report's PDF (regenerated on the server). */
+  downloadReportFile(r: ReportSummary): void {
+    if (this.downloadingId()) return;
+    this.downloadingId.set(r.id);
+    this.api.downloadReportPdf(r.id).subscribe({
+      next: (blob) => {
+        this.saveBlob(
+          blob,
+          `compliance-report-${r.period_start}_${r.period_end}.pdf`,
+        );
+        this.downloadingId.set(null);
+      },
+      error: () => this.downloadingId.set(null),
+    });
+  }
+
   readonly reportKpis = computed(() => {
     const r = this.generatedReport();
     const sb = r?.status_breakdown ?? {};
@@ -698,6 +767,8 @@ export class ManagerComponent {
       next: (r) => {
         this.generatedReport.set(r);
         this.reportGenerating.set(false);
+        // Show it immediately in the tracked list below.
+        this.loadReportsList();
       },
       error: () => {
         this.reportError.set('Could not generate the report.');
