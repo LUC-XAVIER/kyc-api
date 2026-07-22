@@ -241,12 +241,17 @@ export class AgentComponent {
     this.stream = null;
   }
 
-  resetForm(): void {
+  /** Drop the captured images and client ID, freeing their object URLs. */
+  private clearCapture(): void {
     Object.values(this.captured()).forEach(
       (c) => c && URL.revokeObjectURL(c.url),
     );
     this.captured.set({ front: null, back: null, selfie: null });
     this.clientId.set('');
+  }
+
+  resetForm(): void {
+    this.clearCapture();
     this.result.set(null);
     this.verifyError.set('');
     this.verifying.set(false);
@@ -270,6 +275,9 @@ export class AgentComponent {
       next: (r) => {
         this.result.set(r);
         this.verifying.set(false);
+        // Clear the capture so the very same images/ID can't be resubmitted;
+        // the result stays on screen.
+        this.clearCapture();
         this.loadSubmissions();
       },
       error: (err) => {
