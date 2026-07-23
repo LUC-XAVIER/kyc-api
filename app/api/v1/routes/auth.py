@@ -29,7 +29,7 @@ from app.core.security import (
 from app.core.validation import try_normalize_cm_phone
 from app.db.session import get_db
 from app.models import PinReset, User
-from app.models.enums import AgentRole, AgentStatus
+from app.models.enums import AgentRole, AgentStatus, MfiStatus
 from app.schemas.auth import (
     AgentProfile,
     ChangePinRequest,
@@ -120,6 +120,13 @@ def login(
         raise AuthenticationError("Invalid credentials.")
     if agent.status != AgentStatus.ACTIVE:
         raise AuthenticationError("Invalid credentials.")
+    # A suspended MFI locks out all its staff. A platform admin has no MFI
+    # (mfi_account is None), so they are never blocked here.
+    if (
+        agent.mfi_account is not None
+        and agent.mfi_account.status == MfiStatus.SUSPENDED
+    ):
+        raise AuthenticationError("This account has been suspended.")
 
     # A clean login clears the streak; the counter tracks *consecutive*
     # failures, not lifetime ones.
@@ -155,7 +162,7 @@ def read_me(agent: User = Depends(get_current_agent)) -> AgentProfile:
         role=agent.role,
         branch=agent.branch_name,
         mfi_account_id=agent.mfi_account_id,
-        mfi_name=agent.mfi_account.name,
+        mfi_name=agent.mfi_account.name if agent.mfi_account else None,
     )
 
 

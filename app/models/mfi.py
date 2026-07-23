@@ -84,7 +84,10 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "users"
 
-    mfi_account_id: Mapped[uuid.UUID] = mapped_column(
+    # Nullable: a platform admin (Openxtech staff, role ADMIN) belongs to no
+    # single MFI — they oversee all of them. Every MFI-staff account (agent or
+    # manager) always has one; only the cross-tenant admin leaves it null.
+    mfi_account_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("mfi_accounts.id")
     )
     full_name: Mapped[str] = mapped_column(String(255))
@@ -113,7 +116,7 @@ class User(UUIDMixin, TimestampMixin, Base):
         DateTime(timezone=True)
     )
 
-    mfi_account: Mapped["MfiAccount"] = relationship(
+    mfi_account: Mapped["MfiAccount | None"] = relationship(
         back_populates="users"
     )
     branch: Mapped["Branch | None"] = relationship()

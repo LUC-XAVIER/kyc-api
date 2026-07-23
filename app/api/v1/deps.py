@@ -26,7 +26,7 @@ from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.security import decode_access_token, hash_api_key
 from app.db.session import get_db
 from app.models import ApiKey, MfiAccount, User
-from app.models.enums import ActorType, AgentRole, AgentStatus
+from app.models.enums import ActorType, AgentRole, AgentStatus, MfiStatus
 from app.services import subscription
 
 API_KEY_HEADER_NAME = "X-API-Key"
@@ -57,6 +57,10 @@ def _mfi_from_key(api_key: str, db: Session) -> MfiAccount:
     )
     if record is None:
         raise AuthenticationError("Invalid or inactive API key.")
+    if record.mfi_account.status == MfiStatus.SUSPENDED:
+        # A platform admin can suspend an MFI; that must lock its machine
+        # integration out too, not just the dashboard logins.
+        raise AuthenticationError("This account has been suspended.")
     record.last_used_at = datetime.now(UTC)
     db.commit()
     return record.mfi_account
@@ -143,6 +147,23 @@ def require_manager(
     """
     if agent.role not in _MANAGER_ROLES:
         raise AuthorizationError("This action requires a manager role.")
+    return agent
+
+
+def require_platform_admin(
+    agent: User = Depends(get_current_agent),
+) -> User:
+    """Authorize an Openxtech platform-admin, cross-tenant action.
+
+    Distinct from :func:`require_manager`: an MFI manager governs their own
+    tenant, whereas an ``ADMIN`` oversees every MFI and is bound to none.
+    The ``/admin/*`` routes gated by this never scope to a single tenant.
+
+    Raises:
+        AuthorizationError: If the caller is not a platform admin.
+    """
+    if agent.role != AgentRole.ADMIN:
+        raise AuthorizationError("This action requires a platform admin.")
     return agent
 
 

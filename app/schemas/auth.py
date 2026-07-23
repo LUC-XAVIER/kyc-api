@@ -31,7 +31,8 @@ class TokenResponse(BaseModel):
     role: AgentRole
     agent_id: uuid.UUID
     full_name: str
-    mfi_account_id: uuid.UUID
+    # None for a platform admin, who belongs to no single MFI.
+    mfi_account_id: uuid.UUID | None = None
 
 
 class ForgotPinRequest(BaseModel):
@@ -70,5 +71,6 @@ class AgentProfile(BaseModel):
     phone: str | None
     role: AgentRole
     branch: str | None
-    mfi_account_id: uuid.UUID
-    mfi_name: str
+    # None for a platform admin, who belongs to no single MFI.
+    mfi_account_id: uuid.UUID | None = None
+    mfi_name: str | None = None
