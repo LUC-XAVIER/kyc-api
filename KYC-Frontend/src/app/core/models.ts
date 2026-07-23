@@ -192,6 +192,101 @@ export interface AgentProfile {
   phone: string | null;
   role: AgentRole;
   branch: string | null;
-  mfi_account_id: string;
-  mfi_name: string;
+  // Null for a platform admin, who belongs to no single MFI.
+  mfi_account_id: string | null;
+  mfi_name: string | null;
+}
+
+// ---- Platform admin (cross-tenant) ----
+export type MfiStatus = 'ACTIVE' | 'SUSPENDED' | 'PENDING';
+
+export interface PlanBucket {
+  plan: string;
+  count: number;
+}
+
+export interface DayCount {
+  date: string;
+  count: number;
+}
+
+export interface QuotaRow {
+  id: string;
+  name: string;
+  plan: string | null;
+  usage: number;
+  quota: number | null;
+  pct: number;
+}
+
+export interface PlatformStats {
+  total_mfis: number;
+  active_mfis: number;
+  suspended_mfis: number;
+  pending_mfis: number;
+  total_verifications: number;
+  total_users: number;
+  warning_count: number;
+  by_plan: PlanBucket[];
+  per_day: DayCount[];
+  quota_rows: QuotaRow[];
+}
+
+export interface AdminMfiSummary {
+  id: string;
+  name: string;
+  email: string;
+  plan: string | null;
+  status: MfiStatus;
+  usage: number;
+  quota: number | null;
+  verifications: number;
+  users: number;
+  api_keys: number;
+  branches: number;
+  created_at: string;
+}
+
+export interface AdminApiKeySummary {
+  prefix: string;
+  is_active: boolean;
+  last_used_at: string | null;
+}
+
+export interface AdminAgentSummary {
+  id: string;
+  full_name: string;
+  branch: string | null;
+  role: AgentRole;
+  status: 'ACTIVE' | 'DISABLED';
+  verifications: number;
+}
+
+export interface MfiPerformance {
+  verified: number;
+  pending: number;
+  rejected: number;
+  duplicates: number;
+  avg_processing_seconds: number | null;
+}
+
+export interface AdminMfiDetail {
+  id: string;
+  name: string;
+  email: string;
+  status: MfiStatus;
+  plan: string | null;
+  quota: number | null;
+  usage: number;
+  max_branches: number | null;
+  max_agents: number | null;
+  api_access: boolean;
+  this_month: number;
+  last_month: number;
+  avg_per_day: number;
+  billing_cycle_start: string | null;
+  created_at: string;
+  api_keys: AdminApiKeySummary[];
+  agents: AdminAgentSummary[];
+  performance: MfiPerformance;
 }

@@ -53,5 +53,13 @@ export const routes: Routes = [
         (m) => m.ManagerComponent,
       ),
   },
+  {
+    path: 'admin',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/admin/admin.component').then(
+        (m) => m.AdminComponent,
+      ),
+  },
   { path: '**', redirectTo: '' },
 ];

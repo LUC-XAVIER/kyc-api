@@ -6,11 +6,15 @@ import { API_URL } from './config';
 import { skipLoading } from './loading.interceptor';
 import {
   AccountSummary,
+  AdminMfiDetail,
+  AdminMfiSummary,
   AgentProfile,
   AgentSummary,
   ApiKeyCreated,
   ApiKeySummary,
   BranchSummary,
+  MfiStatus,
+  PlatformStats,
   ReportSummary,
   ReviewDecisionResponse,
   ReviewItem,
@@ -183,5 +187,25 @@ export class ApiService {
     email?: string;
   }): Observable<AccountSummary> {
     return this.http.patch<AccountSummary>(`${this.base}/account`, payload);
+  }
+
+  // ---- Platform admin (cross-tenant) ----
+  getPlatformStats(): Observable<PlatformStats> {
+    return this.http.get<PlatformStats>(`${this.base}/admin/stats`);
+  }
+
+  listAdminMfis(): Observable<AdminMfiSummary[]> {
+    return this.http.get<AdminMfiSummary[]>(`${this.base}/admin/mfis`);
+  }
+
+  getAdminMfi(id: string): Observable<AdminMfiDetail> {
+    return this.http.get<AdminMfiDetail>(`${this.base}/admin/mfis/${id}`);
+  }
+
+  setMfiStatus(id: string, status: MfiStatus): Observable<AdminMfiDetail> {
+    return this.http.patch<AdminMfiDetail>(
+      `${this.base}/admin/mfis/${id}/status`,
+      { status },
+    );
   }
 }

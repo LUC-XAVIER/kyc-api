@@ -92,6 +92,7 @@ export class AuthService {
 
   /** The dashboard route for the current role. */
   homeRoute(): string {
+    if (this.role() === 'ADMIN') return '/admin';
     return this.isManager() ? '/manager' : '/agent';
   }
 
