@@ -10,7 +10,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
-from app.models.enums import AgentRole, AgentStatus, MfiStatus
+from app.models.enums import ActorType, AgentRole, AgentStatus, MfiStatus
 
 
 class PlanBucket(BaseModel):
@@ -126,3 +126,16 @@ class MfiStatusUpdate(BaseModel):
     """Request to enable or disable an MFI account."""
 
     status: MfiStatus
+
+
+class AdminAuditEntry(BaseModel):
+    """One immutable audit-log row, with its MFI resolved to a name."""
+
+    id: uuid.UUID
+    action: str
+    actor_type: ActorType
+    actor_id: str | None
+    mfi_name: str | None
+    verification_id: uuid.UUID | None
+    details: dict | None
+    timestamp: datetime

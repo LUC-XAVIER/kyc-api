@@ -5,6 +5,7 @@ import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { LoadingService } from '../../core/loading.service';
 import {
+  AdminAuditEntry,
   AdminMfiDetail,
   AdminMfiSummary,
   MfiStatus,
@@ -70,8 +71,30 @@ const DEFERRED = new Set<AdminPage>([
   'ocr-engine',
   'api-performance',
   'system-health',
-  'audit-logs',
 ]);
+
+/** How each audit action string is rendered in the log. */
+interface ActionMeta {
+  icon: string;
+  category: string;
+  label: string;
+}
+const ACTION_META: Record<string, ActionMeta> = {
+  'verification.processed': { icon: '🔎', category: 'Verification', label: 'Verification processed' },
+  'review.approved': { icon: '✓', category: 'Manual review', label: 'Review approved' },
+  'review.rejected': { icon: '✕', category: 'Manual review', label: 'Review rejected' },
+  'report.generated': { icon: '📄', category: 'Report', label: 'Compliance report generated' },
+  'mfi.suspended': { icon: '🚫', category: 'Admin action', label: 'MFI suspended' },
+  'mfi.reactivated': { icon: '✅', category: 'Admin action', label: 'MFI reactivated' },
+};
+const AUDIT_CATEGORIES = [
+  'All',
+  'Admin action',
+  'Manual review',
+  'Verification',
+  'Report',
+  'System',
+];
 
 const TITLES: Record<AdminPage, [string, string]> = {
   overview: ['Platform Overview', 'Every MFI on the platform, at a glance'],
@@ -83,7 +106,7 @@ const TITLES: Record<AdminPage, [string, string]> = {
   'ocr-engine': ['OCR Engine', 'Coming with model monitoring'],
   'api-performance': ['API Performance', 'Coming with operations metrics'],
   'system-health': ['System Health', 'Coming with operations metrics'],
-  'audit-logs': ['Audit Logs', 'Coming soon'],
+  'audit-logs': ['Audit Logs', 'Immutable platform-wide action trail'],
 };
 
 const PLAN_COLORS: Record<string, string> = {
@@ -179,6 +202,11 @@ export class AdminComponent {
   readonly toast = signal('');
   readonly busyId = signal<string | null>(null);
 
+  readonly auditEntries = signal<AdminAuditEntry[]>([]);
+  readonly auditCategory = signal('All');
+  readonly auditLimit = signal(50);
+  readonly auditCategories = AUDIT_CATEGORIES;
+
   constructor() {
     this.loadStats();
     this.loadMfis();
@@ -202,6 +230,7 @@ export class AdminComponent {
     this.loading.start();
     if (p === 'overview') this.loadStats();
     if (p === 'mfi-accounts') this.loadMfis();
+    if (p === 'audit-logs') this.loadAudit();
     this.loading.stop();
   }
 
@@ -212,6 +241,7 @@ export class AdminComponent {
   refresh(): void {
     if (this.page() === 'overview') this.loadStats();
     else if (this.page() === 'mfi-accounts') this.loadMfis();
+    else if (this.page() === 'audit-logs') this.loadAudit();
     else if (this.page() === 'mfi-detail' && this.detail())
       this.openMfi(this.detail()!.id);
   }
@@ -234,6 +264,70 @@ export class AdminComponent {
       error: () => undefined,
     });
   }
+
+  loadAudit(): void {
+    this.api.listAdminAudit(this.auditLimit()).subscribe({
+      next: (e) => this.auditEntries.set(e),
+      error: () => undefined,
+    });
+  }
+
+  setAuditCategory(c: string): void {
+    this.auditCategory.set(c);
+  }
+
+  loadMoreAudit(): void {
+    this.auditLimit.update((n) => Math.min(n + 50, 200));
+    this.loadAudit();
+  }
+
+  readonly auditRows = computed(() => {
+    const cat = this.auditCategory();
+    return this.auditEntries()
+      .map((e) => {
+        const meta = ACTION_META[e.action] ?? {
+          icon: '•',
+          category: 'System',
+          label: e.action,
+        };
+        const reason =
+          e.details && typeof e.details['reason'] === 'string'
+            ? (e.details['reason'] as string)
+            : null;
+        return {
+          id: e.id,
+          icon: meta.icon,
+          category: meta.category,
+          title: e.mfi_name ? `${meta.label} — ${e.mfi_name}` : meta.label,
+          meta: [
+            e.actor_type,
+            reason ? `reason: ${reason}` : null,
+            e.actor_id ? `actor ${e.actor_id.slice(0, 8)}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          time: new Date(e.timestamp).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        };
+      })
+      .filter((r) => cat === 'All' || r.category === cat);
+  });
+
+  readonly auditCounts = computed(() => {
+    const rows = this.auditEntries().map(
+      (e) => ACTION_META[e.action]?.category ?? 'System',
+    );
+    const of = (c: string) => rows.filter((r) => r === c).length;
+    return {
+      total: rows.length,
+      admin: of('Admin action'),
+      review: of('Manual review'),
+    };
+  });
 
   openMfi(id: string): void {
     this.loading.start();

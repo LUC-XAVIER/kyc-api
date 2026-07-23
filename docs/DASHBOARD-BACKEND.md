@@ -149,6 +149,7 @@ caller is manager-level. Audit-log entries now record the real actor
 | `GET /admin/mfis` | **platform admin** | every MFI + rollup counts |
 | `GET /admin/mfis/{id}` | **platform admin** | one MFI drill-down |
 | `PATCH /admin/mfis/{id}/status` | **platform admin** | enable/disable an MFI (audited) |
+| `GET /admin/audit` | **platform admin** | platform-wide audit trail (paginated) |
 
 ### Verification images
 The detail response carries `available_images` — the kinds actually stored
@@ -181,6 +182,9 @@ now nullable and null for the admin (migration `d3e4f5a6b7c8`). Seed one with
 plan mix, last-14-day bars, quota warnings); `GET /admin/mfis[/{id}]` list and
 drill into accounts. `PATCH /admin/mfis/{id}/status` flips an account between
 `ACTIVE` and `SUSPENDED` and audits it (`mfi.suspended`/`mfi.reactivated`).
+`GET /admin/audit` returns the platform-wide audit trail (newest first,
+`limit`/`offset` paginated), each row joined to its MFI name — the same
+immutable `audit_logs` the suspend/reactivate actions above write to.
 **Suspension is enforced at authentication**: a `SUSPENDED` MFI's staff can no
 longer log in and its API keys are rejected (both raise `401`). A platform
 admin has no MFI, so this check never blocks them.

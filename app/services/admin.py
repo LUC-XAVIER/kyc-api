@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models import (
     ApiKey,
+    AuditLog,
     Branch,
     DuplicateFlag,
     MfiAccount,
@@ -22,6 +23,7 @@ from app.models.enums import MfiStatus, VerificationStatus
 from app.schemas.admin import (
     AdminAgentSummary,
     AdminApiKeySummary,
+    AdminAuditEntry,
     AdminMfiDetail,
     AdminMfiSummary,
     DayCount,
@@ -190,6 +192,37 @@ def list_mfis(db: Session) -> list[AdminMfiSummary]:
             created_at=mfi.created_at,
         )
         for mfi in mfis
+    ]
+
+
+def list_audit(
+    db: Session, *, limit: int, offset: int
+) -> list[AdminAuditEntry]:
+    """Recent audit-log entries across every MFI, newest first.
+
+    Joins each row to its MFI so the admin sees the institution name rather
+    than a bare id; a null name means the tenant was since removed.
+    """
+    rows = (
+        db.query(AuditLog, MfiAccount.name)
+        .outerjoin(MfiAccount, AuditLog.mfi_account_id == MfiAccount.id)
+        .order_by(AuditLog.timestamp.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return [
+        AdminAuditEntry(
+            id=log.id,
+            action=log.action,
+            actor_type=log.actor_type,
+            actor_id=log.actor_id,
+            mfi_name=name,
+            verification_id=log.verification_id,
+            details=log.details,
+            timestamp=log.timestamp,
+        )
+        for log, name in rows
     ]
 
 

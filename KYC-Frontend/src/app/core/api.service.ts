@@ -6,6 +6,7 @@ import { API_URL } from './config';
 import { skipLoading } from './loading.interceptor';
 import {
   AccountSummary,
+  AdminAuditEntry,
   AdminMfiDetail,
   AdminMfiSummary,
   AgentProfile,
@@ -207,5 +208,14 @@ export class ApiService {
       `${this.base}/admin/mfis/${id}/status`,
       { status },
     );
+  }
+
+  listAdminAudit(limit = 50, offset = 0): Observable<AdminAuditEntry[]> {
+    const params = new HttpParams()
+      .set('limit', limit)
+      .set('offset', offset);
+    return this.http.get<AdminAuditEntry[]>(`${this.base}/admin/audit`, {
+      params,
+    });
   }
 }

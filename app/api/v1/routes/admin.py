@@ -7,7 +7,7 @@ the API uses. The admin can review each MFI and enable/disable it.
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.v1.deps import require_platform_admin
@@ -16,6 +16,7 @@ from app.db.session import get_db
 from app.models import MfiAccount, User
 from app.models.enums import ActorType, MfiStatus
 from app.schemas.admin import (
+    AdminAuditEntry,
     AdminMfiDetail,
     AdminMfiSummary,
     MfiStatusUpdate,
@@ -54,6 +55,16 @@ def platform_stats(db: Session = Depends(get_db)) -> PlatformStats:
 def list_mfis(db: Session = Depends(get_db)) -> list[AdminMfiSummary]:
     """Every MFI with its rollup counts, newest first."""
     return admin_service.list_mfis(db)
+
+
+@router.get("/audit", response_model=list[AdminAuditEntry])
+def audit_log(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> list[AdminAuditEntry]:
+    """Platform-wide audit trail, newest first (paginated)."""
+    return admin_service.list_audit(db, limit=limit, offset=offset)
 
 
 @router.get("/mfis/{mfi_id}", response_model=AdminMfiDetail)

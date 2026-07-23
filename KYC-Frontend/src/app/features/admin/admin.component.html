@@ -294,6 +294,41 @@
         </div>
       }
 
+      <!-- AUDIT LOGS -->
+      @if (page() === 'audit-logs') {
+        <div class="grid-3">
+          <div class="card stat"><div class="stat__label">ENTRIES SHOWN</div><div class="stat__value sm">{{ auditCounts().total }}</div></div>
+          <div class="card stat"><div class="stat__label">ADMIN ACTIONS</div><div class="stat__value sm">{{ auditCounts().admin }}</div></div>
+          <div class="card stat"><div class="stat__label">MANUAL REVIEWS</div><div class="stat__value sm">{{ auditCounts().review }}</div></div>
+        </div>
+
+        <div class="filter-row">
+          @for (c of auditCategories; track c) {
+            <button class="chip" [class.is-active]="auditCategory() === c" (click)="setAuditCategory(c)">{{ c }}</button>
+          }
+        </div>
+
+        <div class="card audit-list-card">
+          @for (r of auditRows(); track r.id) {
+            <div class="audit-row">
+              <div class="audit-row__icon">{{ r.icon }}</div>
+              <div class="audit-row__body">
+                <div class="audit-row__title">{{ r.title }}</div>
+                <div class="muted audit-row__meta">{{ r.meta }}</div>
+              </div>
+              <div class="muted audit-row__time">{{ r.time }}</div>
+            </div>
+          } @empty {
+            <div class="mfi-table__empty">No audit entries in this category.</div>
+          }
+          @if (auditRows().length && auditLimit() < 200) {
+            <div class="audit-more">
+              <button class="btn btn--ghost" (click)="loadMoreAudit()">Load more</button>
+            </div>
+          }
+        </div>
+      }
+
       <!-- DEFERRED SECTIONS -->
       @if (isDeferred()) {
         <div class="card placeholder">

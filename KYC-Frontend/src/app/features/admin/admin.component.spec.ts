@@ -152,4 +152,35 @@ describe('AdminComponent', () => {
     component.setPage('system-health');
     expect(component.isDeferred()).toBeTrue();
   });
+
+  it('loads and categorises the audit log', () => {
+    component.setPage('audit-logs');
+    http.expectOne((r) => r.url.endsWith('/admin/audit')).flush([
+      {
+        id: 'a1',
+        action: 'mfi.suspended',
+        actor_type: 'ADMIN',
+        actor_id: 'x',
+        mfi_name: 'MFI One',
+        verification_id: null,
+        details: null,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: 'a2',
+        action: 'review.approved',
+        actor_type: 'MANAGER',
+        actor_id: 'y',
+        mfi_name: 'MFI Two',
+        verification_id: 'v1',
+        details: { reason: 'ok' },
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+    expect(component.isDeferred()).toBeFalse();
+    expect(component.auditRows().length).toBe(2);
+    component.setAuditCategory('Admin action');
+    expect(component.auditRows().length).toBe(1);
+    expect(component.auditRows()[0].title).toContain('MFI One');
+  });
 });

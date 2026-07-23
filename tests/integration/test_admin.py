@@ -136,6 +136,26 @@ def test_admin_suspends_and_reactivates_an_mfi(
     assert resp.json()["status"] == "ACTIVE"
 
 
+def test_admin_audit_lists_actions(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A suspend action shows up in the platform audit trail."""
+    headers = _admin_headers(db_session)
+    mfi, _ = create_mfi_with_key(db_session, name="Audit MFI", email="au@x.cm")
+    api_client.patch(
+        f"{MFIS_URL}/{mfi.id}/status",
+        json={"status": "SUSPENDED"},
+        headers=headers,
+    )
+
+    resp = api_client.get("/api/v1/admin/audit", headers=headers)
+
+    assert resp.status_code == 200
+    entry = next(e for e in resp.json() if e["action"] == "mfi.suspended")
+    assert entry["mfi_name"] == "Audit MFI"
+    assert entry["actor_type"] == "ADMIN"
+
+
 def test_admin_rejects_invalid_status(
     api_client: TestClient, db_session: Session
 ) -> None:

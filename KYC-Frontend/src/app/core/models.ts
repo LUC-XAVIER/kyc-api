@@ -270,6 +270,17 @@ export interface MfiPerformance {
   avg_processing_seconds: number | null;
 }
 
+export interface AdminAuditEntry {
+  id: string;
+  action: string;
+  actor_type: 'AGENT' | 'MANAGER' | 'ADMIN' | 'SYSTEM';
+  actor_id: string | null;
+  mfi_name: string | null;
+  verification_id: string | null;
+  details: Record<string, unknown> | null;
+  timestamp: string;
+}
+
 export interface AdminMfiDetail {
   id: string;
   name: string;
