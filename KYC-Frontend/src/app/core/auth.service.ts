@@ -52,12 +52,14 @@ export class AuthService {
   }
 
   logout(): void {
-    // Remember the role before clearing it, so an agent lands back on the
-    // agent sign-in (the login page defaults to the manager form otherwise).
-    const wasAgent = this._principal()?.role === 'AGENT';
+    // Remember the role before clearing it, so each actor lands back on the
+    // sign-in it came from (the generic page defaults to the manager form).
+    const role = this._principal()?.role;
     this._principal.set(null);
     localStorage.removeItem(STORAGE_KEY);
-    if (wasAgent) {
+    if (role === 'ADMIN') {
+      this.router.navigateByUrl('/admin/login');
+    } else if (role === 'AGENT') {
       this.router.navigate(['/login'], { queryParams: { actor: 'agent' } });
     } else {
       this.router.navigateByUrl('/login');
