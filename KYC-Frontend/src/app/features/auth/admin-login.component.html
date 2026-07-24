@@ -1,45 +1,63 @@
-<div class="admin-login">
-  <form class="alogin-card" (submit)="$event.preventDefault(); submit()">
-    <div class="alogin-card__brand">
-      <div class="alogin-card__logo">X</div>
-      <span>Openxtech</span>
-      <span class="alogin-card__tag">ADMIN</span>
+<div class="login">
+  <!-- Brand panel (hidden on small screens) -->
+  <div class="login__brand">
+    <div class="brand-mark">
+      <div class="brand-mark__logo">K</div>
+      <span>KYC-API</span>
     </div>
+    <div class="brand-copy">
+      <div class="brand-copy__tag">ADMIN PANEL</div>
+      <h1>Platform administration</h1>
+      <p>Oversee every microfinance institution on KYC-API — accounts,
+        usage, subscriptions, and the immutable audit trail.</p>
+    </div>
+    <div class="brand-foot">Restricted access · Platform administrators only</div>
+  </div>
 
-    <h2 class="alogin-card__title">Platform administrator</h2>
-    <p class="alogin-card__sub">
-      Sign in to oversee every MFI on the platform.
-    </p>
+  <!-- Form panel -->
+  <div class="login__main">
+    <form class="login-card" (submit)="$event.preventDefault(); submit()">
+      <div class="login-card__brand">
+        <div class="brand-mark__logo">K</div><span>KYC-API</span>
+      </div>
 
-    <label class="afield-label">Email</label>
-    <input
-      class="afield"
-      type="email"
-      autocomplete="username"
-      placeholder="admin@openxtech.cm"
-      [value]="email()"
-      (input)="email.set($any($event.target).value)"
-    />
+      <h2 class="login-card__title">Admin sign in</h2>
+      <p class="login-card__sub">
+        Sign in to the platform administration console.
+      </p>
 
-    <label class="afield-label">PIN</label>
-    <input
-      class="afield"
-      type="password"
-      inputmode="numeric"
-      autocomplete="current-password"
-      placeholder="••••••"
-      [value]="pin()"
-      (input)="pin.set($any($event.target).value)"
-    />
+      <label class="field-label">Email</label>
+      <input
+        class="field"
+        type="email"
+        autocomplete="username"
+        placeholder="you@example.com"
+        [value]="email()"
+        (input)="email.set($any($event.target).value)"
+      />
 
-    @if (error()) {
-      <div class="alogin-error">{{ error() }}</div>
-    }
+      <label class="field-label">PIN</label>
+      <input
+        class="field"
+        type="password"
+        inputmode="numeric"
+        autocomplete="current-password"
+        placeholder="••••••"
+        [value]="pin()"
+        (input)="pin.set($any($event.target).value)"
+      />
 
-    <button type="submit" class="alogin-submit" [disabled]="loading()">
-      {{ loading() ? 'Signing in…' : 'Sign in' }}
-    </button>
+      @if (error()) {
+        <div class="login-error">{{ error() }}</div>
+      }
 
-    <div class="alogin-foot">Restricted access · Openxtech staff only</div>
-  </form>
+      <button
+        type="submit"
+        class="login-submit"
+        [disabled]="loading()"
+      >
+        {{ loading() ? 'Signing in…' : 'Sign in' }}
+      </button>
+    </form>
+  </div>
 </div>

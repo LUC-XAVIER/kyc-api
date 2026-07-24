@@ -1,128 +1,147 @@
-// Standalone dark admin sign-in — matches the admin dashboard palette,
-// deliberately distinct from the light MFI-facing /login.
-:host {
-  --bg: #0b0e14;
-  --panel: #131722;
-  --accent: #e5484d;
-  --ink: #f2f3f6;
-  --muted: rgba(242, 243, 246, 0.5);
-  display: block;
-}
-
-.admin-login {
-  min-height: 100vh;
+// Two-panel admin sign-in, matching the manager/agent login layout: a brand
+// panel on one side, the form on the other. Uses the global --ox-* tokens so
+// it stays visually consistent with the rest of the auth pages.
+.login {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background:
-    radial-gradient(
-      1000px 500px at 50% -10%,
-      rgba(229, 72, 77, 0.12),
-      transparent 60%
-    ),
-    var(--bg);
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  color: var(--ink);
-}
-
-.alogin-card {
+  min-height: 100vh;
   width: 100%;
-  max-width: 380px;
-  background: var(--panel);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 32px 28px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
 }
 
-.alogin-card__brand {
+// ---- Brand panel ----
+.login__brand {
+  flex: 1;
+  background: var(--ox-navy);
+  color: #fff;
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.brand-mark {
   display: flex;
   align-items: center;
   gap: 10px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
+
+  &__logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: var(--ox-red);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+  }
 }
-.alogin-card__logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
+.brand-copy {
+  &__tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #c4b5fd;
+    background: rgba(139, 92, 246, 0.22);
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 40px;
+    margin: 0 0 12px;
+  }
+  p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+    max-width: 420px;
+  }
+}
+.brand-foot {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+// ---- Form panel ----
+.login__main {
+  flex: 1;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  padding: 32px 24px;
+  background: var(--ox-bg);
 }
-.alogin-card__tag {
-  margin-left: auto;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  color: #c4b5fd;
-  background: rgba(139, 92, 246, 0.16);
-  padding: 3px 8px;
-  border-radius: 5px;
-}
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: #fff;
+  border: 1px solid var(--ox-border);
+  border-radius: 14px;
+  padding: 32px;
 
-.alogin-card__title {
-  font-size: 21px;
-  font-weight: 700;
-  margin: 22px 0 6px;
+  &__brand {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    margin-bottom: 20px;
+  }
+  &__title {
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+  &__sub {
+    font-size: 13px;
+    color: var(--ox-muted);
+    margin: 0 0 24px;
+    line-height: 1.5;
+  }
 }
-.alogin-card__sub {
-  font-size: 13.5px;
-  color: var(--muted);
-  margin: 0 0 22px;
-  line-height: 1.5;
-}
-
-.afield-label {
+.field-label {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  color: rgba(242, 243, 246, 0.7);
   margin-bottom: 6px;
 }
-.afield {
+.field {
   width: 100%;
   box-sizing: border-box;
-  background: #161b26;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--ox-border);
   border-radius: 8px;
-  padding: 11px 13px;
-  color: var(--ink);
+  padding: 12px 14px;
   font-size: 14px;
+  font-family: inherit;
   outline: none;
   margin-bottom: 16px;
   &:focus {
-    border-color: var(--accent);
+    border-color: var(--ox-red);
   }
 }
-
-.alogin-error {
-  background: rgba(229, 72, 77, 0.1);
-  border: 1px solid rgba(229, 72, 77, 0.35);
+.login-error {
+  background: var(--ox-reject-soft);
+  color: var(--ox-reject-text);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 13px;
-  color: #f5a5a7;
   margin-bottom: 16px;
 }
-
-.alogin-submit {
+.login-submit {
   width: 100%;
-  background: var(--accent);
+  padding: 12px;
+  background: var(--ox-red);
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 12px;
   font-size: 14px;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
   &:hover:not(:disabled) {
-    background: #f2727a;
+    filter: brightness(1.05);
   }
   &:disabled {
     opacity: 0.6;
@@ -130,9 +149,12 @@
   }
 }
 
-.alogin-foot {
-  text-align: center;
-  font-size: 11.5px;
-  color: rgba(242, 243, 246, 0.4);
-  margin-top: 18px;
+// ---- Responsive: stack, drop the brand panel ----
+@media (max-width: 800px) {
+  .login__brand {
+    display: none;
+  }
+  .login-card__brand {
+    display: flex;
+  }
 }

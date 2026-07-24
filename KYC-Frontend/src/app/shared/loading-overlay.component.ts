@@ -28,6 +28,13 @@ import { LoadingService } from '../core/loading.service';
       animation: splash-in 160ms ease-out;
     }
 
+    /* The admin dashboard sets .admin-dark on the document root while it is
+       mounted; match its dark backdrop so the splash isn't a white flash.
+       The K mark stays red-on-white in both themes. */
+    :host-context(.admin-dark) .splash {
+      background: #0b0e14;
+    }
+
     /* Indeterminate sliver across the top — the progress cue, since we
        cannot know how far along a lazy chunk download actually is. */
     .splash__bar {

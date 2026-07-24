@@ -1,5 +1,12 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
@@ -172,20 +179,25 @@ function shortDate(iso: string): string {
   });
 }
 
+const THEME_KEY = 'kyc_admin_theme';
+
 /**
- * The Openxtech platform-admin dashboard. A cross-tenant surface: it sees
- * every MFI, unlike the manager/agent dashboards. Same signal + setPage()
- * shape as those, but keeps the design's dark theme. Overview, MFI Accounts
- * and MFI Detail are wired to /admin/*; the model-monitoring and operations
- * sections are placeholders until those metrics exist.
+ * The platform-admin dashboard. A cross-tenant surface: it sees every MFI,
+ * unlike the manager/agent dashboards. Same signal + setPage() shape as
+ * those. Dark by default with a light-mode toggle (persisted); the choice
+ * also drives the global loading splash via a class on the document root,
+ * removed when this dashboard is torn down so the other surfaces stay light.
+ * Overview, MFI Accounts and MFI Detail are wired to /admin/*; the
+ * model-monitoring and operations sections are placeholders for now.
  */
 @Component({
   selector: 'app-admin',
   imports: [DatePipe],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
+  host: { '[class.theme-light]': "theme() === 'light'" },
 })
-export class AdminComponent {
+export class AdminComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly loading = inject(LoadingService);
@@ -207,9 +219,30 @@ export class AdminComponent {
   readonly auditLimit = signal(50);
   readonly auditCategories = AUDIT_CATEGORIES;
 
+  readonly theme = signal<'dark' | 'light'>(
+    localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark',
+  );
+
   constructor() {
     this.loadStats();
     this.loadMfis();
+    // Reflect the theme onto the document root so the global loading splash
+    // (a sibling component) can match it. Cleared in ngOnDestroy.
+    effect(() => {
+      const root = document.documentElement.classList;
+      const dark = this.theme() === 'dark';
+      root.toggle('admin-dark', dark);
+      root.toggle('admin-light', !dark);
+    });
+  }
+
+  toggleTheme(): void {
+    this.theme.update((t) => (t === 'dark' ? 'light' : 'dark'));
+    localStorage.setItem(THEME_KEY, this.theme());
+  }
+
+  ngOnDestroy(): void {
+    document.documentElement.classList.remove('admin-dark', 'admin-light');
   }
 
   readonly userInitials = computed(() => initials(this.user()?.full_name ?? 'A'));
