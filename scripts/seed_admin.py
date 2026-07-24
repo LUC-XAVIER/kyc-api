@@ -5,7 +5,8 @@ manager or agent, the admin belongs to no MFI (``mfi_account_id`` is null).
 
 Safe to run on every deploy: if the admin already exists it is left as-is
 (its PIN is **not** reset, so a PIN changed from the dashboard survives).
-Pass ``--force`` to reset the PIN of an existing admin.
+Pass ``--force`` to reset the PIN **and clear 2FA** of an existing admin —
+the break-glass recovery for a lost authenticator.
 
 Credentials come from ``--email`` / ``--pin`` or the ``ADMIN_EMAIL`` /
 ``ADMIN_PIN`` env vars, falling back to the bootstrap defaults.
@@ -60,6 +61,11 @@ def main() -> None:
             admin.full_name = args.name
         if created or args.force:
             admin.hashed_pin = hash_password(args.pin)
+        if args.force:
+            # Break-glass recovery: also clear 2FA, so a lost authenticator
+            # can't lock the admin out permanently (needs host/db access).
+            admin.totp_enabled = False
+            admin.totp_secret = None
 
         db.commit()
         if created:
@@ -68,7 +74,10 @@ def main() -> None:
                 f"pin={args.pin}"
             )
         elif args.force:
-            print(f"Platform admin PIN reset — email={args.email}")
+            print(
+                f"Platform admin reset (PIN + 2FA cleared) — "
+                f"email={args.email}"
+            )
         else:
             print(
                 f"Platform admin already exists — email={args.email} "
