@@ -13,6 +13,10 @@ class FakeAuth {
     this._role = 'ADMIN';
     return of({});
   });
+  verifyMfa = jasmine.createSpy('verifyMfa').and.callFake(() => {
+    this._role = 'ADMIN';
+    return of({});
+  });
   setRole(r: string | null) {
     this._role = r;
   }
@@ -42,6 +46,18 @@ describe('AdminLoginComponent', () => {
     component.pin.set('123456');
     component.submit();
     expect(auth.login).toHaveBeenCalledWith('admin@example.com', '123456');
+  });
+
+  it('moves to the code step when 2FA is required', () => {
+    auth.login.and.returnValue(of({ mfa_required: true, mfa_token: 'tok' }));
+    component.email.set('admin@example.com');
+    component.pin.set('123456');
+    component.submit();
+    expect(component.mfaStep()).toBeTrue();
+
+    component.code.set('123456');
+    component.verify();
+    expect(auth.verifyMfa).toHaveBeenCalledWith('tok', '123456');
   });
 
   it('surfaces the API error message on failure', () => {

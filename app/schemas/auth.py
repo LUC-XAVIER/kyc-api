@@ -33,6 +33,38 @@ class TokenResponse(BaseModel):
     full_name: str
     # None for a platform admin, who belongs to no single MFI.
     mfi_account_id: uuid.UUID | None = None
+    # When the account has 2FA enabled, the password step returns no session
+    # token: instead ``mfa_required`` is true and ``mfa_token`` is a
+    # short-lived challenge to exchange (with a TOTP code) for the real token.
+    mfa_required: bool = False
+    mfa_token: str | None = None
+
+
+class MfaVerifyRequest(BaseModel):
+    """Second login step: a challenge token plus the authenticator code."""
+
+    mfa_token: str
+    code: str
+
+
+class TwoFactorSetupResponse(BaseModel):
+    """Enrolment payload — shown once so the admin can scan/store it."""
+
+    secret: str
+    otpauth_uri: str
+    qr: str  # inline SVG data URI of the otpauth URI
+
+
+class TwoFactorCodeRequest(BaseModel):
+    """A 6-digit TOTP code, to enable or disable 2FA."""
+
+    code: str
+
+
+class TwoFactorStatus(BaseModel):
+    """Whether 2FA is currently active on the account."""
+
+    enabled: bool
 
 
 class ForgotPinRequest(BaseModel):

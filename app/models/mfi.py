@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
+from app.db.types import EncryptedString
 from app.models.enums import AgentRole, AgentStatus, MfiStatus, PlanName
 
 
@@ -114,6 +115,13 @@ class User(UUIDMixin, TimestampMixin, Base):
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
+    )
+    # TOTP two-factor auth (used to harden the platform admin). The base32
+    # secret is encrypted at rest; ``totp_enabled`` gates the login challenge
+    # so a half-finished enrolment never locks anyone out.
+    totp_secret: Mapped[str | None] = mapped_column(EncryptedString)
+    totp_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
     )
 
     mfi_account: Mapped["MfiAccount | None"] = relationship(
