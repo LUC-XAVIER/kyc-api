@@ -16,48 +16,77 @@
 
   <!-- Form panel -->
   <div class="login__main">
-    <form class="login-card" (submit)="$event.preventDefault(); submit()">
-      <div class="login-card__brand">
-        <div class="brand-mark__logo">K</div><span>KYC-API</span>
-      </div>
+    @if (!mfaStep()) {
+      <form class="login-card" (submit)="$event.preventDefault(); submit()">
+        <div class="login-card__brand">
+          <div class="brand-mark__logo">K</div><span>KYC-API</span>
+        </div>
 
-      <h2 class="login-card__title">Admin sign in</h2>
-      <p class="login-card__sub">
-        Sign in to the platform administration console.
-      </p>
+        <h2 class="login-card__title">Admin sign in</h2>
+        <p class="login-card__sub">
+          Sign in to the platform administration console.
+        </p>
 
-      <label class="field-label">Email</label>
-      <input
-        class="field"
-        type="email"
-        autocomplete="username"
-        placeholder="you@example.com"
-        [value]="email()"
-        (input)="email.set($any($event.target).value)"
-      />
+        <label class="field-label">Email</label>
+        <input
+          class="field"
+          type="email"
+          autocomplete="username"
+          placeholder="you@example.com"
+          [value]="email()"
+          (input)="email.set($any($event.target).value)"
+        />
 
-      <label class="field-label">PIN</label>
-      <input
-        class="field"
-        type="password"
-        inputmode="numeric"
-        autocomplete="current-password"
-        placeholder="••••••"
-        [value]="pin()"
-        (input)="pin.set($any($event.target).value)"
-      />
+        <label class="field-label">PIN</label>
+        <input
+          class="field"
+          type="password"
+          inputmode="numeric"
+          autocomplete="current-password"
+          placeholder="••••••"
+          [value]="pin()"
+          (input)="pin.set($any($event.target).value)"
+        />
 
-      @if (error()) {
-        <div class="login-error">{{ error() }}</div>
-      }
+        @if (error()) {
+          <div class="login-error">{{ error() }}</div>
+        }
 
-      <button
-        type="submit"
-        class="login-submit"
-        [disabled]="loading()"
-      >
-        {{ loading() ? 'Signing in…' : 'Sign in' }}
-      </button>
-    </form>
+        <button type="submit" class="login-submit" [disabled]="loading()">
+          {{ loading() ? 'Signing in…' : 'Sign in' }}
+        </button>
+      </form>
+    } @else {
+      <form class="login-card" (submit)="$event.preventDefault(); verify()">
+        <div class="login-card__brand">
+          <div class="brand-mark__logo">K</div><span>KYC-API</span>
+        </div>
+
+        <h2 class="login-card__title">Two-factor code</h2>
+        <p class="login-card__sub">
+          Enter the 6-digit code from your authenticator app.
+        </p>
+
+        <label class="field-label">Authentication code</label>
+        <input
+          class="field"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          placeholder="123456"
+          [value]="code()"
+          (input)="code.set($any($event.target).value)"
+        />
+
+        @if (error()) {
+          <div class="login-error">{{ error() }}</div>
+        }
+
+        <button type="submit" class="login-submit" [disabled]="loading()">
+          {{ loading() ? 'Verifying…' : 'Verify' }}
+        </button>
+      </form>
+    }
   </div>
 </div>

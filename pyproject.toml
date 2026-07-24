@@ -27,6 +27,10 @@ dependencies = [
     # Server-side compliance-report PDF rendering (the dashboard only
     # downloads the result via the API).
     "reportlab>=4.2",
+    # TOTP two-factor auth for the platform admin, plus QR generation for
+    # authenticator-app enrolment (SVG factory — no Pillow dependency).
+    "pyotp>=2.9",
+    "qrcode>=7.4",
 ]
 
 [project.optional-dependencies]

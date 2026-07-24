@@ -74,7 +74,15 @@ export class LoginComponent {
     this.loading.set(true);
     this.error.set('');
     this.auth.login(identifier, pin).subscribe({
-      next: () => this.router.navigateByUrl(this.auth.homeRoute()),
+      next: (res) => {
+        // A 2FA account (the platform admin) completes sign-in on the
+        // dedicated admin page, which has the code step.
+        if (res.mfa_required) {
+          this.router.navigateByUrl('/admin/login');
+          return;
+        }
+        this.router.navigateByUrl(this.auth.homeRoute());
+      },
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
         this.error.set(this.messageFor(err));

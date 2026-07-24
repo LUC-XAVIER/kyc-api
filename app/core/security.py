@@ -11,12 +11,16 @@ the digest so a database leak alone does not reveal usable keys.
 import base64
 import hashlib
 import hmac
+import io
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
+import pyotp
+import qrcode
+from qrcode.image.svg import SvgImage
 
 from app.core.config import settings
 
@@ -176,6 +180,59 @@ def create_access_token(
     return jwt.encode(
         payload, settings.secret_key, algorithm=settings.jwt_algorithm
     )
+
+
+def create_mfa_challenge(subject: str, *, expires_minutes: int = 5) -> str:
+    """Mint a short-lived token proving the password step of 2FA login passed.
+
+    Carries an ``mfa`` claim so it cannot be used as a session token; the
+    caller exchanges it (plus a valid TOTP code) for a real access token.
+    """
+    now = datetime.now(UTC)
+    payload = {
+        "sub": subject,
+        "mfa": True,
+        "iat": now,
+        "exp": now + timedelta(minutes=expires_minutes),
+    }
+    return jwt.encode(
+        payload, settings.secret_key, algorithm=settings.jwt_algorithm
+    )
+
+
+# --- TOTP two-factor authentication -----------------------------------
+
+
+TOTP_ISSUER = "KYC-API"
+
+
+def generate_totp_secret() -> str:
+    """A fresh base32 TOTP secret to store (encrypted) against a user."""
+    return pyotp.random_base32()
+
+
+def totp_provisioning_uri(secret: str, account_name: str) -> str:
+    """The ``otpauth://`` URI an authenticator app enrols from."""
+    return pyotp.TOTP(secret).provisioning_uri(
+        name=account_name, issuer_name=TOTP_ISSUER
+    )
+
+
+def verify_totp(secret: str, code: str) -> bool:
+    """Whether ``code`` is valid for ``secret`` now (±1 step for skew)."""
+    return pyotp.TOTP(secret).verify(code.strip(), valid_window=1)
+
+
+def totp_qr_data_uri(provisioning_uri: str) -> str:
+    """Render the provisioning URI as an inline SVG QR-code data URI.
+
+    SVG (not PNG) so no Pillow dependency is pulled into the API image.
+    """
+    img = qrcode.make(provisioning_uri, image_factory=SvgImage)
+    buf = io.BytesIO()
+    img.save(buf)
+    encoded = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 def decode_access_token(token: str) -> dict:

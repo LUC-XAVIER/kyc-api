@@ -7,9 +7,10 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 
 import { ApiService } from '../../core/api.service';
-import { AuthService } from '../../core/auth.service';
+import { AuthService, TwoFactorSetup } from '../../core/auth.service';
 import { LoadingService } from '../../core/loading.service';
 import {
   AdminAuditEntry,
@@ -29,7 +30,8 @@ type AdminPage =
   | 'ocr-engine'
   | 'api-performance'
   | 'system-health'
-  | 'audit-logs';
+  | 'audit-logs'
+  | 'security';
 
 interface NavItem {
   id: AdminPage;
@@ -67,6 +69,10 @@ const NAV: NavSection[] = [
       { id: 'system-health', label: 'System Health', glyph: '▥' },
       { id: 'audit-logs', label: 'Audit Logs', glyph: '▧' },
     ],
+  },
+  {
+    section: 'ACCOUNT',
+    items: [{ id: 'security', label: 'Security', glyph: '🔒' }],
   },
 ];
 
@@ -114,6 +120,7 @@ const TITLES: Record<AdminPage, [string, string]> = {
   'api-performance': ['API Performance', 'Coming with operations metrics'],
   'system-health': ['System Health', 'Coming with operations metrics'],
   'audit-logs': ['Audit Logs', 'Immutable platform-wide action trail'],
+  security: ['Security', 'Protect your platform-admin account'],
 };
 
 const PLAN_COLORS: Record<string, string> = {
@@ -201,7 +208,14 @@ export class AdminComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly loading = inject(LoadingService);
+  private readonly sanitizer = inject(DomSanitizer);
   readonly user = this.auth.principal;
+
+  /** The enrolment QR (an SVG data URI) trusted for use in an <img src>. */
+  readonly twoFaQr = computed<SafeUrl | null>(() => {
+    const s = this.twoFaSetup();
+    return s ? this.sanitizer.bypassSecurityTrustUrl(s.qr) : null;
+  });
 
   readonly nav = NAV;
   readonly page = signal<AdminPage>('overview');
@@ -222,6 +236,14 @@ export class AdminComponent implements OnDestroy {
   readonly theme = signal<'dark' | 'light'>(
     localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark',
   );
+
+  // Two-factor (Security page) state.
+  readonly twoFaEnabled = signal<boolean | null>(null);
+  readonly twoFaSetup = signal<TwoFactorSetup | null>(null);
+  readonly twoFaCode = signal('');
+  readonly twoFaBusy = signal(false);
+  readonly twoFaError = signal('');
+  readonly twoFaMsg = signal('');
 
   constructor() {
     this.loadStats();
@@ -264,6 +286,7 @@ export class AdminComponent implements OnDestroy {
     if (p === 'overview') this.loadStats();
     if (p === 'mfi-accounts') this.loadMfis();
     if (p === 'audit-logs') this.loadAudit();
+    if (p === 'security') this.loadTwoFa();
     this.loading.stop();
   }
 
@@ -275,6 +298,7 @@ export class AdminComponent implements OnDestroy {
     if (this.page() === 'overview') this.loadStats();
     else if (this.page() === 'mfi-accounts') this.loadMfis();
     else if (this.page() === 'audit-logs') this.loadAudit();
+    else if (this.page() === 'security') this.loadTwoFa();
     else if (this.page() === 'mfi-detail' && this.detail())
       this.openMfi(this.detail()!.id);
   }
@@ -303,6 +327,89 @@ export class AdminComponent implements OnDestroy {
       next: (e) => this.auditEntries.set(e),
       error: () => undefined,
     });
+  }
+
+  // ---- Two-factor auth ----
+  loadTwoFa(): void {
+    this.twoFaSetup.set(null);
+    this.twoFaCode.set('');
+    this.twoFaError.set('');
+    this.twoFaMsg.set('');
+    this.auth.twoFactorStatus().subscribe({
+      next: (s) => this.twoFaEnabled.set(s.enabled),
+      error: () => this.twoFaEnabled.set(null),
+    });
+  }
+
+  startTwoFaSetup(): void {
+    this.twoFaBusy.set(true);
+    this.twoFaError.set('');
+    this.auth.twoFactorSetup().subscribe({
+      next: (s) => {
+        this.twoFaBusy.set(false);
+        this.twoFaSetup.set(s);
+      },
+      error: (e) => {
+        this.twoFaBusy.set(false);
+        this.twoFaError.set(this.errMsg(e, 'Could not start setup.'));
+      },
+    });
+  }
+
+  confirmTwoFa(): void {
+    const code = this.twoFaCode().trim();
+    if (!code) {
+      this.twoFaError.set('Enter the code from your authenticator.');
+      return;
+    }
+    this.twoFaBusy.set(true);
+    this.twoFaError.set('');
+    this.auth.twoFactorEnable(code).subscribe({
+      next: () => {
+        this.twoFaBusy.set(false);
+        this.twoFaSetup.set(null);
+        this.twoFaCode.set('');
+        this.twoFaEnabled.set(true);
+        this.twoFaMsg.set('Two-factor authentication is now on.');
+      },
+      error: (e) => {
+        this.twoFaBusy.set(false);
+        this.twoFaError.set(this.errMsg(e, 'That code was not accepted.'));
+      },
+    });
+  }
+
+  disableTwoFa(): void {
+    const code = this.twoFaCode().trim();
+    if (!code) {
+      this.twoFaError.set('Enter a current code to turn 2FA off.');
+      return;
+    }
+    this.twoFaBusy.set(true);
+    this.twoFaError.set('');
+    this.auth.twoFactorDisable(code).subscribe({
+      next: () => {
+        this.twoFaBusy.set(false);
+        this.twoFaCode.set('');
+        this.twoFaEnabled.set(false);
+        this.twoFaMsg.set('Two-factor authentication is now off.');
+      },
+      error: (e) => {
+        this.twoFaBusy.set(false);
+        this.twoFaError.set(this.errMsg(e, 'That code was not accepted.'));
+      },
+    });
+  }
+
+  cancelTwoFaSetup(): void {
+    this.twoFaSetup.set(null);
+    this.twoFaCode.set('');
+    this.twoFaError.set('');
+  }
+
+  private errMsg(err: unknown, fallback: string): string {
+    const body = (err as { error?: { error?: { message?: string } } })?.error;
+    return body?.error?.message ?? fallback;
   }
 
   setAuditCategory(c: string): void {
