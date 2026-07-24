@@ -1,4 +1,4 @@
-"""Openxtech platform-admin routes (cross-tenant).
+"""Platform-admin routes (cross-tenant).
 
 Every endpoint here is gated by :func:`require_platform_admin` and reports
 across *all* MFIs, so none of them apply the per-tenant scoping the rest of

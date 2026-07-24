@@ -1,4 +1,4 @@
-"""Cross-tenant aggregations for the Openxtech platform-admin dashboard.
+"""Cross-tenant aggregations for the platform-admin dashboard.
 
 Unlike :mod:`app.services.stats` (which scopes to one MFI), these roll up
 *every* MFI on the platform. Consumed only by the ``/admin/*`` routes.

@@ -105,6 +105,12 @@ jobs:
             # updates them in place on later ones.
             docker compose -f docker-compose.prod.yml run --rm api \
               python -m scripts.seed_plans
+            # Idempotent: creates the platform admin on first deploy and
+            # leaves an existing one untouched (its PIN is never reset here,
+            # so a dashboard PIN change survives). Override the credentials
+            # with ADMIN_EMAIL / ADMIN_PIN in the host .env.
+            docker compose -f docker-compose.prod.yml run --rm api \
+              python -m scripts.seed_admin
             docker compose -f docker-compose.prod.yml up -d --no-deps api
             # Rebuild the dashboard from the freshly checked-out source and
             # roll it out. Without this the api updates but the UI (camera

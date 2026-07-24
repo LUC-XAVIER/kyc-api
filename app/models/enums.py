@@ -28,7 +28,7 @@ class AgentRole(enum.StrEnum):
     Drives which dashboard surface the account sees and what it may do:
     an ``AGENT`` submits verifications; a ``MANAGER`` also reviews the
     pending queue and generates compliance reports. ``ADMIN`` is reserved
-    for Openxtech platform staff.
+    for platform staff.
     """
 
     AGENT = "AGENT"
