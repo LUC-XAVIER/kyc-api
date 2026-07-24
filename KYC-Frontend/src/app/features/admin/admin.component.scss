@@ -20,26 +20,32 @@
   --avatar-2: #2a3040;
   --accent: #e5484d;
   --accent-hover: #f2727a;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --sidebar-shadow: none;
   display: block;
 }
 
 :host(.theme-light) {
-  --bg: #f4f6f9;
+  // A greyer canvas so the white cards and sidebar read as raised surfaces.
+  --bg: #e8ecf2;
   --panel: #ffffff;
   --sidebar: #ffffff;
-  --line: rgba(0, 0, 0, 0.1);
-  --line-soft: rgba(0, 0, 0, 0.07);
-  --line-faint: rgba(0, 0, 0, 0.05);
+  --line: rgba(16, 24, 40, 0.12);
+  --line-soft: rgba(16, 24, 40, 0.08);
+  --line-faint: rgba(16, 24, 40, 0.06);
   --ink: #1a1f2b;
   --nav-ink: rgba(26, 31, 43, 0.72);
-  --muted: rgba(26, 31, 43, 0.5);
-  --hover: rgba(0, 0, 0, 0.035);
-  --input: #f1f3f6;
-  --track: rgba(0, 0, 0, 0.08);
-  --surface-soft: rgba(0, 0, 0, 0.03);
-  --donut-track: #e3e6ec;
+  --muted: rgba(26, 31, 43, 0.55);
+  --hover: rgba(16, 24, 40, 0.05);
+  --input: #eef1f6;
+  --track: rgba(16, 24, 40, 0.09);
+  --surface-soft: rgba(16, 24, 40, 0.04);
+  --donut-track: #dfe3ea;
   --avatar: #6d5bb5;
   --avatar-2: #d6d9e2;
+  --card-shadow:
+    0 1px 3px rgba(16, 24, 40, 0.1), 0 1px 2px rgba(16, 24, 40, 0.06);
+  --sidebar-shadow: 1px 0 3px rgba(16, 24, 40, 0.06);
 }
 
 .layout {
@@ -64,12 +70,14 @@
   flex: none;
   background: var(--sidebar);
   border-right: 1px solid var(--line);
+  box-shadow: var(--sidebar-shadow);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   position: sticky;
   top: 0;
   height: 100vh;
+  z-index: 1;
 }
 .sidebar__brand {
   display: flex;
@@ -281,14 +289,22 @@
 .tight {
   margin-top: 16px;
 }
+// Vertical stack of cards (used in the MFI-detail left column). Spacing lives
+// here — never on `.card` itself, so cards sitting in a grid row aren't each
+// nudged down and left misaligned.
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-content: start;
+}
 .card {
+  box-sizing: border-box;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 20px;
-  & + .card {
-    margin-top: 16px;
-  }
+  box-shadow: var(--card-shadow);
 }
 .card__title {
   font-size: 15px;
@@ -704,6 +720,83 @@ $cols: 1.6fr 0.8fr 0.9fr 1.3fr 0.7fr 0.6fr 0.6fr 0.8fr 1.3fr;
   display: flex;
   justify-content: center;
   padding: 16px;
+}
+
+// ---- Two-factor (Security) ----
+.twofa__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.twofa__cta {
+  margin-top: 18px;
+}
+.twofa__ok,
+.twofa__err {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.twofa__ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: #1a8f4a;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.twofa__err {
+  background: rgba(229, 72, 77, 0.1);
+  color: #d13b40;
+  border: 1px solid rgba(229, 72, 77, 0.3);
+}
+.twofa__setup {
+  display: flex;
+  gap: 24px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.twofa__qr {
+  background: #fff;
+  padding: 12px;
+  border-radius: 10px;
+  flex: none;
+  align-self: flex-start;
+  img {
+    display: block;
+  }
+}
+.twofa__steps {
+  flex: 1;
+  min-width: 240px;
+  p {
+    font-size: 13.5px;
+    margin: 8px 0 4px;
+  }
+}
+.twofa__secret {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  border-radius: 8px;
+  letter-spacing: 2px;
+  font-size: 14px;
+  margin: 6px 0 12px;
+  word-break: break-all;
+}
+.twofa__confirm {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.twofa__code {
+  width: 120px;
+  text-align: center;
+  letter-spacing: 3px;
+}
+.twofa__disable {
+  margin-top: 18px;
 }
 
 // ---- Placeholder ----
