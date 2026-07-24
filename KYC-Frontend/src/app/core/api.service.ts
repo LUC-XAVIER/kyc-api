@@ -6,11 +6,16 @@ import { API_URL } from './config';
 import { skipLoading } from './loading.interceptor';
 import {
   AccountSummary,
+  AdminAuditEntry,
+  AdminMfiDetail,
+  AdminMfiSummary,
   AgentProfile,
   AgentSummary,
   ApiKeyCreated,
   ApiKeySummary,
   BranchSummary,
+  MfiStatus,
+  PlatformStats,
   ReportSummary,
   ReviewDecisionResponse,
   ReviewItem,
@@ -183,5 +188,34 @@ export class ApiService {
     email?: string;
   }): Observable<AccountSummary> {
     return this.http.patch<AccountSummary>(`${this.base}/account`, payload);
+  }
+
+  // ---- Platform admin (cross-tenant) ----
+  getPlatformStats(): Observable<PlatformStats> {
+    return this.http.get<PlatformStats>(`${this.base}/admin/stats`);
+  }
+
+  listAdminMfis(): Observable<AdminMfiSummary[]> {
+    return this.http.get<AdminMfiSummary[]>(`${this.base}/admin/mfis`);
+  }
+
+  getAdminMfi(id: string): Observable<AdminMfiDetail> {
+    return this.http.get<AdminMfiDetail>(`${this.base}/admin/mfis/${id}`);
+  }
+
+  setMfiStatus(id: string, status: MfiStatus): Observable<AdminMfiDetail> {
+    return this.http.patch<AdminMfiDetail>(
+      `${this.base}/admin/mfis/${id}/status`,
+      { status },
+    );
+  }
+
+  listAdminAudit(limit = 50, offset = 0): Observable<AdminAuditEntry[]> {
+    const params = new HttpParams()
+      .set('limit', limit)
+      .set('offset', offset);
+    return this.http.get<AdminAuditEntry[]>(`${this.base}/admin/audit`, {
+      params,
+    });
   }
 }

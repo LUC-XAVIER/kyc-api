@@ -145,6 +145,11 @@ caller is manager-level. Audit-log entries now record the real actor
 | `GET /kyc/monitoring/drift` | API key *(see §9)* | face-match drift report |
 | `GET /agents` · `POST /agents` · `PATCH /agents/{id}` | **manager** | staff management |
 | `GET /api-keys` · `POST /api-keys` · `DELETE /api-keys/{id}` | **manager** | key management |
+| `GET /admin/stats` | **platform admin** | cross-tenant Overview totals |
+| `GET /admin/mfis` | **platform admin** | every MFI + rollup counts |
+| `GET /admin/mfis/{id}` | **platform admin** | one MFI drill-down |
+| `PATCH /admin/mfis/{id}/status` | **platform admin** | enable/disable an MFI (audited) |
+| `GET /admin/audit` | **platform admin** | platform-wide audit trail (paginated) |
 
 ### Verification images
 The detail response carries `available_images` — the kinds actually stored
@@ -166,6 +171,23 @@ password.`) so the endpoint can't be used to enumerate accounts.
 `Verification.agent_id` and `submission_method = DASHBOARD` and audits the
 agent; a machine (API-key) call stays `submission_method = API` / actor
 `SYSTEM`.
+
+### Platform admin (Openxtech, cross-tenant)
+The `ADMIN` role is the Openxtech operator who oversees **every** MFI, so —
+unlike a manager — an admin belongs to **no** MFI: `users.mfi_account_id` is
+now nullable and null for the admin (migration `d3e4f5a6b7c8`). Seed one with
+`python -m scripts.seed_admin`. The `/admin/*` routes are gated by
+`require_platform_admin` (`role == ADMIN`) and never apply per-tenant scoping.
+`GET /admin/stats` aggregates platform totals (MFI/verification/user counts,
+plan mix, last-14-day bars, quota warnings); `GET /admin/mfis[/{id}]` list and
+drill into accounts. `PATCH /admin/mfis/{id}/status` flips an account between
+`ACTIVE` and `SUSPENDED` and audits it (`mfi.suspended`/`mfi.reactivated`).
+`GET /admin/audit` returns the platform-wide audit trail (newest first,
+`limit`/`offset` paginated), each row joined to its MFI name — the same
+immutable `audit_logs` the suspend/reactivate actions above write to.
+**Suspension is enforced at authentication**: a `SUSPENDED` MFI's staff can no
+longer log in and its API keys are rejected (both raise `401`). A platform
+admin has no MFI, so this check never blocks them.
 
 ---
 

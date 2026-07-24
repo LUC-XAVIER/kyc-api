@@ -1,0 +1,350 @@
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar__brand">
+        <div class="sidebar__logo">X</div>
+        <div class="sidebar__brandname">Openxtech</div>
+        <span class="sidebar__role">ADMIN</span>
+      </div>
+
+      @for (sec of nav; track sec.section) {
+        <div class="nav-section">{{ sec.section }}</div>
+        @for (item of sec.items; track item.id) {
+          <button class="nav-item" [class.is-active]="isActive(item.id)" (click)="setPage(item.id)">
+            <span class="nav-item__glyph">{{ item.glyph }}</span>
+            <span>{{ item.label }}</span>
+          </button>
+        }
+      }
+    </div>
+
+    <div>
+      <button class="logout-btn" (click)="logout()">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+        Log out
+      </button>
+      <div class="sidebar__user">
+        <div class="avatar">{{ userInitials() }}</div>
+        <div>
+          <div class="sidebar__username">{{ user()?.full_name || 'Admin' }}</div>
+          <div class="sidebar__usermeta">Platform Administrator</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar__titles">
+        <div class="topbar__title">{{ title()[0] }}</div>
+        <div class="topbar__subtitle">{{ title()[1] }}</div>
+      </div>
+      <div class="topbar__actions">
+        @if (page() === 'mfi-accounts') {
+          <input class="search" placeholder="Search MFI or email"
+            [value]="search()" (input)="search.set($any($event.target).value)" />
+        }
+        <button class="refresh-btn" title="Refresh" (click)="refresh()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- OVERVIEW -->
+      @if (page() === 'overview') {
+        <div class="grid-4">
+          @for (c of overviewCards(); track c.label) {
+            <div class="card stat">
+              <div class="stat__label">{{ c.label }}</div>
+              <div class="stat__value" [style.color]="c.color || null">{{ c.value }}</div>
+              <div class="stat__sub">{{ c.sub }}</div>
+            </div>
+          }
+        </div>
+
+        <div class="grid-2-wide">
+          <div class="card">
+            <div class="card__title">Daily verifications</div>
+            <div class="card__sub">Last 14 days · all MFIs</div>
+            <div class="bars">
+              @for (b of dayBars(); track $index) {
+                <div class="bar-col" [title]="b.tip">
+                  <div class="bar" [style.height.px]="b.h"></div>
+                  <div class="bar-label">{{ b.label }}</div>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__title">MFI quota usage</div>
+            <div class="card__sub">Highest consumption first</div>
+            <div class="quota-list">
+              @for (q of quotaRows(); track q.id) {
+                <div class="quota-row">
+                  <div class="quota-row__head">
+                    <span><b>{{ q.name }}</b> <span class="muted">· {{ q.plan }}</span></span>
+                    <span class="quota-row__pct">{{ q.pct }}%
+                      <span class="pill" [style.color]="q.color">● {{ q.band }}</span>
+                    </span>
+                  </div>
+                  <div class="track"><div class="track__fill" [style.width.%]="q.pct > 100 ? 100 : q.pct" [style.background]="q.color"></div></div>
+                </div>
+              } @empty {
+                <div class="muted">No metered MFIs yet.</div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card__title">Subscribers by plan</div>
+            <div class="donut-wrap">
+              <div class="donut" [attr.style]="donutStyle()"><div class="donut__hole"></div></div>
+              <div class="legend">
+                @for (s of donut(); track s.plan) {
+                  <div class="legend__row">
+                    <span class="dot" [style.background]="s.color"></span>
+                    <span class="legend__label">{{ s.plan }}</span>
+                    <span class="legend__val">{{ s.count }} · {{ s.pct }}%</span>
+                  </div>
+                } @empty {
+                  <div class="muted">No subscriptions yet.</div>
+                }
+              </div>
+            </div>
+          </div>
+
+          <div class="card placeholder-inline">
+            <div class="card__title">Platform alerts</div>
+            <div class="card__sub">Derived from quota usage</div>
+            <div class="alert-list">
+              @for (q of quotaRows(); track q.id) {
+                @if (q.pct >= 80) {
+                  <div class="alert" [class.alert--crit]="q.pct >= 100">
+                    <span>{{ q.pct >= 100 ? '⛔' : '⚠' }}</span>
+                    <span><b>{{ q.name }}</b> is at {{ q.pct }}% of its {{ q.plan }} quota.</span>
+                  </div>
+                }
+              } @empty {
+                <div class="muted">Nothing needs attention.</div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MFI ACCOUNTS -->
+      @if (page() === 'mfi-accounts') {
+        <div class="grid-4">
+          @for (c of accountCards(); track c.label) {
+            <div class="card stat">
+              <div class="stat__label">{{ c.label }}</div>
+              <div class="stat__value" [style.color]="c.color || null">{{ c.value }}</div>
+            </div>
+          }
+        </div>
+
+        <div class="filter-row">
+          @for (f of filters(); track f.id) {
+            <button class="chip" [class.is-active]="mfiFilter() === f.id" (click)="setFilter(f.id)">{{ f.label }}</button>
+          }
+        </div>
+
+        <div class="card mfi-table">
+          <div class="mfi-table__head">
+            <div>INSTITUTION</div><div>PLAN</div><div>STATUS</div><div>QUOTA</div>
+            <div>VERIFS</div><div>USERS</div><div>KEYS</div><div>JOINED</div><div>ACTIONS</div>
+          </div>
+          @for (r of rows(); track r.id) {
+            <div class="mfi-table__row">
+              <div class="cell-inst">
+                <div class="cell-inst__name" (click)="openMfi(r.id)">{{ r.name }}</div>
+                <div class="cell-inst__meta">{{ r.email }} · {{ r.branches }} branch(es)</div>
+              </div>
+              <div>
+                @if (r.plan) {
+                  <span class="plan-tag" [style.color]="r.planColor" [style.background]="r.planColor + '22'">{{ r.plan }}</span>
+                } @else { <span class="muted">—</span> }
+              </div>
+              <div class="cell-status" [style.color]="statusColor(r.status)">● {{ r.status }}</div>
+              <div>
+                @if (r.quota) {
+                  <div class="cell-quota">
+                    <div class="track"><div class="track__fill" [style.width.%]="r.quotaPct" [style.background]="statusColor(r.status)"></div></div>
+                    <span class="cell-quota__label">{{ r.quotaLabel }}</span>
+                  </div>
+                } @else { <span class="muted">—</span> }
+              </div>
+              <div>{{ r.verifications }}</div>
+              <div>{{ r.users }}</div>
+              <div>{{ r.apiKeys }}</div>
+              <div class="muted">{{ r.joined }}</div>
+              <div class="cell-actions">
+                @if (r.status === 'SUSPENDED') {
+                  <button class="btn btn--ok" [disabled]="busyId() === r.id" (click)="setStatus(r.id, 'ACTIVE')">Reactivate</button>
+                } @else {
+                  <button class="btn btn--danger" [disabled]="busyId() === r.id" (click)="setStatus(r.id, 'SUSPENDED')">Suspend</button>
+                }
+                <button class="btn btn--ghost" (click)="openMfi(r.id)">View</button>
+              </div>
+            </div>
+          } @empty {
+            <div class="mfi-table__empty">No MFIs match this filter.</div>
+          }
+        </div>
+      }
+
+      <!-- MFI DETAIL -->
+      @if (page() === 'mfi-detail' && detail(); as d) {
+        <div class="detail-actions">
+          <button class="btn btn--ghost" (click)="backToAccounts()">← Back to Accounts</button>
+          @if (d.status === 'SUSPENDED') {
+            <button class="btn btn--ok" [disabled]="busyId() === d.id" (click)="setStatus(d.id, 'ACTIVE')">Reactivate account</button>
+          } @else {
+            <button class="btn btn--danger" [disabled]="busyId() === d.id" (click)="setStatus(d.id, 'SUSPENDED')">Suspend account</button>
+          }
+        </div>
+
+        <div class="card detail-head">
+          <div class="detail-head__avatar">{{ detailInitials() }}</div>
+          <div class="detail-head__id">
+            <div class="detail-head__name">{{ d.name }}</div>
+            <div class="detail-head__meta">{{ d.email }} · {{ d.plan || 'No plan' }} · joined {{ d.created_at | date: 'mediumDate' }}</div>
+          </div>
+          <span class="cell-status" [style.color]="statusColor(d.status)">● {{ d.status }}</span>
+        </div>
+
+        <div class="grid-2-wide">
+          <div>
+            <div class="card plan-card">
+              <div class="plan-card__head">
+                <div class="card__title">{{ d.plan || 'No' }} plan</div>
+                <span class="pct-big">{{ detailUsedPct() }}%</span>
+              </div>
+              <div class="card__sub">{{ detailPlanLine() }}</div>
+              <div class="track track--lg"><div class="track__fill" [style.width.%]="detailUsedPct()" [style.background]="detailUsedPct() >= 80 ? '#f5a524' : '#22c55e'"></div></div>
+              <div class="card__sub">{{ d.usage }} used this cycle{{ d.quota ? ' of ' + d.quota : '' }}</div>
+            </div>
+
+            <div class="grid-3 tight">
+              <div class="card stat"><div class="stat__label">THIS MONTH</div><div class="stat__value sm">{{ d.this_month }}</div></div>
+              <div class="card stat"><div class="stat__label">LAST MONTH</div><div class="stat__value sm">{{ d.last_month }}</div></div>
+              <div class="card stat"><div class="stat__label">AVG / DAY</div><div class="stat__value sm">{{ d.avg_per_day }}</div></div>
+            </div>
+
+            <div class="card">
+              <div class="card__title">API keys</div>
+              @for (k of d.api_keys; track k.prefix) {
+                <div class="key-row">
+                  <span class="mono">{{ k.prefix }}…</span>
+                  <span class="pill" [style.color]="k.is_active ? '#22c55e' : 'rgba(242,243,246,.4)'">● {{ k.is_active ? 'Active' : 'Revoked' }}</span>
+                  <span class="muted">{{ k.last_used_at ? 'used ' + (k.last_used_at | date: 'shortDate') : 'never used' }}</span>
+                </div>
+              } @empty {
+                <div class="muted">No API keys.</div>
+              }
+            </div>
+
+            <div class="card">
+              <div class="card__title">Verification performance</div>
+              @for (p of detailPerf(); track p.label) {
+                <div class="perf-row">
+                  <span class="muted">{{ p.label }}</span>
+                  <b [style.color]="p.color">{{ p.value }}</b>
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__title">Staff accounts</div>
+            <div class="card__sub">{{ d.agents.length }} account(s)</div>
+            <div class="agent-list">
+              @for (a of d.agents; track a.id) {
+                <div class="agent-row">
+                  <div class="avatar avatar--sm">{{ agentInitials(a.full_name) }}</div>
+                  <div class="agent-row__id">
+                    <div class="agent-row__name">{{ a.full_name }}</div>
+                    <div class="muted">{{ a.role }} · {{ a.branch || 'no branch' }}</div>
+                  </div>
+                  <div class="agent-row__right">
+                    <div>{{ a.verifications }} verifs</div>
+                    <div class="pill" [style.color]="a.status === 'ACTIVE' ? '#22c55e' : 'rgba(242,243,246,.4)'">● {{ a.status }}</div>
+                  </div>
+                </div>
+              } @empty {
+                <div class="muted">No staff accounts.</div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- AUDIT LOGS -->
+      @if (page() === 'audit-logs') {
+        <div class="grid-3">
+          <div class="card stat"><div class="stat__label">ENTRIES SHOWN</div><div class="stat__value sm">{{ auditCounts().total }}</div></div>
+          <div class="card stat"><div class="stat__label">ADMIN ACTIONS</div><div class="stat__value sm">{{ auditCounts().admin }}</div></div>
+          <div class="card stat"><div class="stat__label">MANUAL REVIEWS</div><div class="stat__value sm">{{ auditCounts().review }}</div></div>
+        </div>
+
+        <div class="filter-row">
+          @for (c of auditCategories; track c) {
+            <button class="chip" [class.is-active]="auditCategory() === c" (click)="setAuditCategory(c)">{{ c }}</button>
+          }
+        </div>
+
+        <div class="card audit-list-card">
+          @for (r of auditRows(); track r.id) {
+            <div class="audit-row">
+              <div class="audit-row__icon">{{ r.icon }}</div>
+              <div class="audit-row__body">
+                <div class="audit-row__title">{{ r.title }}</div>
+                <div class="muted audit-row__meta">{{ r.meta }}</div>
+              </div>
+              <div class="muted audit-row__time">{{ r.time }}</div>
+            </div>
+          } @empty {
+            <div class="mfi-table__empty">No audit entries in this category.</div>
+          }
+          @if (auditRows().length && auditLimit() < 200) {
+            <div class="audit-more">
+              <button class="btn btn--ghost" (click)="loadMoreAudit()">Load more</button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- DEFERRED SECTIONS -->
+      @if (isDeferred()) {
+        <div class="card placeholder">
+          <div class="placeholder__icon">🚧</div>
+          <div class="placeholder__title">{{ title()[0] }} — coming soon</div>
+          <p class="placeholder__body">
+            This section will surface real model-monitoring and operations metrics
+            once that pipeline is in place. It's intentionally left empty rather
+            than showing sample numbers that aren't real.
+          </p>
+        </div>
+      }
+    </div>
+  </main>
+
+  @if (toast()) {
+    <div class="toast">{{ toast() }}</div>
+  }
+</div>

@@ -18,6 +18,8 @@ VERIFICATION_PROCESSED = "verification.processed"
 REVIEW_APPROVED = "review.approved"
 REVIEW_REJECTED = "review.rejected"
 REPORT_GENERATED = "report.generated"
+MFI_SUSPENDED = "mfi.suspended"
+MFI_REACTIVATED = "mfi.reactivated"
 
 
 def record(

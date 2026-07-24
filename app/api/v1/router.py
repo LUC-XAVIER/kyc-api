@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from app.api.v1.routes import (
     account,
+    admin,
     agents,
     api_keys,
     auth,
@@ -34,3 +35,4 @@ api_router.include_router(reviews.router)
 api_router.include_router(verifications.router)
 api_router.include_router(reports.router)
 api_router.include_router(monitoring.router)
+api_router.include_router(admin.router)

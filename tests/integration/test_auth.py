@@ -11,11 +11,21 @@ from fastapi.security.http import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_agent, require_manager
+from app.api.v1.deps import (
+    get_current_agent,
+    get_current_mfi,
+    require_manager,
+    require_platform_admin,
+)
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, AuthorizationError
-from app.core.security import create_access_token, decode_access_token
-from app.models.enums import AgentRole, AgentStatus
+from app.core.security import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+)
+from app.models import User
+from app.models.enums import AgentRole, AgentStatus, MfiStatus
 from tests.factories import create_agent, create_mfi_with_key
 
 ACCOUNT_URL = "/api/v1/account"
@@ -311,6 +321,78 @@ def test_require_manager_forbids_plain_agent(
     agent = create_agent(db_session, mfi, role=AgentRole.AGENT)
     with pytest.raises(AuthorizationError):
         require_manager(agent=agent)
+
+
+def _create_admin(
+    db_session: Session, email: str = "admin@openxtech.cm"
+) -> User:
+    """Seed a tenant-less platform admin (mfi_account_id is null)."""
+    admin = User(
+        full_name="Admin Openxtech",
+        mfi_account_id=None,
+        email=email,
+        hashed_pin=hash_password("123456"),
+        role=AgentRole.ADMIN,
+    )
+    db_session.add(admin)
+    db_session.flush()
+    return admin
+
+
+def test_require_platform_admin_allows_admin(db_session: Session) -> None:
+    """A platform admin passes the admin-only gate."""
+    admin = _create_admin(db_session)
+    assert require_platform_admin(agent=admin) is admin
+
+
+def test_require_platform_admin_forbids_manager(db_session: Session) -> None:
+    """A mere MFI manager cannot reach admin-only routes."""
+    mfi, _ = create_mfi_with_key(db_session)
+    manager = create_agent(db_session, mfi, role=AgentRole.MANAGER)
+    with pytest.raises(AuthorizationError):
+        require_platform_admin(agent=manager)
+
+
+def test_admin_logs_in_with_no_mfi(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """The tenant-less admin signs in; its token carries no MFI id."""
+    _create_admin(db_session, email="admin@openxtech.cm")
+    resp = api_client.post(
+        LOGIN_URL,
+        json={"identifier": "admin@openxtech.cm", "pin": "123456"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["role"] == "ADMIN"
+    assert body["mfi_account_id"] is None
+
+
+def test_login_blocked_when_mfi_suspended(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Suspending an MFI locks its staff out of the dashboard."""
+    mfi, _ = create_mfi_with_key(db_session)
+    create_agent(db_session, mfi, email="mgr@mfi.cm", pin="483920")
+    mfi.status = MfiStatus.SUSPENDED
+    db_session.flush()
+
+    resp = api_client.post(
+        LOGIN_URL,
+        json={"identifier": "mgr@mfi.cm", "pin": "483920"},
+    )
+    assert resp.status_code == 401
+    assert "suspended" in resp.json()["error"]["message"].lower()
+
+
+def test_api_key_rejected_when_mfi_suspended(db_session: Session) -> None:
+    """A suspended MFI's API key is refused at the gateway too."""
+    mfi, full_key = create_mfi_with_key(db_session)
+    mfi.status = MfiStatus.SUSPENDED
+    db_session.flush()
+
+    with pytest.raises(AuthenticationError):
+        get_current_mfi(api_key=full_key, db=db_session)
 
 
 # --- Dashboard account access (bearer) + profile ------------------------
