@@ -38,17 +38,17 @@ describe('AdminLoginComponent', () => {
   });
 
   it('submits the entered email and PIN', () => {
-    component.email.set('admin@openxtech.cm');
+    component.email.set('admin@example.com');
     component.pin.set('123456');
     component.submit();
-    expect(auth.login).toHaveBeenCalledWith('admin@openxtech.cm', '123456');
+    expect(auth.login).toHaveBeenCalledWith('admin@example.com', '123456');
   });
 
   it('surfaces the API error message on failure', () => {
     auth.login.and.returnValue(
       throwError(() => ({ error: { error: { message: 'Invalid credentials.' } } })),
     );
-    component.email.set('admin@openxtech.cm');
+    component.email.set('admin@example.com');
     component.pin.set('000000');
     component.submit();
     expect(component.error()).toContain('Invalid credentials');

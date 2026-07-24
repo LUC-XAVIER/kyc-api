@@ -84,7 +84,7 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "users"
 
-    # Nullable: a platform admin (Openxtech staff, role ADMIN) belongs to no
+    # Nullable: a platform admin (role ADMIN) belongs to no
     # single MFI — they oversee all of them. Every MFI-staff account (agent or
     # manager) always has one; only the cross-tenant admin leaves it null.
     mfi_account_id: Mapped[uuid.UUID | None] = mapped_column(

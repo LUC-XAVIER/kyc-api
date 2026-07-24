@@ -153,7 +153,7 @@ def require_manager(
 def require_platform_admin(
     agent: User = Depends(get_current_agent),
 ) -> User:
-    """Authorize an Openxtech platform-admin, cross-tenant action.
+    """Authorize a platform-admin, cross-tenant action.
 
     Distinct from :func:`require_manager`: an MFI manager governs their own
     tenant, whereas an ``ADMIN`` oversees every MFI and is bound to none.

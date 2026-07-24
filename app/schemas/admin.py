@@ -1,4 +1,4 @@
-"""Schemas for the Openxtech platform-admin dashboard.
+"""Schemas for the platform-admin dashboard.
 
 These are *cross-tenant*: they summarise every MFI on the platform, unlike
 the per-tenant dashboard schemas. All are served behind
