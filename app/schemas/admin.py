@@ -128,6 +128,79 @@ class MfiStatusUpdate(BaseModel):
     status: MfiStatus
 
 
+class ScoreBucket(BaseModel):
+    """One bar of a 0.0–1.0 score histogram."""
+
+    label: str
+    count: int
+
+
+class PerMfiScore(BaseModel):
+    """A single MFI's aggregate model scores (to spot weak populations)."""
+
+    name: str
+    evaluated: int
+    avg_score: float | None
+    verified_rate: float | None  # fraction 0..1
+
+
+class FaceMatchingReport(BaseModel):
+    """Cross-tenant face-match metrics from stored results."""
+
+    evaluated: int
+    avg_score: float | None
+    threshold: float | None
+    verified_rate: float | None
+    distribution: list[ScoreBucket]
+    per_mfi: list[PerMfiScore]
+
+
+class AntiSpoofReport(BaseModel):
+    """Cross-tenant liveness / anti-spoof metrics from stored results."""
+
+    evaluated: int
+    avg_score: float | None
+    pass_rate: float | None
+    spoof_flagged: int
+    distribution: list[ScoreBucket]
+
+
+class OcrFieldAccuracy(BaseModel):
+    """Average OCR confidence for one NIC field."""
+
+    field: str
+    avg_confidence: float
+    samples: int
+
+
+class OcrReport(BaseModel):
+    """Cross-tenant OCR confidence, aggregated from field_confidences."""
+
+    evaluated: int
+    avg_confidence: float | None
+    per_field: list[OcrFieldAccuracy]
+
+
+class DuplicateReport(BaseModel):
+    """Duplicate-detector footprint and flag outcomes."""
+
+    index_size: int  # stored face embeddings
+    flags: int
+    avg_similarity: float | None
+    confirmed: int
+    dismissed: int
+    pending: int
+
+
+class ModelHealthReport(BaseModel):
+    """Everything the model-monitoring screens render, all real data."""
+
+    face_matching: FaceMatchingReport
+    anti_spoofing: AntiSpoofReport
+    ocr: OcrReport
+    duplicate: DuplicateReport
+
+
 class AdminAuditEntry(BaseModel):
     """One immutable audit-log row, with its MFI resolved to a name."""
 

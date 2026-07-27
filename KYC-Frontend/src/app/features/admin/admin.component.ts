@@ -17,7 +17,9 @@ import {
   AdminMfiDetail,
   AdminMfiSummary,
   MfiStatus,
+  ModelHealthReport,
   PlatformStats,
+  ScoreBucket,
 } from '../../core/models';
 
 type AdminPage =
@@ -77,13 +79,14 @@ const NAV: NavSection[] = [
 ];
 
 /** Pages not yet backed by real data — shown as a labelled placeholder. */
-const DEFERRED = new Set<AdminPage>([
+const DEFERRED = new Set<AdminPage>(['api-performance', 'system-health']);
+
+/** Pages whose data comes from GET /admin/models. */
+const MODEL_PAGES = new Set<AdminPage>([
   'model-health',
   'face-matching',
   'anti-spoofing',
   'ocr-engine',
-  'api-performance',
-  'system-health',
 ]);
 
 /** How each audit action string is rendered in the log. */
@@ -113,10 +116,10 @@ const TITLES: Record<AdminPage, [string, string]> = {
   overview: ['Platform Overview', 'Every MFI on the platform, at a glance'],
   'mfi-accounts': ['MFI Accounts', 'All registered institutions'],
   'mfi-detail': ['MFI Detail', 'Account drill-down'],
-  'model-health': ['Model Health', 'Coming with model monitoring'],
-  'face-matching': ['Face Matching', 'Coming with model monitoring'],
-  'anti-spoofing': ['Anti-Spoofing', 'Coming with model monitoring'],
-  'ocr-engine': ['OCR Engine', 'Coming with model monitoring'],
+  'model-health': ['Model Health', 'Live metrics from stored pipeline results'],
+  'face-matching': ['Face Matching', 'ArcFace — from stored match scores'],
+  'anti-spoofing': ['Anti-Spoofing', 'Liveness — from stored anti-spoof scores'],
+  'ocr-engine': ['OCR Engine', 'Field confidence — from stored OCR results'],
   'api-performance': ['API Performance', 'Coming with operations metrics'],
   'system-health': ['System Health', 'Coming with operations metrics'],
   'audit-logs': ['Audit Logs', 'Immutable platform-wide action trail'],
@@ -233,6 +236,8 @@ export class AdminComponent implements OnDestroy {
   readonly auditLimit = signal(50);
   readonly auditCategories = AUDIT_CATEGORIES;
 
+  readonly models = signal<ModelHealthReport | null>(null);
+
   readonly theme = signal<'dark' | 'light'>(
     localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark',
   );
@@ -287,6 +292,7 @@ export class AdminComponent implements OnDestroy {
     if (p === 'mfi-accounts') this.loadMfis();
     if (p === 'audit-logs') this.loadAudit();
     if (p === 'security') this.loadTwoFa();
+    if (MODEL_PAGES.has(p)) this.loadModels();
     this.loading.stop();
   }
 
@@ -299,6 +305,7 @@ export class AdminComponent implements OnDestroy {
     else if (this.page() === 'mfi-accounts') this.loadMfis();
     else if (this.page() === 'audit-logs') this.loadAudit();
     else if (this.page() === 'security') this.loadTwoFa();
+    else if (MODEL_PAGES.has(this.page())) this.loadModels();
     else if (this.page() === 'mfi-detail' && this.detail())
       this.openMfi(this.detail()!.id);
   }
@@ -328,6 +335,56 @@ export class AdminComponent implements OnDestroy {
       error: () => undefined,
     });
   }
+
+  // ---- Model monitoring ----
+  loadModels(): void {
+    this.api.getModelHealth().subscribe({
+      next: (m) => this.models.set(m),
+      error: () => undefined,
+    });
+  }
+
+  /** Percent string from a 0..1 fraction (or "—"). */
+  pctOf(frac: number | null | undefined): string {
+    return frac == null ? '—' : `${Math.round(frac * 100)}%`;
+  }
+
+  /** Histogram bars sized to the tallest bin; optional red/green split. */
+  histBars(
+    dist: ScoreBucket[],
+    threshold: number | null = null,
+  ): { h: number; color: string; label: string; count: number }[] {
+    const max = Math.max(1, ...dist.map((b) => b.count));
+    return dist.map((b) => {
+      const below = threshold != null && parseFloat(b.label) < threshold;
+      return {
+        h: Math.round((b.count / max) * 150),
+        color: threshold == null ? '#8b5cf6' : below ? '#e5484d' : '#22c55e',
+        label: b.label,
+        count: b.count,
+      };
+    });
+  }
+
+  /** A traffic-light status for a model, from a 0..1 quality fraction. */
+  modelStatus(frac: number | null): { label: string; color: string } {
+    if (frac == null) return { label: 'No data', color: 'rgba(148,148,148,.8)' };
+    if (frac >= 0.9) return { label: 'Healthy', color: '#22c55e' };
+    if (frac >= 0.75) return { label: 'Monitor', color: '#f5a524' };
+    return { label: 'Review', color: '#e5484d' };
+  }
+
+  /** Field-confidence bars for the OCR page (worst first). */
+  readonly ocrFields = computed(() =>
+    (this.models()?.ocr.per_field ?? [])
+      .slice()
+      .sort((a, b) => a.avg_confidence - b.avg_confidence)
+      .map((f) => ({
+        field: f.field,
+        pct: Math.round(f.avg_confidence * 100),
+        color: f.avg_confidence >= 0.9 ? '#22c55e' : '#f5a524',
+      })),
+  );
 
   // ---- Two-factor auth ----
   loadTwoFa(): void {

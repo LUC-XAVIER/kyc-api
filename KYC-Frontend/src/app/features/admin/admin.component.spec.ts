@@ -153,6 +153,55 @@ describe('AdminComponent', () => {
     expect(component.isDeferred()).toBeTrue();
   });
 
+  it('loads real model metrics for the monitoring pages', () => {
+    component.setPage('face-matching');
+    http.expectOne((r) => r.url.endsWith('/admin/models')).flush({
+      face_matching: {
+        evaluated: 3,
+        avg_score: 0.82,
+        threshold: 0.4,
+        verified_rate: 0.9,
+        distribution: Array.from({ length: 10 }, (_, i) => ({
+          label: (i / 10).toFixed(1),
+          count: i,
+        })),
+        per_mfi: [
+          { name: 'MFI One', evaluated: 3, avg_score: 0.82, verified_rate: 0.9 },
+        ],
+      },
+      anti_spoofing: {
+        evaluated: 3,
+        avg_score: 0.95,
+        pass_rate: 1,
+        spoof_flagged: 0,
+        distribution: [],
+      },
+      ocr: {
+        evaluated: 3,
+        avg_confidence: 0.97,
+        per_field: [
+          { field: 'full_name', avg_confidence: 0.97, samples: 3 },
+          { field: 'place_of_birth', avg_confidence: 0.8, samples: 3 },
+        ],
+      },
+      duplicate: {
+        index_size: 5,
+        flags: 1,
+        avg_similarity: 0.7,
+        confirmed: 0,
+        dismissed: 1,
+        pending: 0,
+      },
+    });
+    expect(component.isDeferred()).toBeFalse();
+    expect(component.models()?.face_matching.evaluated).toBe(3);
+    // Threshold split colours the histogram bars.
+    const bars = component.histBars([{ label: '0.3', count: 2 }], 0.4);
+    expect(bars[0].color).toBe('#e5484d');
+    // OCR fields sorted weakest-first.
+    expect(component.ocrFields()[0].field).toBe('place_of_birth');
+  });
+
   it('loads and categorises the audit log', () => {
     component.setPage('audit-logs');
     http.expectOne((r) => r.url.endsWith('/admin/audit')).flush([

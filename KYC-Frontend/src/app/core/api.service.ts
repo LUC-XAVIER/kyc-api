@@ -10,6 +10,7 @@ import {
   AdminMfiDetail,
   AdminMfiSummary,
   AgentProfile,
+  ModelHealthReport,
   AgentSummary,
   ApiKeyCreated,
   ApiKeySummary,
@@ -208,6 +209,10 @@ export class ApiService {
       `${this.base}/admin/mfis/${id}/status`,
       { status },
     );
+  }
+
+  getModelHealth(): Observable<ModelHealthReport> {
+    return this.http.get<ModelHealthReport>(`${this.base}/admin/models`);
   }
 
   listAdminAudit(limit = 50, offset = 0): Observable<AdminAuditEntry[]> {
