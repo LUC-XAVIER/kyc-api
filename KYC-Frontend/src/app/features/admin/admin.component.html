@@ -243,7 +243,7 @@
         </div>
 
         <div class="grid-2-wide">
-          <div>
+          <div class="stack">
             <div class="card plan-card">
               <div class="plan-card__head">
                 <div class="card__title">{{ d.plan || 'No' }} plan</div>
@@ -254,7 +254,7 @@
               <div class="card__sub">{{ d.usage }} used this cycle{{ d.quota ? ' of ' + d.quota : '' }}</div>
             </div>
 
-            <div class="grid-3 tight">
+            <div class="grid-3">
               <div class="card stat"><div class="stat__label">THIS MONTH</div><div class="stat__value sm">{{ d.this_month }}</div></div>
               <div class="card stat"><div class="stat__label">LAST MONTH</div><div class="stat__value sm">{{ d.last_month }}</div></div>
               <div class="card stat"><div class="stat__label">AVG / DAY</div><div class="stat__value sm">{{ d.avg_per_day }}</div></div>
@@ -338,6 +338,75 @@
           @if (auditRows().length && auditLimit() < 200) {
             <div class="audit-more">
               <button class="btn btn--ghost" (click)="loadMoreAudit()">Load more</button>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- SECURITY (2FA) -->
+      @if (page() === 'security') {
+        <div class="card twofa">
+          <div class="twofa__head">
+            <div>
+              <div class="card__title">Two-factor authentication</div>
+              <div class="card__sub">
+                Require a time-based code from an authenticator app in addition
+                to your PIN. Strongly recommended for the platform admin.
+              </div>
+            </div>
+            @if (twoFaEnabled() !== null) {
+              <span class="pill" [style.color]="twoFaEnabled() ? '#22c55e' : '#f5a524'">
+                ● {{ twoFaEnabled() ? 'Enabled' : 'Disabled' }}
+              </span>
+            }
+          </div>
+
+          @if (twoFaMsg()) { <div class="twofa__ok">{{ twoFaMsg() }}</div> }
+          @if (twoFaError()) { <div class="twofa__err">{{ twoFaError() }}</div> }
+
+          <!-- Not enrolled, not mid-setup -->
+          @if (twoFaEnabled() === false && !twoFaSetup()) {
+            <button class="btn btn--danger twofa__cta" [disabled]="twoFaBusy()" (click)="startTwoFaSetup()">
+              {{ twoFaBusy() ? 'Preparing…' : 'Set up two-factor' }}
+            </button>
+          }
+
+          <!-- Mid-setup: scan + confirm -->
+          @if (twoFaSetup(); as s) {
+            <div class="twofa__setup">
+              <div class="twofa__qr">
+                <img [src]="twoFaQr()" alt="Authenticator QR code" width="180" height="180" />
+              </div>
+              <div class="twofa__steps">
+                <p>1. Scan the QR with Google Authenticator, Authy, or 1Password.</p>
+                <p>2. Or enter this key manually:</p>
+                <div class="twofa__secret mono">{{ s.secret }}</div>
+                <p>3. Enter the 6-digit code it shows:</p>
+                <div class="twofa__confirm">
+                  <input class="search twofa__code" inputmode="numeric" maxlength="6"
+                    placeholder="123456" [value]="twoFaCode()"
+                    (input)="twoFaCode.set($any($event.target).value)" />
+                  <button class="btn btn--ok" [disabled]="twoFaBusy()" (click)="confirmTwoFa()">
+                    {{ twoFaBusy() ? 'Verifying…' : 'Enable' }}
+                  </button>
+                  <button class="btn btn--ghost" (click)="cancelTwoFaSetup()">Cancel</button>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Enrolled: allow disabling -->
+          @if (twoFaEnabled() === true && !twoFaSetup()) {
+            <div class="twofa__disable">
+              <p class="card__sub">Enter a current code to turn two-factor off.</p>
+              <div class="twofa__confirm">
+                <input class="search twofa__code" inputmode="numeric" maxlength="6"
+                  placeholder="123456" [value]="twoFaCode()"
+                  (input)="twoFaCode.set($any($event.target).value)" />
+                <button class="btn btn--danger" [disabled]="twoFaBusy()" (click)="disableTwoFa()">
+                  {{ twoFaBusy() ? 'Working…' : 'Disable 2FA' }}
+                </button>
+              </div>
             </div>
           }
         </div>

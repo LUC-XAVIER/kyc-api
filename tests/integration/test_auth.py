@@ -6,6 +6,7 @@ staff login (email/password -> JWT) plus its role dependencies.
 
 from datetime import UTC, datetime, timedelta
 
+import pyotp
 import pytest
 from fastapi.security.http import HTTPAuthorizationCredentials
 from fastapi.testclient import TestClient
@@ -366,6 +367,123 @@ def test_admin_logs_in_with_no_mfi(
     body = resp.json()
     assert body["role"] == "ADMIN"
     assert body["mfi_account_id"] is None
+
+
+def _admin_bearer(db_session: Session, email: str) -> tuple:
+    """Create a platform admin and return (admin, bearer headers)."""
+    admin = _create_admin(db_session, email=email)
+    token = create_access_token(subject=str(admin.id), role="ADMIN")
+    return admin, _bearer_headers(token)
+
+
+def test_two_factor_setup_is_admin_only(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A mere manager cannot reach the 2FA enrolment endpoints."""
+    mfi, _ = create_mfi_with_key(db_session)
+    manager = create_agent(db_session, mfi, role=AgentRole.MANAGER)
+    token = create_access_token(subject=str(manager.id), role="MANAGER")
+    resp = api_client.post(
+        "/api/v1/auth/2fa/setup", headers=_bearer_headers(token)
+    )
+    assert resp.status_code == 403
+
+
+def test_two_factor_enrol_then_two_step_login(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Enrol in 2FA, then a login needs the password *and* a fresh code."""
+    _, headers = _admin_bearer(db_session, "admin@2fa.cm")
+
+    setup = api_client.post("/api/v1/auth/2fa/setup", headers=headers)
+    assert setup.status_code == 200
+    secret = setup.json()["secret"]
+    assert setup.json()["qr"].startswith("data:image/svg+xml;base64,")
+
+    enable = api_client.post(
+        "/api/v1/auth/2fa/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers=headers,
+    )
+    assert enable.status_code == 200
+
+    # Step 1: password alone yields a challenge, no session token.
+    step1 = api_client.post(
+        LOGIN_URL, json={"identifier": "admin@2fa.cm", "pin": "123456"}
+    )
+    body = step1.json()
+    assert body["mfa_required"] is True
+    assert body["access_token"] == ""
+    mfa_token = body["mfa_token"]
+
+    # Step 2: the code completes the login.
+    step2 = api_client.post(
+        "/api/v1/auth/login/verify",
+        json={"mfa_token": mfa_token, "code": pyotp.TOTP(secret).now()},
+    )
+    assert step2.status_code == 200
+    assert step2.json()["access_token"]
+    assert step2.json()["mfa_required"] is False
+
+
+def test_two_factor_verify_rejects_a_bad_code(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A wrong TOTP code at step 2 is refused."""
+    _, headers = _admin_bearer(db_session, "admin@bad.cm")
+    secret = api_client.post(
+        "/api/v1/auth/2fa/setup", headers=headers
+    ).json()["secret"]
+    api_client.post(
+        "/api/v1/auth/2fa/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers=headers,
+    )
+    mfa_token = api_client.post(
+        LOGIN_URL, json={"identifier": "admin@bad.cm", "pin": "123456"}
+    ).json()["mfa_token"]
+
+    resp = api_client.post(
+        "/api/v1/auth/login/verify",
+        json={"mfa_token": mfa_token, "code": "000000"},
+    )
+    assert resp.status_code == 401
+
+
+def test_two_factor_disable_needs_a_code(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """Disabling 2FA requires a valid code, then normal login resumes."""
+    _, headers = _admin_bearer(db_session, "admin@off.cm")
+    secret = api_client.post(
+        "/api/v1/auth/2fa/setup", headers=headers
+    ).json()["secret"]
+    api_client.post(
+        "/api/v1/auth/2fa/enable",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers=headers,
+    )
+
+    bad = api_client.post(
+        "/api/v1/auth/2fa/disable",
+        json={"code": "000000"},
+        headers=headers,
+    )
+    assert bad.status_code == 400
+
+    ok = api_client.post(
+        "/api/v1/auth/2fa/disable",
+        json={"code": pyotp.TOTP(secret).now()},
+        headers=headers,
+    )
+    assert ok.status_code == 200
+
+    # 2FA off -> the password login returns a token directly again.
+    login = api_client.post(
+        LOGIN_URL, json={"identifier": "admin@off.cm", "pin": "123456"}
+    )
+    assert login.json()["mfa_required"] is False
+    assert login.json()["access_token"]
 
 
 def test_login_blocked_when_mfi_suspended(

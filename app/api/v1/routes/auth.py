@@ -6,13 +6,15 @@ on dashboard endpoints. This is separate from the ``X-API-Key`` gateway
 used by MFIs' own software.
 """
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
+import jwt
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_current_agent
+from app.api.v1.deps import get_current_agent, require_platform_admin
 from app.core.config import settings
 from app.core.exceptions import (
     AuthenticationError,
@@ -21,10 +23,16 @@ from app.core.exceptions import (
 )
 from app.core.security import (
     create_access_token,
+    create_mfa_challenge,
+    decode_access_token,
     generate_token,
+    generate_totp_secret,
     hash_password,
     hash_token,
+    totp_provisioning_uri,
+    totp_qr_data_uri,
     verify_password,
+    verify_totp,
 )
 from app.core.validation import try_normalize_cm_phone
 from app.db.session import get_db
@@ -36,8 +44,12 @@ from app.schemas.auth import (
     ForgotPinRequest,
     ForgotPinResponse,
     LoginRequest,
+    MfaVerifyRequest,
     ResetPinRequest,
     TokenResponse,
+    TwoFactorCodeRequest,
+    TwoFactorSetupResponse,
+    TwoFactorStatus,
 )
 from app.services import email as email_service
 
@@ -135,16 +147,63 @@ def login(
         agent.locked_until = None
         db.commit()
 
-    token = create_access_token(
-        subject=str(agent.id), role=agent.role.value
-    )
+    # 2FA gate: the password is correct, but an enrolled account gets no
+    # session token yet — only a challenge to exchange for one with a code.
+    if agent.totp_enabled and agent.totp_secret:
+        return TokenResponse(
+            access_token="",
+            role=agent.role,
+            agent_id=agent.id,
+            full_name=agent.full_name,
+            mfi_account_id=agent.mfi_account_id,
+            mfa_required=True,
+            mfa_token=create_mfa_challenge(str(agent.id)),
+        )
+    return _session_response(agent)
+
+
+def _session_response(agent: User) -> TokenResponse:
+    """Build a full session-token response for an authenticated account."""
     return TokenResponse(
-        access_token=token,
+        access_token=create_access_token(
+            subject=str(agent.id), role=agent.role.value
+        ),
         role=agent.role,
         agent_id=agent.id,
         full_name=agent.full_name,
         mfi_account_id=agent.mfi_account_id,
     )
+
+
+@router.post("/login/verify", response_model=TokenResponse)
+def login_verify(
+    payload: MfaVerifyRequest,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    """Second step of a 2FA login: exchange the challenge + code for a token.
+
+    The ``mfa_token`` proves the password step passed; the ``code`` proves
+    possession of the authenticator. Any failure returns the same generic
+    error as a bad password.
+    """
+    try:
+        claims = decode_access_token(payload.mfa_token)
+        if not claims.get("mfa"):
+            raise AuthenticationError("Invalid credentials.")
+        agent_id = uuid.UUID(claims["sub"])
+    except (jwt.InvalidTokenError, KeyError, ValueError):
+        raise AuthenticationError("Invalid credentials.") from None
+
+    agent = db.get(User, agent_id)
+    if (
+        agent is None
+        or agent.status != AgentStatus.ACTIVE
+        or not agent.totp_enabled
+        or not agent.totp_secret
+        or not verify_totp(agent.totp_secret, payload.code)
+    ):
+        raise AuthenticationError("Invalid credentials.")
+    return _session_response(agent)
 
 
 @router.get("/me", response_model=AgentProfile)
@@ -255,3 +314,69 @@ def change_pin(
     agent.hashed_pin = hash_password(payload.new_pin)
     db.flush()
     return {"status": "changed"}
+
+
+# --- Two-factor authentication (platform admin) -----------------------
+
+
+@router.get("/2fa", response_model=TwoFactorStatus)
+def two_factor_status(
+    admin: User = Depends(require_platform_admin),
+) -> TwoFactorStatus:
+    """Whether 2FA is currently enabled on the admin account."""
+    return TwoFactorStatus(enabled=admin.totp_enabled)
+
+
+@router.post("/2fa/setup", response_model=TwoFactorSetupResponse)
+def two_factor_setup(
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+) -> TwoFactorSetupResponse:
+    """Begin enrolment: mint a secret and return it once for the app to scan.
+
+    Stored but not yet active — the admin must confirm a code via
+    ``/2fa/enable`` before the login challenge turns on. Re-running before
+    enabling simply rotates the pending secret.
+    """
+    if admin.totp_enabled:
+        raise ValidationError("Two-factor is already enabled.")
+    secret = generate_totp_secret()
+    admin.totp_secret = secret
+    db.commit()
+    uri = totp_provisioning_uri(secret, admin.email or "admin")
+    return TwoFactorSetupResponse(
+        secret=secret, otpauth_uri=uri, qr=totp_qr_data_uri(uri)
+    )
+
+
+@router.post("/2fa/enable", status_code=status.HTTP_200_OK)
+def two_factor_enable(
+    payload: TwoFactorCodeRequest,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Confirm enrolment: verify a code against the pending secret."""
+    if not admin.totp_secret:
+        raise ValidationError("Start two-factor setup first.")
+    if not verify_totp(admin.totp_secret, payload.code):
+        raise ValidationError("That code is invalid or expired.")
+    admin.totp_enabled = True
+    db.commit()
+    return {"status": "enabled"}
+
+
+@router.post("/2fa/disable", status_code=status.HTTP_200_OK)
+def two_factor_disable(
+    payload: TwoFactorCodeRequest,
+    admin: User = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Turn 2FA off — a current code is required to do it."""
+    if not admin.totp_enabled or not admin.totp_secret:
+        raise ValidationError("Two-factor is not enabled.")
+    if not verify_totp(admin.totp_secret, payload.code):
+        raise ValidationError("That code is invalid or expired.")
+    admin.totp_enabled = False
+    admin.totp_secret = None
+    db.commit()
+    return {"status": "disabled"}

@@ -12,7 +12,17 @@ export interface Principal {
   role: 'AGENT' | 'MANAGER' | 'ADMIN';
   agent_id: string;
   full_name: string;
-  mfi_account_id: string;
+  mfi_account_id: string | null;
+  // Set when the account has 2FA on: the password step returns a challenge
+  // instead of a usable session, to be exchanged via verifyMfa().
+  mfa_required?: boolean;
+  mfa_token?: string | null;
+}
+
+export interface TwoFactorSetup {
+  secret: string;
+  otpauth_uri: string;
+  qr: string;
 }
 
 const STORAGE_KEY = 'kyc_principal';
@@ -44,11 +54,49 @@ export class AuthService {
     return this.http
       .post<Principal>(`${API_URL}/auth/login`, { identifier, pin })
       .pipe(
-        tap((principal) => {
-          this._principal.set(principal);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(principal));
+        tap((res) => {
+          // A 2FA challenge is not a session — hold it for the second step.
+          if (!res.mfa_required) this.store(res);
         }),
       );
+  }
+
+  /** Second login step: exchange the challenge + TOTP code for a session. */
+  verifyMfa(mfaToken: string, code: string): Observable<Principal> {
+    return this.http
+      .post<Principal>(`${API_URL}/auth/login/verify`, {
+        mfa_token: mfaToken,
+        code,
+      })
+      .pipe(tap((p) => this.store(p)));
+  }
+
+  private store(principal: Principal): void {
+    this._principal.set(principal);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(principal));
+  }
+
+  // ---- Two-factor management (platform admin) ----
+  twoFactorStatus(): Observable<{ enabled: boolean }> {
+    return this.http.get<{ enabled: boolean }>(`${API_URL}/auth/2fa`);
+  }
+
+  twoFactorSetup(): Observable<TwoFactorSetup> {
+    return this.http.post<TwoFactorSetup>(`${API_URL}/auth/2fa/setup`, {});
+  }
+
+  twoFactorEnable(code: string): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(
+      `${API_URL}/auth/2fa/enable`,
+      { code },
+    );
+  }
+
+  twoFactorDisable(code: string): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(
+      `${API_URL}/auth/2fa/disable`,
+      { code },
+    );
   }
 
   logout(): void {

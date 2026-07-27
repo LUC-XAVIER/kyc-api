@@ -129,8 +129,10 @@ caller is manager-level. Audit-log entries now record the real actor
 
 | Method & path | Auth / role | Purpose |
 |---|---|---|
-| `POST /auth/login` | public | email + password → JWT + identity |
+| `POST /auth/login` | public | email/phone + PIN → JWT (or a 2FA challenge) |
+| `POST /auth/login/verify` | public | exchange a 2FA challenge + TOTP code for a JWT |
 | `GET /auth/me` | bearer (any) | the signed-in agent's profile |
+| `GET · POST /auth/2fa[/setup·/enable·/disable]` | **platform admin** | enrol / confirm / remove TOTP two-factor |
 | `GET /account` | **any authenticated** | account + subscription/quota summary |
 | `POST /kyc/verify` | any authenticated (metered) | run a verification |
 | `GET /kyc/verifications` | API key *(see §9)* | history list |
@@ -188,6 +190,16 @@ immutable `audit_logs` the suspend/reactivate actions above write to.
 **Suspension is enforced at authentication**: a `SUSPENDED` MFI's staff can no
 longer log in and its API keys are rejected (both raise `401`). A platform
 admin has no MFI, so this check never blocks them.
+
+**Two-factor auth (admin hardening).** The admin can enrol in TOTP 2FA from the
+dashboard Security page: `POST /auth/2fa/setup` mints a secret (returned once
+with an inline SVG QR), `POST /auth/2fa/enable` confirms a code, `POST
+/auth/2fa/disable` removes it — all gated by `require_platform_admin`. The
+secret is stored AES-GCM-encrypted (`users.totp_secret`, migration
+`e4f5a6b7c8d9`). Once enabled, `POST /auth/login` returns **no session token**:
+instead `mfa_required=true` and a short-lived `mfa_token`, which `POST
+/auth/login/verify` exchanges (with a fresh code) for the real JWT. `pyotp`
+drives the codes; `qrcode` renders the enrolment QR as SVG (no Pillow).
 
 ---
 

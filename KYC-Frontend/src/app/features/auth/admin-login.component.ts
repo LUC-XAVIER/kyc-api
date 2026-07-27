@@ -28,6 +28,11 @@ export class AdminLoginComponent {
   readonly pin = signal('');
   readonly error = signal('');
   readonly loading = signal(false);
+  // Second factor: when the account has 2FA on, step 1 returns a challenge
+  // and we ask for the authenticator code.
+  readonly mfaStep = signal(false);
+  readonly code = signal('');
+  private mfaToken = '';
 
   constructor() {
     if (this.auth.role() === 'ADMIN') {
@@ -46,19 +51,47 @@ export class AdminLoginComponent {
     this.loading.set(true);
     this.error.set('');
     this.auth.login(email, pin).subscribe({
-      next: () => {
-        if (this.auth.role() !== 'ADMIN') {
-          // A non-admin used the admin door; send them where they belong.
-          this.router.navigateByUrl(this.auth.homeRoute());
+      next: (res) => {
+        this.loading.set(false);
+        if (res.mfa_required) {
+          this.mfaToken = res.mfa_token ?? '';
+          this.mfaStep.set(true);
           return;
         }
-        this.router.navigateByUrl('/admin');
+        this.land();
       },
       error: (err: HttpErrorResponse) => {
         this.loading.set(false);
         this.error.set(this.messageFor(err));
       },
     });
+  }
+
+  verify(): void {
+    if (this.loading()) return;
+    const code = this.code().trim();
+    if (!code) {
+      this.error.set('Enter the 6-digit code from your authenticator.');
+      return;
+    }
+    this.loading.set(true);
+    this.error.set('');
+    this.auth.verifyMfa(this.mfaToken, code).subscribe({
+      next: () => this.land(),
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        this.error.set(this.messageFor(err));
+      },
+    });
+  }
+
+  private land(): void {
+    // A non-admin who used the admin door goes to their own dashboard.
+    if (this.auth.role() !== 'ADMIN') {
+      this.router.navigateByUrl(this.auth.homeRoute());
+      return;
+    }
+    this.router.navigateByUrl('/admin');
   }
 
   private messageFor(err: HttpErrorResponse): string {
