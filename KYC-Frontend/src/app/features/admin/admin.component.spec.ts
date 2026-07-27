@@ -148,9 +148,79 @@ describe('AdminComponent', () => {
     expect(component.toast()).toContain('suspended');
   });
 
-  it('shows a placeholder for deferred sections', () => {
+  it('loads real operations data for system health', () => {
     component.setPage('system-health');
-    expect(component.isDeferred()).toBeTrue();
+    http.expectOne((r) => r.url.endsWith('/admin/operations')).flush({
+      total_verifications: 12,
+      total_embeddings: 5,
+      total_users: 8,
+      total_mfis: 2,
+      total_api_keys: 3,
+      latency: {
+        measured: 10,
+        avg_seconds: 4.2,
+        p50_seconds: 3.9,
+        p95_seconds: 8.1,
+        max_seconds: 9.5,
+      },
+      per_day: Array.from({ length: 14 }, (_, i) => ({
+        date: `2026-07-${String(i + 1).padStart(2, '0')}`,
+        count: i,
+      })),
+      by_channel: [{ channel: 'API', count: 12 }],
+    });
+    expect(component.isDeferred()).toBeFalse();
+    expect(component.ops()?.total_verifications).toBe(12);
+    expect(component.opsBars().length).toBe(14);
+  });
+
+  it('loads real model metrics for the monitoring pages', () => {
+    component.setPage('face-matching');
+    http.expectOne((r) => r.url.endsWith('/admin/models')).flush({
+      face_matching: {
+        evaluated: 3,
+        avg_score: 0.82,
+        threshold: 0.4,
+        verified_rate: 0.9,
+        distribution: Array.from({ length: 10 }, (_, i) => ({
+          label: (i / 10).toFixed(1),
+          count: i,
+        })),
+        per_mfi: [
+          { name: 'MFI One', evaluated: 3, avg_score: 0.82, verified_rate: 0.9 },
+        ],
+      },
+      anti_spoofing: {
+        evaluated: 3,
+        avg_score: 0.95,
+        pass_rate: 1,
+        spoof_flagged: 0,
+        distribution: [],
+      },
+      ocr: {
+        evaluated: 3,
+        avg_confidence: 0.97,
+        per_field: [
+          { field: 'full_name', avg_confidence: 0.97, samples: 3 },
+          { field: 'place_of_birth', avg_confidence: 0.8, samples: 3 },
+        ],
+      },
+      duplicate: {
+        index_size: 5,
+        flags: 1,
+        avg_similarity: 0.7,
+        confirmed: 0,
+        dismissed: 1,
+        pending: 0,
+      },
+    });
+    expect(component.isDeferred()).toBeFalse();
+    expect(component.models()?.face_matching.evaluated).toBe(3);
+    // Threshold split colours the histogram bars.
+    const bars = component.histBars([{ label: '0.3', count: 2 }], 0.4);
+    expect(bars[0].color).toBe('#e5484d');
+    // OCR fields sorted weakest-first.
+    expect(component.ocrFields()[0].field).toBe('place_of_birth');
   });
 
   it('loads and categorises the audit log', () => {

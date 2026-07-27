@@ -722,6 +722,56 @@ $cols: 1.6fr 0.8fr 0.9fr 1.3fr 0.7fr 0.6fr 0.6fr 0.8fr 1.3fr;
   padding: 16px;
 }
 
+// ---- Model monitoring ----
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.model-card {
+  cursor: pointer;
+  &--static {
+    cursor: default;
+  }
+}
+.model-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.model-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+.model-card__val {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.perf-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.perf-bar__name {
+  width: 190px;
+  flex: none;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.perf-bar .track {
+  flex: 1;
+}
+.perf-bar__val {
+  width: 170px;
+  flex: none;
+  text-align: right;
+  font-size: 12.5px;
+}
+
 // ---- Two-factor (Security) ----
 .twofa__head {
   display: flex;
@@ -797,6 +847,13 @@ $cols: 1.6fr 0.8fr 0.9fr 1.3fr 0.7fr 0.6fr 0.6fr 0.8fr 1.3fr;
 }
 .twofa__disable {
   margin-top: 18px;
+}
+
+.ops-note {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin-top: 14px;
 }
 
 // ---- Placeholder ----

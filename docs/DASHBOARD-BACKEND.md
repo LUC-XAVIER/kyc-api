@@ -152,6 +152,8 @@ caller is manager-level. Audit-log entries now record the real actor
 | `GET /admin/mfis/{id}` | **platform admin** | one MFI drill-down |
 | `PATCH /admin/mfis/{id}/status` | **platform admin** | enable/disable an MFI (audited) |
 | `GET /admin/audit` | **platform admin** | platform-wide audit trail (paginated) |
+| `GET /admin/models` | **platform admin** | cross-tenant model-monitoring metrics |
+| `GET /admin/operations` | **platform admin** | DB counts, pipeline latency, throughput |
 
 ### Verification images
 The detail response carries `available_images` — the kinds actually stored
@@ -187,6 +189,22 @@ drill into accounts. `PATCH /admin/mfis/{id}/status` flips an account between
 `GET /admin/audit` returns the platform-wide audit trail (newest first,
 `limit`/`offset` paginated), each row joined to its MFI name — the same
 immutable `audit_logs` the suspend/reactivate actions above write to.
+
+`GET /admin/models` powers the model-monitoring screens (Model Health, Face
+Matching, Anti-Spoofing, OCR). Everything is aggregated **from stored pipeline
+results** — `face_match_results`, `liveness_results`, `extracted_data`
+confidences, `face_embeddings`, `duplicate_flags` — so no figure is
+fabricated. Metrics needing ground-truth labels (FAR/FRR), attack-type
+breakdowns, or request-level telemetry (per-endpoint latency, uptime) are
+deliberately **not** produced.
+
+`GET /admin/operations` backs the System Health and API Performance screens
+with real figures only: table counts (verifications, embeddings, users, MFIs,
+active keys), end-to-end **pipeline** latency (`avg`/`p50`/`p95`/`max` of
+`processed_at − created_at`), 14-day throughput, and volume by channel. What we
+don't collect — host uptime/CPU, container health, per-endpoint HTTP latency
+and 4xx/5xx rates — is labelled "not yet instrumented" on those screens rather
+than faked.
 **Suspension is enforced at authentication**: a `SUSPENDED` MFI's staff can no
 longer log in and its API keys are rejected (both raise `401`). A platform
 admin has no MFI, so this check never blocks them.

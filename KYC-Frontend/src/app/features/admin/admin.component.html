@@ -343,6 +343,145 @@
         </div>
       }
 
+      <!-- MODEL HEALTH -->
+      @if (page() === 'model-health' && models(); as m) {
+        <div class="model-grid">
+          <div class="card model-card" (click)="setPage('face-matching')">
+            <div class="model-card__head">
+              <div class="card__title">◍ Face Matching (ArcFace)</div>
+              <span class="pill" [style.color]="modelStatus(m.face_matching.verified_rate).color">● {{ modelStatus(m.face_matching.verified_rate).label }}</span>
+            </div>
+            <div class="model-card__metrics">
+              <div><div class="stat__label">VERIFIED RATE</div><div class="model-card__val">{{ pctOf(m.face_matching.verified_rate) }}</div></div>
+              <div><div class="stat__label">AVG SCORE</div><div class="model-card__val">{{ m.face_matching.avg_score ?? '—' }}</div></div>
+              <div><div class="stat__label">EVALUATED</div><div class="model-card__val">{{ m.face_matching.evaluated }}</div></div>
+            </div>
+          </div>
+
+          <div class="card model-card" (click)="setPage('anti-spoofing')">
+            <div class="model-card__head">
+              <div class="card__title">🛡 Anti-Spoofing (Liveness)</div>
+              <span class="pill" [style.color]="modelStatus(m.anti_spoofing.pass_rate).color">● {{ modelStatus(m.anti_spoofing.pass_rate).label }}</span>
+            </div>
+            <div class="model-card__metrics">
+              <div><div class="stat__label">PASS RATE</div><div class="model-card__val">{{ pctOf(m.anti_spoofing.pass_rate) }}</div></div>
+              <div><div class="stat__label">AVG SCORE</div><div class="model-card__val">{{ m.anti_spoofing.avg_score ?? '—' }}</div></div>
+              <div><div class="stat__label">SPOOF FLAGGED</div><div class="model-card__val">{{ m.anti_spoofing.spoof_flagged }}</div></div>
+            </div>
+          </div>
+
+          <div class="card model-card" (click)="setPage('ocr-engine')">
+            <div class="model-card__head">
+              <div class="card__title">▤ OCR Engine</div>
+              <span class="pill" [style.color]="modelStatus(m.ocr.avg_confidence).color">● {{ modelStatus(m.ocr.avg_confidence).label }}</span>
+            </div>
+            <div class="model-card__metrics">
+              <div><div class="stat__label">AVG CONFIDENCE</div><div class="model-card__val">{{ pctOf(m.ocr.avg_confidence) }}</div></div>
+              <div><div class="stat__label">FIELDS</div><div class="model-card__val">{{ m.ocr.per_field.length }}</div></div>
+              <div><div class="stat__label">EVALUATED</div><div class="model-card__val">{{ m.ocr.evaluated }}</div></div>
+            </div>
+          </div>
+
+          <div class="card model-card model-card--static">
+            <div class="model-card__head">
+              <div class="card__title">✦ Duplicate Detector (FAISS)</div>
+              <span class="pill" [style.color]="'#22c55e'">● Active</span>
+            </div>
+            <div class="model-card__metrics">
+              <div><div class="stat__label">INDEX SIZE</div><div class="model-card__val">{{ m.duplicate.index_size }}</div></div>
+              <div><div class="stat__label">FLAGS</div><div class="model-card__val">{{ m.duplicate.flags }}</div></div>
+              <div><div class="stat__label">AVG SIMILARITY</div><div class="model-card__val">{{ m.duplicate.avg_similarity ?? '—' }}</div></div>
+            </div>
+            <div class="card__sub">{{ m.duplicate.confirmed }} confirmed · {{ m.duplicate.dismissed }} dismissed · {{ m.duplicate.pending }} pending</div>
+          </div>
+        </div>
+      }
+
+      <!-- FACE MATCHING -->
+      @if (page() === 'face-matching' && models(); as m) {
+        <div class="grid-4">
+          <div class="card stat"><div class="stat__label">PAIRS EVALUATED</div><div class="stat__value sm">{{ m.face_matching.evaluated }}</div></div>
+          <div class="card stat"><div class="stat__label">AVG MATCH SCORE</div><div class="stat__value sm">{{ m.face_matching.avg_score ?? '—' }}</div></div>
+          <div class="card stat"><div class="stat__label">THRESHOLD</div><div class="stat__value sm">{{ m.face_matching.threshold ?? '—' }}</div></div>
+          <div class="card stat"><div class="stat__label">VERIFIED RATE</div><div class="stat__value sm">{{ pctOf(m.face_matching.verified_rate) }}</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card__title">Match-score distribution</div>
+          <div class="card__sub">Green = at/above threshold, red = below</div>
+          <div class="bars">
+            @for (b of histBars(m.face_matching.distribution, m.face_matching.threshold); track $index) {
+              <div class="bar-col" [title]="b.count + ' at ' + b.label">
+                <div class="bar" [style.height.px]="b.h" [style.background]="b.color"></div>
+                <div class="bar-label">{{ b.label }}</div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__title">Accuracy per MFI</div>
+          <div class="card__sub">Weakest face-match populations first</div>
+          <div class="quota-list">
+            @for (p of m.face_matching.per_mfi; track p.name) {
+              <div class="perf-bar">
+                <div class="perf-bar__name">{{ p.name }}</div>
+                <div class="track"><div class="track__fill" [style.width.%]="(p.avg_score || 0) * 100" [style.background]="(p.avg_score || 0) >= 0.75 ? '#22c55e' : '#f5a524'"></div></div>
+                <div class="perf-bar__val">{{ p.avg_score ?? '—' }} · {{ pctOf(p.verified_rate) }} <span class="muted">({{ p.evaluated }})</span></div>
+              </div>
+            } @empty {
+              <div class="muted">No face-match results yet.</div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ANTI-SPOOFING -->
+      @if (page() === 'anti-spoofing' && models(); as m) {
+        <div class="grid-4">
+          <div class="card stat"><div class="stat__label">CHECKS RUN</div><div class="stat__value sm">{{ m.anti_spoofing.evaluated }}</div></div>
+          <div class="card stat"><div class="stat__label">AVG SCORE</div><div class="stat__value sm">{{ m.anti_spoofing.avg_score ?? '—' }}</div></div>
+          <div class="card stat"><div class="stat__label">PASS RATE</div><div class="stat__value sm">{{ pctOf(m.anti_spoofing.pass_rate) }}</div></div>
+          <div class="card stat"><div class="stat__label">SPOOF FLAGGED</div><div class="stat__value sm">{{ m.anti_spoofing.spoof_flagged }}</div></div>
+        </div>
+        <div class="card">
+          <div class="card__title">Anti-spoof score distribution</div>
+          <div class="card__sub">Higher scores = more confidently live</div>
+          <div class="bars">
+            @for (b of histBars(m.anti_spoofing.distribution); track $index) {
+              <div class="bar-col" [title]="b.count + ' at ' + b.label">
+                <div class="bar" [style.height.px]="b.h" [style.background]="b.color"></div>
+                <div class="bar-label">{{ b.label }}</div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- OCR ENGINE -->
+      @if (page() === 'ocr-engine' && models(); as m) {
+        <div class="grid-3">
+          <div class="card stat"><div class="stat__label">IMAGES EVALUATED</div><div class="stat__value sm">{{ m.ocr.evaluated }}</div></div>
+          <div class="card stat"><div class="stat__label">OVERALL CONFIDENCE</div><div class="stat__value sm">{{ pctOf(m.ocr.avg_confidence) }}</div></div>
+          <div class="card stat"><div class="stat__label">FIELDS TRACKED</div><div class="stat__value sm">{{ m.ocr.per_field.length }}</div></div>
+        </div>
+        <div class="card">
+          <div class="card__title">Confidence per field</div>
+          <div class="card__sub">Weakest fields first · from stored OCR confidences</div>
+          <div class="quota-list">
+            @for (f of ocrFields(); track f.field) {
+              <div class="perf-bar">
+                <div class="perf-bar__name">{{ f.field }}</div>
+                <div class="track"><div class="track__fill" [style.width.%]="f.pct" [style.background]="f.color"></div></div>
+                <div class="perf-bar__val">{{ f.pct }}%</div>
+              </div>
+            } @empty {
+              <div class="muted">No OCR confidence data yet.</div>
+            }
+          </div>
+        </div>
+      }
+
       <!-- SECURITY (2FA) -->
       @if (page() === 'security') {
         <div class="card twofa">
@@ -412,16 +551,72 @@
         </div>
       }
 
-      <!-- DEFERRED SECTIONS -->
-      @if (isDeferred()) {
-        <div class="card placeholder">
-          <div class="placeholder__icon">🚧</div>
-          <div class="placeholder__title">{{ title()[0] }} — coming soon</div>
-          <p class="placeholder__body">
-            This section will surface real model-monitoring and operations metrics
-            once that pipeline is in place. It's intentionally left empty rather
-            than showing sample numbers that aren't real.
-          </p>
+      <!-- SYSTEM HEALTH -->
+      @if (page() === 'system-health' && ops(); as o) {
+        <div class="grid-4">
+          <div class="card stat"><div class="stat__label">VERIFICATIONS STORED</div><div class="stat__value sm">{{ o.total_verifications }}</div></div>
+          <div class="card stat"><div class="stat__label">FACE EMBEDDINGS</div><div class="stat__value sm">{{ o.total_embeddings }}</div></div>
+          <div class="card stat"><div class="stat__label">STAFF ACCOUNTS</div><div class="stat__value sm">{{ o.total_users }}</div></div>
+          <div class="card stat"><div class="stat__label">MFI ACCOUNTS</div><div class="stat__value sm">{{ o.total_mfis }}</div></div>
+        </div>
+        <div class="grid-2-wide">
+          <div class="card">
+            <div class="card__title">Data footprint</div>
+            <div class="card__sub">Live counts from the database</div>
+            <div class="perf-row"><span class="muted">Verifications</span><b>{{ o.total_verifications }}</b></div>
+            <div class="perf-row"><span class="muted">Face embeddings (dedup index)</span><b>{{ o.total_embeddings }}</b></div>
+            <div class="perf-row"><span class="muted">Active API keys</span><b>{{ o.total_api_keys }}</b></div>
+            <div class="perf-row"><span class="muted">Avg pipeline time</span><b>{{ o.latency.avg_seconds ?? '—' }}s</b></div>
+          </div>
+          <div class="card">
+            <div class="card__title">Infrastructure</div>
+            <div class="card__sub">Not yet instrumented</div>
+            <p class="ops-note">
+              Uptime, CPU/RAM and container health aren't collected yet — they
+              need host-level metrics wiring. Shown here rather than faked.
+            </p>
+          </div>
+        </div>
+      }
+
+      <!-- API PERFORMANCE -->
+      @if (page() === 'api-performance' && ops(); as o) {
+        <div class="grid-4">
+          <div class="card stat"><div class="stat__label">AVG PROCESSING</div><div class="stat__value sm">{{ o.latency.avg_seconds ?? '—' }}s</div></div>
+          <div class="card stat"><div class="stat__label">MEDIAN (P50)</div><div class="stat__value sm">{{ o.latency.p50_seconds ?? '—' }}s</div></div>
+          <div class="card stat"><div class="stat__label">P95</div><div class="stat__value sm">{{ o.latency.p95_seconds ?? '—' }}s</div></div>
+          <div class="card stat"><div class="stat__label">SLOWEST</div><div class="stat__value sm">{{ o.latency.max_seconds ?? '—' }}s</div></div>
+        </div>
+        <div class="card">
+          <div class="card__title">Verification throughput</div>
+          <div class="card__sub">Last 14 days · all MFIs · {{ o.latency.measured }} timed</div>
+          <div class="bars">
+            @for (b of opsBars(); track $index) {
+              <div class="bar-col" [title]="b.tip">
+                <div class="bar" [style.height.px]="b.h"></div>
+                <div class="bar-label">{{ b.label }}</div>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="grid-2-wide">
+          <div class="card">
+            <div class="card__title">By submission channel</div>
+            @for (c of o.by_channel; track c.channel) {
+              <div class="perf-row"><span class="muted">{{ c.channel }}</span><b>{{ c.count }}</b></div>
+            } @empty {
+              <div class="muted">No verifications yet.</div>
+            }
+          </div>
+          <div class="card">
+            <div class="card__title">HTTP metrics</div>
+            <div class="card__sub">Not yet instrumented</div>
+            <p class="ops-note">
+              Per-endpoint latency and 4xx/5xx error rates need request-level
+              logging, which isn't in place yet. The figures above are the
+              real end-to-end pipeline processing times.
+            </p>
+          </div>
         </div>
       }
     </div>

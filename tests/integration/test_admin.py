@@ -1,12 +1,18 @@
 """Integration tests for the platform-admin (cross-tenant) routes."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password
-from app.models import User, Verification
+from app.models import (
+    ExtractedData,
+    FaceMatchResult,
+    LivenessResult,
+    User,
+    Verification,
+)
 from app.models.enums import (
     AgentRole,
     MfiStatus,
@@ -134,6 +140,86 @@ def test_admin_suspends_and_reactivates_an_mfi(
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "ACTIVE"
+
+
+def test_admin_model_health_reports_real_metrics(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """/admin/models aggregates stored ML results across MFIs."""
+    headers = _admin_headers(db_session)
+    mfi, _ = create_mfi_with_key(db_session, name="Model MFI", email="md@x.cm")
+    v = Verification(
+        client_id="C",
+        mfi_account_id=mfi.id,
+        submission_method=SubmissionMethod.API,
+        status=VerificationStatus.VERIFIED,
+        confidence_score=0.8,
+        created_at=datetime.now(UTC),
+    )
+    db_session.add(v)
+    db_session.flush()
+    db_session.add_all(
+        [
+            FaceMatchResult(
+                verification_id=v.id,
+                match_score=0.82,
+                verified=True,
+                threshold=0.4,
+            ),
+            LivenessResult(
+                verification_id=v.id,
+                passed=True,
+                method="fasnet",
+                anti_spoof_score=0.95,
+                landmarks_detected=True,
+            ),
+            ExtractedData(
+                verification_id=v.id,
+                field_confidences={"full_name": 0.97, "id_number": 0.99},
+            ),
+        ]
+    )
+    db_session.flush()
+
+    resp = api_client.get("/api/v1/admin/models", headers=headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["face_matching"]["evaluated"] >= 1
+    assert body["face_matching"]["threshold"] == 0.4
+    assert len(body["face_matching"]["distribution"]) == 10
+    assert body["anti_spoofing"]["evaluated"] >= 1
+    fields = {f["field"] for f in body["ocr"]["per_field"]}
+    assert {"full_name", "id_number"} <= fields
+
+
+def test_admin_operations_reports_real_figures(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """/admin/operations returns counts, latency, throughput from our data."""
+    headers = _admin_headers(db_session)
+    mfi, _ = create_mfi_with_key(db_session, name="Ops MFI", email="ops@x.cm")
+    v = Verification(
+        client_id="C",
+        mfi_account_id=mfi.id,
+        submission_method=SubmissionMethod.API,
+        status=VerificationStatus.VERIFIED,
+        confidence_score=0.8,
+        created_at=datetime.now(UTC) - timedelta(seconds=5),
+        processed_at=datetime.now(UTC),
+    )
+    db_session.add(v)
+    db_session.flush()
+
+    resp = api_client.get("/api/v1/admin/operations", headers=headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_verifications"] >= 1
+    assert body["latency"]["measured"] >= 1
+    assert body["latency"]["avg_seconds"] is not None
+    assert len(body["per_day"]) == 14
+    assert any(c["channel"] == "API" for c in body["by_channel"])
 
 
 def test_admin_audit_lists_actions(

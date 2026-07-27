@@ -20,10 +20,12 @@ from app.schemas.admin import (
     AdminMfiDetail,
     AdminMfiSummary,
     MfiStatusUpdate,
+    ModelHealthReport,
+    OperationsReport,
     PlatformStats,
 )
 from app.services import admin as admin_service
-from app.services import audit
+from app.services import admin_monitoring, audit
 
 router = APIRouter(
     prefix="/admin",
@@ -55,6 +57,18 @@ def platform_stats(db: Session = Depends(get_db)) -> PlatformStats:
 def list_mfis(db: Session = Depends(get_db)) -> list[AdminMfiSummary]:
     """Every MFI with its rollup counts, newest first."""
     return admin_service.list_mfis(db)
+
+
+@router.get("/models", response_model=ModelHealthReport)
+def model_health(db: Session = Depends(get_db)) -> ModelHealthReport:
+    """Cross-tenant model-monitoring metrics (face/liveness/OCR/duplicate)."""
+    return admin_monitoring.model_health(db)
+
+
+@router.get("/operations", response_model=OperationsReport)
+def operations(db: Session = Depends(get_db)) -> OperationsReport:
+    """Real operational figures: counts, pipeline latency, throughput."""
+    return admin_monitoring.operations(db)
 
 
 @router.get("/audit", response_model=list[AdminAuditEntry])

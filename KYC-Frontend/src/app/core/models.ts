@@ -281,6 +281,79 @@ export interface AdminAuditEntry {
   timestamp: string;
 }
 
+// ---- Model monitoring ----
+export interface ScoreBucket {
+  label: string;
+  count: number;
+}
+export interface PerMfiScore {
+  name: string;
+  evaluated: number;
+  avg_score: number | null;
+  verified_rate: number | null;
+}
+export interface FaceMatchingReport {
+  evaluated: number;
+  avg_score: number | null;
+  threshold: number | null;
+  verified_rate: number | null;
+  distribution: ScoreBucket[];
+  per_mfi: PerMfiScore[];
+}
+export interface AntiSpoofReport {
+  evaluated: number;
+  avg_score: number | null;
+  pass_rate: number | null;
+  spoof_flagged: number;
+  distribution: ScoreBucket[];
+}
+export interface OcrFieldAccuracy {
+  field: string;
+  avg_confidence: number;
+  samples: number;
+}
+export interface OcrReport {
+  evaluated: number;
+  avg_confidence: number | null;
+  per_field: OcrFieldAccuracy[];
+}
+export interface DuplicateReport {
+  index_size: number;
+  flags: number;
+  avg_similarity: number | null;
+  confirmed: number;
+  dismissed: number;
+  pending: number;
+}
+export interface ModelHealthReport {
+  face_matching: FaceMatchingReport;
+  anti_spoofing: AntiSpoofReport;
+  ocr: OcrReport;
+  duplicate: DuplicateReport;
+}
+
+export interface LatencyStats {
+  measured: number;
+  avg_seconds: number | null;
+  p50_seconds: number | null;
+  p95_seconds: number | null;
+  max_seconds: number | null;
+}
+export interface ChannelCount {
+  channel: string;
+  count: number;
+}
+export interface OperationsReport {
+  total_verifications: number;
+  total_embeddings: number;
+  total_users: number;
+  total_mfis: number;
+  total_api_keys: number;
+  latency: LatencyStats;
+  per_day: DayCount[];
+  by_channel: ChannelCount[];
+}
+
 export interface AdminMfiDetail {
   id: string;
   name: string;
