@@ -551,16 +551,72 @@
         </div>
       }
 
-      <!-- DEFERRED SECTIONS -->
-      @if (isDeferred()) {
-        <div class="card placeholder">
-          <div class="placeholder__icon">🚧</div>
-          <div class="placeholder__title">{{ title()[0] }} — coming soon</div>
-          <p class="placeholder__body">
-            This section will surface real model-monitoring and operations metrics
-            once that pipeline is in place. It's intentionally left empty rather
-            than showing sample numbers that aren't real.
-          </p>
+      <!-- SYSTEM HEALTH -->
+      @if (page() === 'system-health' && ops(); as o) {
+        <div class="grid-4">
+          <div class="card stat"><div class="stat__label">VERIFICATIONS STORED</div><div class="stat__value sm">{{ o.total_verifications }}</div></div>
+          <div class="card stat"><div class="stat__label">FACE EMBEDDINGS</div><div class="stat__value sm">{{ o.total_embeddings }}</div></div>
+          <div class="card stat"><div class="stat__label">STAFF ACCOUNTS</div><div class="stat__value sm">{{ o.total_users }}</div></div>
+          <div class="card stat"><div class="stat__label">MFI ACCOUNTS</div><div class="stat__value sm">{{ o.total_mfis }}</div></div>
+        </div>
+        <div class="grid-2-wide">
+          <div class="card">
+            <div class="card__title">Data footprint</div>
+            <div class="card__sub">Live counts from the database</div>
+            <div class="perf-row"><span class="muted">Verifications</span><b>{{ o.total_verifications }}</b></div>
+            <div class="perf-row"><span class="muted">Face embeddings (dedup index)</span><b>{{ o.total_embeddings }}</b></div>
+            <div class="perf-row"><span class="muted">Active API keys</span><b>{{ o.total_api_keys }}</b></div>
+            <div class="perf-row"><span class="muted">Avg pipeline time</span><b>{{ o.latency.avg_seconds ?? '—' }}s</b></div>
+          </div>
+          <div class="card">
+            <div class="card__title">Infrastructure</div>
+            <div class="card__sub">Not yet instrumented</div>
+            <p class="ops-note">
+              Uptime, CPU/RAM and container health aren't collected yet — they
+              need host-level metrics wiring. Shown here rather than faked.
+            </p>
+          </div>
+        </div>
+      }
+
+      <!-- API PERFORMANCE -->
+      @if (page() === 'api-performance' && ops(); as o) {
+        <div class="grid-4">
+          <div class="card stat"><div class="stat__label">AVG PROCESSING</div><div class="stat__value sm">{{ o.latency.avg_seconds ?? '—' }}s</div></div>
+          <div class="card stat"><div class="stat__label">MEDIAN (P50)</div><div class="stat__value sm">{{ o.latency.p50_seconds ?? '—' }}s</div></div>
+          <div class="card stat"><div class="stat__label">P95</div><div class="stat__value sm">{{ o.latency.p95_seconds ?? '—' }}s</div></div>
+          <div class="card stat"><div class="stat__label">SLOWEST</div><div class="stat__value sm">{{ o.latency.max_seconds ?? '—' }}s</div></div>
+        </div>
+        <div class="card">
+          <div class="card__title">Verification throughput</div>
+          <div class="card__sub">Last 14 days · all MFIs · {{ o.latency.measured }} timed</div>
+          <div class="bars">
+            @for (b of opsBars(); track $index) {
+              <div class="bar-col" [title]="b.tip">
+                <div class="bar" [style.height.px]="b.h"></div>
+                <div class="bar-label">{{ b.label }}</div>
+              </div>
+            }
+          </div>
+        </div>
+        <div class="grid-2-wide">
+          <div class="card">
+            <div class="card__title">By submission channel</div>
+            @for (c of o.by_channel; track c.channel) {
+              <div class="perf-row"><span class="muted">{{ c.channel }}</span><b>{{ c.count }}</b></div>
+            } @empty {
+              <div class="muted">No verifications yet.</div>
+            }
+          </div>
+          <div class="card">
+            <div class="card__title">HTTP metrics</div>
+            <div class="card__sub">Not yet instrumented</div>
+            <p class="ops-note">
+              Per-endpoint latency and 4xx/5xx error rates need request-level
+              logging, which isn't in place yet. The figures above are the
+              real end-to-end pipeline processing times.
+            </p>
+          </div>
         </div>
       }
     </div>

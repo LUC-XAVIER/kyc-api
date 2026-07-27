@@ -7,32 +7,42 @@ confidences, ``face_embeddings``, ``duplicate_flags``). Nothing is fabricated
 not produced.
 """
 
+from datetime import date, timedelta
+
 from sqlalchemy import Integer, cast, func
 from sqlalchemy.orm import Session
 
 from app.models import (
+    ApiKey,
     DuplicateFlag,
     ExtractedData,
     FaceEmbedding,
     FaceMatchResult,
     LivenessResult,
     MfiAccount,
+    User,
     Verification,
 )
 from app.models.enums import DuplicateResolution
 from app.schemas.admin import (
     AntiSpoofReport,
+    ChannelCount,
+    DayCount,
     DuplicateReport,
     FaceMatchingReport,
+    LatencyStats,
     ModelHealthReport,
     OcrFieldAccuracy,
     OcrReport,
+    OperationsReport,
     PerMfiScore,
     ScoreBucket,
 )
 
 # Histogram resolution for the 0.0–1.0 score charts.
 BINS = 10
+# Days of history the operations throughput chart covers.
+OPS_DAYS = 14
 
 
 def _r(value: float | None, digits: int = 3) -> float | None:
@@ -173,4 +183,75 @@ def model_health(db: Session) -> ModelHealthReport:
         anti_spoofing=_anti_spoofing(db),
         ocr=_ocr(db),
         duplicate=_duplicate(db),
+    )
+
+
+def _latency(db: Session) -> LatencyStats:
+    """Pipeline processing-time stats over verifications that finished."""
+    seconds = func.extract(
+        "epoch", Verification.processed_at - Verification.created_at
+    )
+    done = Verification.processed_at.isnot(None)
+    row = db.query(
+        func.count(),
+        func.avg(seconds),
+        func.percentile_cont(0.5).within_group(seconds.asc()),
+        func.percentile_cont(0.95).within_group(seconds.asc()),
+        func.max(seconds),
+    ).filter(done).one()
+    measured, avg, p50, p95, mx = row
+    return LatencyStats(
+        measured=measured or 0,
+        avg_seconds=_r(avg, 2),
+        p50_seconds=_r(p50, 2),
+        p95_seconds=_r(p95, 2),
+        max_seconds=_r(mx, 2),
+    )
+
+
+def _per_day(db: Session) -> list[DayCount]:
+    """Verifications per day over the last ``OPS_DAYS`` days, zero-filled."""
+    start = date.today() - timedelta(days=OPS_DAYS - 1)
+    day = func.date(Verification.created_at)
+    counts = {
+        d: c
+        for d, c in db.query(day, func.count())
+        .filter(day >= start)
+        .group_by(day)
+        .all()
+    }
+    return [
+        DayCount(
+            date=(d := start + timedelta(days=i)), count=counts.get(d, 0)
+        )
+        for i in range(OPS_DAYS)
+    ]
+
+
+def operations(db: Session) -> OperationsReport:
+    """Real operational figures (counts, latency, throughput)."""
+    by_channel = [
+        ChannelCount(channel=method.value, count=count)
+        for method, count in db.query(
+            Verification.submission_method, func.count()
+        )
+        .group_by(Verification.submission_method)
+        .all()
+    ]
+    return OperationsReport(
+        total_verifications=db.query(func.count(Verification.id)).scalar()
+        or 0,
+        total_embeddings=db.query(func.count(FaceEmbedding.id)).scalar() or 0,
+        total_users=db.query(func.count(User.id))
+        .filter(User.mfi_account_id.isnot(None))
+        .scalar()
+        or 0,
+        total_mfis=db.query(func.count(MfiAccount.id)).scalar() or 0,
+        total_api_keys=db.query(func.count(ApiKey.id))
+        .filter(ApiKey.is_active.is_(True))
+        .scalar()
+        or 0,
+        latency=_latency(db),
+        per_day=_per_day(db),
+        by_channel=by_channel,
     )

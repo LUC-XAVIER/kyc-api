@@ -18,6 +18,7 @@ import {
   AdminMfiSummary,
   MfiStatus,
   ModelHealthReport,
+  OperationsReport,
   PlatformStats,
   ScoreBucket,
 } from '../../core/models';
@@ -78,9 +79,6 @@ const NAV: NavSection[] = [
   },
 ];
 
-/** Pages not yet backed by real data — shown as a labelled placeholder. */
-const DEFERRED = new Set<AdminPage>(['api-performance', 'system-health']);
-
 /** Pages whose data comes from GET /admin/models. */
 const MODEL_PAGES = new Set<AdminPage>([
   'model-health',
@@ -88,6 +86,9 @@ const MODEL_PAGES = new Set<AdminPage>([
   'anti-spoofing',
   'ocr-engine',
 ]);
+
+/** Pages whose data comes from GET /admin/operations. */
+const OPS_PAGES = new Set<AdminPage>(['api-performance', 'system-health']);
 
 /** How each audit action string is rendered in the log. */
 interface ActionMeta {
@@ -237,6 +238,7 @@ export class AdminComponent implements OnDestroy {
   readonly auditCategories = AUDIT_CATEGORIES;
 
   readonly models = signal<ModelHealthReport | null>(null);
+  readonly ops = signal<OperationsReport | null>(null);
 
   readonly theme = signal<'dark' | 'light'>(
     localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark',
@@ -281,7 +283,8 @@ export class AdminComponent implements OnDestroy {
     return TITLES[this.page()];
   });
 
-  readonly isDeferred = computed(() => DEFERRED.has(this.page()));
+  // Every section now has real data — nothing is a placeholder.
+  readonly isDeferred = computed(() => false);
 
   // ---- Navigation ----
   setPage(p: AdminPage): void {
@@ -293,6 +296,7 @@ export class AdminComponent implements OnDestroy {
     if (p === 'audit-logs') this.loadAudit();
     if (p === 'security') this.loadTwoFa();
     if (MODEL_PAGES.has(p)) this.loadModels();
+    if (OPS_PAGES.has(p)) this.loadOps();
     this.loading.stop();
   }
 
@@ -306,6 +310,7 @@ export class AdminComponent implements OnDestroy {
     else if (this.page() === 'audit-logs') this.loadAudit();
     else if (this.page() === 'security') this.loadTwoFa();
     else if (MODEL_PAGES.has(this.page())) this.loadModels();
+    else if (OPS_PAGES.has(this.page())) this.loadOps();
     else if (this.page() === 'mfi-detail' && this.detail())
       this.openMfi(this.detail()!.id);
   }
@@ -385,6 +390,25 @@ export class AdminComponent implements OnDestroy {
         color: f.avg_confidence >= 0.9 ? '#22c55e' : '#f5a524',
       })),
   );
+
+  // ---- Operations (System Health / API Performance) ----
+  loadOps(): void {
+    this.api.getOperations().subscribe({
+      next: (o) => this.ops.set(o),
+      error: () => undefined,
+    });
+  }
+
+  /** Throughput bars from the operations per-day series. */
+  readonly opsBars = computed(() => {
+    const days = this.ops()?.per_day ?? [];
+    const max = Math.max(1, ...days.map((d) => d.count));
+    return days.map((d) => ({
+      h: Math.round((d.count / max) * 150),
+      label: new Date(d.date).getDate().toString(),
+      tip: `${d.count} on ${new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+    }));
+  });
 
   // ---- Two-factor auth ----
   loadTwoFa(): void {

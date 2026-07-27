@@ -332,6 +332,28 @@ export interface ModelHealthReport {
   duplicate: DuplicateReport;
 }
 
+export interface LatencyStats {
+  measured: number;
+  avg_seconds: number | null;
+  p50_seconds: number | null;
+  p95_seconds: number | null;
+  max_seconds: number | null;
+}
+export interface ChannelCount {
+  channel: string;
+  count: number;
+}
+export interface OperationsReport {
+  total_verifications: number;
+  total_embeddings: number;
+  total_users: number;
+  total_mfis: number;
+  total_api_keys: number;
+  latency: LatencyStats;
+  per_day: DayCount[];
+  by_channel: ChannelCount[];
+}
+
 export interface AdminMfiDetail {
   id: string;
   name: string;

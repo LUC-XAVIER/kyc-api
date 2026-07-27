@@ -148,9 +148,30 @@ describe('AdminComponent', () => {
     expect(component.toast()).toContain('suspended');
   });
 
-  it('shows a placeholder for deferred sections', () => {
+  it('loads real operations data for system health', () => {
     component.setPage('system-health');
-    expect(component.isDeferred()).toBeTrue();
+    http.expectOne((r) => r.url.endsWith('/admin/operations')).flush({
+      total_verifications: 12,
+      total_embeddings: 5,
+      total_users: 8,
+      total_mfis: 2,
+      total_api_keys: 3,
+      latency: {
+        measured: 10,
+        avg_seconds: 4.2,
+        p50_seconds: 3.9,
+        p95_seconds: 8.1,
+        max_seconds: 9.5,
+      },
+      per_day: Array.from({ length: 14 }, (_, i) => ({
+        date: `2026-07-${String(i + 1).padStart(2, '0')}`,
+        count: i,
+      })),
+      by_channel: [{ channel: 'API', count: 12 }],
+    });
+    expect(component.isDeferred()).toBeFalse();
+    expect(component.ops()?.total_verifications).toBe(12);
+    expect(component.opsBars().length).toBe(14);
   });
 
   it('loads real model metrics for the monitoring pages', () => {

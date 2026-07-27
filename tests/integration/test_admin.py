@@ -1,6 +1,6 @@
 """Integration tests for the platform-admin (cross-tenant) routes."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -191,6 +191,35 @@ def test_admin_model_health_reports_real_metrics(
     assert body["anti_spoofing"]["evaluated"] >= 1
     fields = {f["field"] for f in body["ocr"]["per_field"]}
     assert {"full_name", "id_number"} <= fields
+
+
+def test_admin_operations_reports_real_figures(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """/admin/operations returns counts, latency, throughput from our data."""
+    headers = _admin_headers(db_session)
+    mfi, _ = create_mfi_with_key(db_session, name="Ops MFI", email="ops@x.cm")
+    v = Verification(
+        client_id="C",
+        mfi_account_id=mfi.id,
+        submission_method=SubmissionMethod.API,
+        status=VerificationStatus.VERIFIED,
+        confidence_score=0.8,
+        created_at=datetime.now(UTC) - timedelta(seconds=5),
+        processed_at=datetime.now(UTC),
+    )
+    db_session.add(v)
+    db_session.flush()
+
+    resp = api_client.get("/api/v1/admin/operations", headers=headers)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total_verifications"] >= 1
+    assert body["latency"]["measured"] >= 1
+    assert body["latency"]["avg_seconds"] is not None
+    assert len(body["per_day"]) == 14
+    assert any(c["channel"] == "API" for c in body["by_channel"])
 
 
 def test_admin_audit_lists_actions(

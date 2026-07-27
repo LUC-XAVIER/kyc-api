@@ -201,6 +201,41 @@ class ModelHealthReport(BaseModel):
     duplicate: DuplicateReport
 
 
+class LatencyStats(BaseModel):
+    """End-to-end pipeline processing time (not HTTP latency)."""
+
+    measured: int
+    avg_seconds: float | None
+    p50_seconds: float | None
+    p95_seconds: float | None
+    max_seconds: float | None
+
+
+class ChannelCount(BaseModel):
+    """Verification volume by submission channel (API vs dashboard)."""
+
+    channel: str
+    count: int
+
+
+class OperationsReport(BaseModel):
+    """Real operational figures for the System Health / API screens.
+
+    Everything here is queried from our own tables — infra metrics (uptime,
+    CPU, container health, per-endpoint HTTP latency) are not collected, so
+    they are simply absent rather than invented.
+    """
+
+    total_verifications: int
+    total_embeddings: int
+    total_users: int
+    total_mfis: int
+    total_api_keys: int
+    latency: LatencyStats
+    per_day: list[DayCount]
+    by_channel: list[ChannelCount]
+
+
 class AdminAuditEntry(BaseModel):
     """One immutable audit-log row, with its MFI resolved to a name."""
 
