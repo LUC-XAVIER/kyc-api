@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 420" width="560" height="420" fill="none" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <defs>
+    <clipPath id="frame"><rect x="8" y="8" width="544" height="404" rx="18"/></clipPath>
+    <clipPath id="ava"><circle cx="84" cy="132" r="46"/></clipPath>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#17181d" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <g clip-path="url(#frame)">
+      <rect x="8" y="8" width="544" height="404" fill="#ffffff"/>
+      <!-- window chrome -->
+      <rect x="8" y="8" width="544" height="46" fill="#f6f7f9"/>
+      <line x1="8" y1="54" x2="552" y2="54" stroke="#e6e7eb"/>
+      <circle cx="30" cy="31" r="5" fill="#e5484d"/>
+      <circle cx="48" cy="31" r="5" fill="#f5a524"/>
+      <circle cx="66" cy="31" r="5" fill="#22c55e"/>
+      <rect x="150" y="19" width="260" height="24" rx="12" fill="#ffffff" stroke="#e6e7eb"/>
+      <text x="280" y="35" text-anchor="middle" font-size="12" fill="#9aa0ab">kyc-api · verification result</text>
+
+      <!-- profile -->
+      <circle cx="84" cy="132" r="46" fill="#f0e6dc"/>
+      <g clip-path="url(#ava)">
+        <rect x="38" y="86" width="92" height="92" fill="#f0e6dc"/>
+        <ellipse cx="84" cy="196" rx="50" ry="34" fill="#2f4a6b"/>
+        <rect x="75" y="150" width="18" height="22" fill="#a86b3f"/>
+        <circle cx="84" cy="124" r="30" fill="#241a15"/>
+        <circle cx="84" cy="132" r="25" fill="#a86b3f"/>
+        <circle cx="75" cy="130" r="2.6" fill="#241a15"/>
+        <circle cx="93" cy="130" r="2.6" fill="#241a15"/>
+        <path d="M74 141 q10 8 20 0" stroke="#6b4423" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      </g>
+      <circle cx="116" cy="162" r="15" fill="#178a5c" stroke="#ffffff" stroke-width="3"/>
+      <path d="M110 162 l4 4 l7 -8" stroke="#ffffff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <text x="152" y="108" font-size="20" font-weight="700" fill="#17181d">FOTSO Jean-Pierre</text>
+      <text x="152" y="132" font-size="13" fill="#565b66">NIC · 118220441 · exp. 2028-04-30</text>
+      <rect x="152" y="146" width="112" height="27" rx="13.5" fill="#e6f7ef"/>
+      <circle cx="167" cy="159.5" r="3.5" fill="#178a5c"/>
+      <text x="177" y="164" font-size="12" font-weight="700" fill="#178a5c">VERIFIED</text>
+
+      <line x1="40" y1="210" x2="520" y2="210" stroke="#eceff2"/>
+
+      <!-- score rows -->
+      <text x="40" y="244" font-size="13" fill="#565b66">Face match</text>
+      <text x="520" y="244" text-anchor="end" font-size="13" font-weight="700" fill="#17181d">0.91</text>
+      <rect x="40" y="252" width="480" height="8" rx="4" fill="#eceff2"/>
+      <rect x="40" y="252" width="437" height="8" rx="4" fill="#178a5c"/>
+
+      <text x="40" y="288" font-size="13" fill="#565b66">Liveness / anti-spoof</text>
+      <text x="520" y="288" text-anchor="end" font-size="13" font-weight="700" fill="#17181d">0.94</text>
+      <rect x="40" y="296" width="480" height="8" rx="4" fill="#eceff2"/>
+      <rect x="40" y="296" width="451" height="8" rx="4" fill="#178a5c"/>
+
+      <text x="40" y="332" font-size="13" fill="#565b66">OCR confidence</text>
+      <text x="520" y="332" text-anchor="end" font-size="13" font-weight="700" fill="#17181d">0.97</text>
+      <rect x="40" y="340" width="480" height="8" rx="4" fill="#eceff2"/>
+      <rect x="40" y="340" width="466" height="8" rx="4" fill="#178a5c"/>
+
+      <line x1="40" y1="372" x2="520" y2="372" stroke="#eceff2"/>
+      <circle cx="48" cy="393" r="9" fill="#e6f7ef"/>
+      <path d="M44 393 l3 3 l5 -6" stroke="#178a5c" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="64" y="397" font-size="12.5" fill="#565b66">Duplicate check — no match across the platform</text>
+      <text x="520" y="397" text-anchor="end" font-size="12" fill="#9aa0ab">4.2s</text>
+    </g>
+    <rect x="8" y="8" width="544" height="404" rx="18" fill="none" stroke="#e6e7eb"/>
+  </g>
+</svg>

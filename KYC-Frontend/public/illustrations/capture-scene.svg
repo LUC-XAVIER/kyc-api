@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 440" width="460" height="440" fill="none" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <defs>
+    <clipPath id="portrait"><rect x="190" y="164" width="46" height="58" rx="4"/></clipPath>
+    <filter id="chip" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#17181d" flood-opacity="0.14"/>
+    </filter>
+    <linearGradient id="scan" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c0392b" stop-opacity="0"/>
+      <stop offset="1" stop-color="#c0392b" stop-opacity="0.22"/>
+    </linearGradient>
+  </defs>
+
+  <!-- soft backdrop -->
+  <circle cx="250" cy="220" r="180" fill="#fbeceb"/>
+  <circle cx="250" cy="220" r="120" fill="#f8dedd"/>
+
+  <!-- phone -->
+  <g filter="url(#chip)">
+    <rect x="140" y="36" width="220" height="372" rx="34" fill="#17181d"/>
+    <rect x="154" y="62" width="192" height="320" rx="12" fill="#0d1017"/>
+  </g>
+  <rect x="232" y="52" width="36" height="6" rx="3" fill="#2a2f3a"/>
+  <rect x="225" y="372" width="50" height="5" rx="2.5" fill="#3a4150"/>
+
+  <!-- NIC card being scanned -->
+  <rect x="178" y="150" width="144" height="104" rx="8" fill="#eef1f4" stroke="#d7d9df"/>
+  <rect x="190" y="164" width="46" height="58" rx="4" fill="#dfe7ee"/>
+  <g clip-path="url(#portrait)">
+    <rect x="190" y="164" width="46" height="58" fill="#dfe7ee"/>
+    <ellipse cx="213" cy="230" rx="22" ry="14" fill="#2f4a6b"/>
+    <circle cx="213" cy="188" r="14" fill="#241a15"/>
+    <circle cx="213" cy="194" r="11.5" fill="#a86b3f"/>
+    <circle cx="209" cy="193" r="1.4" fill="#241a15"/>
+    <circle cx="217" cy="193" r="1.4" fill="#241a15"/>
+  </g>
+  <rect x="248" y="170" width="58" height="6" rx="3" fill="#c7ccd4"/>
+  <rect x="248" y="186" width="64" height="6" rx="3" fill="#c7ccd4"/>
+  <rect x="248" y="202" width="44" height="6" rx="3" fill="#c7ccd4"/>
+  <rect x="248" y="218" width="54" height="6" rx="3" fill="#c0392b"/>
+
+  <!-- scan brackets + line -->
+  <g stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M172 166 L172 146 L192 146"/>
+    <path d="M328 166 L328 146 L308 146"/>
+    <path d="M172 238 L172 258 L192 258"/>
+    <path d="M328 238 L328 258 L308 258"/>
+  </g>
+  <rect x="178" y="188" width="144" height="20" fill="url(#scan)"/>
+  <rect x="178" y="206" width="144" height="3" rx="1.5" fill="#c0392b"/>
+
+  <!-- capture button -->
+  <circle cx="250" cy="350" r="19" fill="none" stroke="#e5e7eb" stroke-width="3"/>
+  <circle cx="250" cy="350" r="13" fill="#ffffff"/>
+
+  <!-- floating chips -->
+  <g filter="url(#chip)">
+    <rect x="298" y="78" width="130" height="36" rx="18" fill="#ffffff"/>
+    <circle cx="318" cy="96" r="4" fill="#178a5c"/>
+    <text x="330" y="100" font-size="12.5" font-weight="600" fill="#178a5c">VERIFIED · 0.96</text>
+  </g>
+  <g filter="url(#chip)">
+    <rect x="34" y="170" width="118" height="36" rx="18" fill="#ffffff"/>
+    <rect x="50" y="182" width="12" height="12" rx="2" fill="none" stroke="#c0392b" stroke-width="2"/>
+    <text x="70" y="192" font-size="12.5" font-weight="600" fill="#17181d">OCR · 0.97</text>
+  </g>
+  <g filter="url(#chip)">
+    <rect x="40" y="286" width="130" height="36" rx="18" fill="#ffffff"/>
+    <circle cx="58" cy="304" r="6.5" fill="none" stroke="#c0392b" stroke-width="2"/>
+    <text x="74" y="308" font-size="12.5" font-weight="600" fill="#17181d">Face match · 0.91</text>
+  </g>
+</svg>

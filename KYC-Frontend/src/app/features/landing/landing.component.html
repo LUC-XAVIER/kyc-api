@@ -1,89 +1,357 @@
-<div class="landing">
-  <header class="topbar">
-    <div class="brand"><div class="brand__logo">K</div><span>KYC-API</span></div>
-    <a class="signin-link" routerLink="/login">Sign in →</a>
-  </header>
+<div class="site">
+  <nav>
+    <div class="nav-logo" (click)="setPage('home')">
+      <div class="logo-mark">K</div>
+      KYC-API
+    </div>
+    <div class="nav-links">
+      <button class="nav-link" [class.active]="page() === 'users'" (click)="setPage('users')">Who uses KYC-API</button>
+      <button class="nav-link" [class.active]="page() === 'pricing'" (click)="setPage('pricing')">Pricing</button>
+      <button class="nav-link" [class.active]="page() === 'contact'" (click)="setPage('contact')">Contact</button>
+    </div>
+    <div class="nav-cta">
+      <a class="btn-ghost" routerLink="/login">Sign in</a>
+      <button class="btn-primary" (click)="setPage('demo')">Get a demo</button>
+    </div>
+  </nav>
 
-  <section class="hero">
-    <div class="hero__eyebrow">KYC-API FOR MICROFINANCE INSTITUTIONS</div>
-    <h1>Automated biometric identity verification</h1>
-    <p>COBAC-compliant KYC for Cameroonian MFIs — face match, liveness, OCR,
-      and duplicate detection, from one dashboard or your own software.</p>
-  </section>
-
-  @if (sentLink() !== null || sentEmail()) {
-    <section class="sent">
-      <div class="sent__icon">✓</div>
-      <div>
-        <div class="sent__title">Check your email</div>
-        <div class="sent__meta">
-          We've sent a signup link to <b>{{ sentEmail() }}</b>.
+  <!-- HOME -->
+  @if (page() === 'home') {
+    <div class="page">
+      <div class="hero">
+        <div class="hero-badge"><span class="ic ic-sm" [innerHTML]="icon('shield-check')"></span> COBAC-compliant · Built for Cameroon</div>
+        <h1>Verify your clients' identity <span>automatically</span> — in under 5 seconds</h1>
+        <p class="hero-sub">KYC-API automates identity verification for Microfinance Institutions. Capture a NIC card and selfie — get a verified, pending, or rejected result instantly.</p>
+        <div class="hero-actions">
+          <button class="btn-hero btn-hero-primary" (click)="setPage('demo')"><span class="ic ic-sm" [innerHTML]="icon('play')"></span> Get a demo</button>
+          <button class="btn-hero btn-hero-secondary" (click)="setPage('contact')">Contact us</button>
         </div>
-        @if (sentLink()) {
-          <a class="sent__dev" [href]="sentLink()">
-            Dev link — open signup →
-          </a>
+        <p class="hero-coverage">Active in <strong>Cameroon</strong> · supporting MFIs across the CEMAC zone</p>
+
+        <div class="hero-showcase">
+          <img src="/illustrations/verification-card.svg" alt="A verified KYC-API result: a client's selfie matched to their national ID, with liveness, OCR and duplicate-check scores" />
+        </div>
+
+        <div class="pipeline">
+          @for (s of pipeline; track s.title; let last = $last) {
+            <div class="pipe-step" [class.pipe-step--final]="last">
+              <span class="ic" [innerHTML]="icon(s.icon)"></span>
+              <span class="pipe-title">{{ s.title }}</span>
+              <small>{{ s.sub }}</small>
+            </div>
+            @if (!last) { <div class="pipe-arrow"><span class="ic ic-sm" [innerHTML]="icon('arrow-right')"></span></div> }
+          }
+        </div>
+      </div>
+
+      <div class="stats-band">
+        @for (s of stats; track s.label) {
+          <div class="stat-item"><div class="stat-num">{{ s.num }}</div><div class="stat-label">{{ s.label }}</div></div>
         }
       </div>
-    </section>
+
+      <div class="section">
+        <div class="section-label">What KYC-API does</div>
+        <h2>Everything your MFI needs — nothing more</h2>
+        <p class="section-sub">A complete identity verification platform. Your agents capture the client's documents on-site; KYC-API handles everything else.</p>
+        <div class="features-grid">
+          @for (f of features; track f.title) {
+            <div class="feature-card">
+              <div class="feature-icon"><span class="ic" [innerHTML]="icon(f.icon)"></span></div>
+              <h3>{{ f.title }}</h3>
+              <p>{{ f.desc }}</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">How it works</div>
+        <h2>Simple for agents, powerful underneath</h2>
+        <p class="section-sub">Your agents don't need technical training. The workflow is straightforward.</p>
+        <div class="how-layout">
+          <div class="steps">
+            @for (st of steps; track st.n) {
+              <div class="step-row">
+                <div class="step-num">{{ st.n }}</div>
+                <div class="step-content"><h3>{{ st.title }}</h3><p>{{ st.desc }}</p></div>
+              </div>
+            }
+          </div>
+          <div class="how-visual">
+            <img src="/illustrations/capture-scene.svg" alt="An agent capturing a client's national ID and selfie on a phone, with live OCR, face-match and liveness scores appearing" />
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Common questions</div>
+        <h2>FAQ</h2>
+        <p class="section-sub">Everything you need to know before subscribing.</p>
+        <div class="faq-list">
+          @for (f of faqs; track f.q) {
+            <div class="faq-item">
+              <button class="faq-q" [class.open]="openFaqs().has(f.q)" (click)="toggleFaq(f.q)">
+                {{ f.q }}
+                <span class="ic ic-sm faq-plus" [innerHTML]="icon('plus')"></span>
+              </button>
+              @if (openFaqs().has(f.q)) { <div class="faq-a">{{ f.a }}</div> }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
   }
 
-  <section class="plans-wrap">
-    <h2>Choose your plan</h2>
-    <p class="plans-sub">Pick the verification volume that matches your
-      institution's size and growth.</p>
-    <div class="plans">
-      @for (p of plans; track p.key) {
-        <div class="plan" [class.plan--popular]="p.popular">
-          @if (p.popular) { <div class="plan__badge">Most popular</div> }
-          <div class="plan__name">{{ p.name }}</div>
-          <div class="plan__tag">{{ p.tagline }}</div>
-          <div class="plan__price">{{ p.price }}<span>{{ p.period }}</span></div>
-          @if (p.yearly) { <div class="plan__year">{{ p.yearly }}</div> }
-          <div class="plan__vol">{{ p.volume }}</div>
-          <button
-            class="ox-btn plan__btn"
-            [class.ox-btn--primary]="p.popular"
-            [class.ox-btn--outline-red]="!p.popular"
-            (click)="choose(p)"
-          >
-            {{ p.key === 'ENTERPRISE' ? 'Contact sales' : 'Choose ' + p.name }}
-          </button>
-          <div class="plan__features">
-            @for (f of p.features; track f) {
-              <div class="feature">✓ {{ f }}</div>
+  <!-- WHO USES -->
+  @if (page() === 'users') {
+    <div class="page">
+      <div class="page-hero">
+        <div class="section-label">Who uses KYC-API</div>
+        <h1>Built for microfinance, ready for any financial institution</h1>
+        <p>KYC-API serves MFIs across the size spectrum — from single-branch cooperatives to nationwide networks — as well as financial platforms that embed identity verification in their own software.</p>
+      </div>
+      <div class="section">
+        <div class="users-grid">
+          @for (u of users; track u.title) {
+            <div class="user-card">
+              <span class="user-type">{{ u.type }}</span>
+              <h3>{{ u.title }}</h3>
+              <p>{{ u.desc }}</p>
+            </div>
+          }
+        </div>
+
+        <div class="testimonial-band">
+          @for (t of testimonials; track t.cite) {
+            <div class="testimonial">
+              <blockquote>{{ t.quote }}</blockquote>
+              <cite>{{ t.cite }}</cite>
+            </div>
+          }
+        </div>
+
+        <div class="regions">
+          <p>Operational regions</p>
+          <div class="region-chips">
+            @for (r of regions; track r) { <span class="region-chip">{{ r }}</span> }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- PRICING -->
+  @if (page() === 'pricing') {
+    <div class="page">
+      <div class="page-hero">
+        <div class="section-label">Pricing</div>
+        <h1>Choose the volume that fits your institution</h1>
+        <p>All plans include the full verification pipeline, complete management dashboard, COBAC compliance reports, and duplicate detection. No hidden features — only volume and team size differ.</p>
+      </div>
+      <div class="section">
+        <div class="pricing-grid">
+          @for (p of plans; track p.key) {
+            <div class="plan-card" [class.featured]="p.popular">
+              @if (p.popular) { <div class="plan-badge">Most popular</div> }
+              <div class="plan-name">{{ p.name }}</div>
+              <div class="plan-price">{{ p.price }}<span class="unit">{{ p.period }}</span></div>
+              <div class="plan-quota">{{ p.volume }}</div>
+              <div class="plan-divider"></div>
+              <ul class="plan-features">
+                @for (f of p.features; track f) {
+                  <li><span class="ic ic-sm check" [innerHTML]="icon('check')"></span>{{ f }}</li>
+                }
+              </ul>
+              <button class="plan-btn" (click)="choose(p)">{{ p.key === 'ENTERPRISE' ? 'Contact sales' : 'Get started' }}</button>
+            </div>
+          }
+        </div>
+
+        <div class="pricing-faq">
+          <div class="section-label">Pricing FAQ</div>
+          <div class="faq-list">
+            @for (f of faqs.slice(2, 6); track f.q) {
+              <div class="faq-item">
+                <button class="faq-q" [class.open]="openFaqs().has(f.q)" (click)="toggleFaq(f.q)">
+                  {{ f.q }}<span class="ic ic-sm faq-plus" [innerHTML]="icon('plus')"></span>
+                </button>
+                @if (openFaqs().has(f.q)) { <div class="faq-a">{{ f.a }}</div> }
+              </div>
             }
           </div>
         </div>
-      }
+      </div>
     </div>
-  </section>
+  }
 
-  <!-- Email capture modal -->
+  <!-- CONTACT -->
+  @if (page() === 'contact') {
+    <div class="page">
+      <div class="page-hero">
+        <div class="section-label">Contact</div>
+        <h1>Get in touch</h1>
+        <p>Whether you want to subscribe, have a question, or want to talk through which plan fits your institution — we're here.</p>
+      </div>
+      <div class="section">
+        <div class="contact-layout">
+          <div class="contact-info">
+            <h2>We'd love to hear from you</h2>
+            <p>Reach out to discuss your MFI's needs, request a custom demo, or ask about Enterprise pricing. We respond within one business day.</p>
+            <div class="contact-methods">
+              @for (m of contactMethods; track m.label) {
+                <div class="contact-method">
+                  <span class="ic" [innerHTML]="icon(m.icon)"></span>
+                  <div><span>{{ m.label }}</span><strong>{{ m.value }}</strong></div>
+                </div>
+              }
+            </div>
+          </div>
+          <div class="form-card">
+            <h3>Send us a message</h3>
+            <form (submit)="$event.preventDefault(); sendContact()">
+              <div class="form-row">
+                <div class="form-group"><label>First name</label><input type="text" placeholder="Jean-Pierre" [value]="cFirst()" (input)="cFirst.set($any($event.target).value)"></div>
+                <div class="form-group"><label>Last name</label><input type="text" placeholder="FOTSO" [value]="cLast()" (input)="cLast.set($any($event.target).value)"></div>
+              </div>
+              <div class="form-group"><label>Institution name</label><input type="text" placeholder="CamFinance Microfinance" [value]="cOrg()" (input)="cOrg.set($any($event.target).value)"></div>
+              <div class="form-group"><label>Email address</label><input type="email" placeholder="you@mfi.cm" [value]="cEmail()" (input)="cEmail.set($any($event.target).value)"></div>
+              <div class="form-group">
+                <label>What are you interested in?</label>
+                <select [value]="cInterest()" (change)="cInterest.set($any($event.target).value)">
+                  @for (i of interests; track i) { <option [value]="i">{{ i }}</option> }
+                </select>
+              </div>
+              <div class="form-group"><label>Message</label><textarea placeholder="Tell us about your MFI — number of branches, agents, estimated monthly verifications..." [value]="cMessage()" (input)="cMessage.set($any($event.target).value)"></textarea></div>
+              <button type="submit" class="form-submit">Send message</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- DEMO -->
+  @if (page() === 'demo') {
+    <div class="page">
+      <div class="page-hero">
+        <div class="section-label">Demonstration</div>
+        <h1>See KYC-API in action</h1>
+        <p>Run a live sandbox verification using sample data and see the full pipeline response — no account required.</p>
+      </div>
+      <div class="section">
+        <div class="demo-layout">
+          <div class="demo-info">
+            <h2>What the demo shows you</h2>
+            <p>The sandbox runs the complete 5-stage pipeline against pre-loaded sample NIC images and a synthetic selfie. You see the exact JSON response structure your integration would receive.</p>
+            <div class="demo-features">
+              @for (f of demoFeatures; track f) {
+                <div class="demo-feature"><span class="ic ic-sm check" [innerHTML]="icon('check')"></span>{{ f }}</div>
+              }
+            </div>
+            <div class="demo-warn">
+              <strong>Sandbox mode</strong> — this demo uses pre-loaded sample data, not real client images. No biometric data is captured or stored during the demonstration.
+            </div>
+          </div>
+
+          <div>
+            <div class="sandbox-card">
+              <h3>Live sandbox</h3>
+              <p>Choose a scenario and run the pipeline</p>
+              <div class="form-group">
+                <label>Scenario</label>
+                <select [value]="scenario()" (change)="scenario.set($any($event.target).value)">
+                  @for (s of demoScenarios; track s.value) { <option [value]="s.value">{{ s.label }}</option> }
+                </select>
+              </div>
+              <button class="sandbox-btn" [disabled]="demoRunning()" (click)="runDemo()">
+                @if (demoRunning()) { <span class="spinner"></span> Running… }
+                @else { <span class="ic ic-sm" [innerHTML]="icon('play')"></span> Run verification }
+              </button>
+              @if (demoLines(); as lines) {
+                <div class="sandbox-result">
+                  <div class="result-line brace">&#123;</div>
+                  @for (l of lines; track $index) {
+                    <div class="result-line" [class.indent]="l.indent">
+                      <span class="key">"{{ l.key }}": </span><span [class]="l.cls">{{ l.val }}</span>
+                    </div>
+                  }
+                  <div class="result-line brace">&#125;</div>
+                </div>
+              }
+            </div>
+
+            <div class="book-card">
+              <h3>Want a full walkthrough?</h3>
+              <p>Book a live demo with our team. We'll walk you through the dashboard, the manager review flow, compliance reporting, and the API integration process.</p>
+              <button class="sandbox-btn" (click)="setPage('contact')"><span class="ic ic-sm" [innerHTML]="icon('calendar')"></span> Book a demo call</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-brand">
+      <div class="logo-wrap"><div class="logo-mark">K</div><span class="footer-name">KYC-API</span></div>
+      <p>Automated biometric identity verification for Microfinance Institutions in Cameroon.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Product</h4>
+      <a (click)="setPage('home')">How it works</a>
+      <a (click)="setPage('pricing')">Pricing</a>
+      <a (click)="setPage('demo')">Demonstration</a>
+    </div>
+    <div class="footer-col">
+      <h4>Company</h4>
+      <a (click)="setPage('users')">Who uses KYC-API</a>
+      <a (click)="setPage('contact')">Contact</a>
+      <a href="https://github.com/LUC-XAVIER/kyc-api" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <div class="footer-col">
+      <h4>Legal</h4>
+      <a>Privacy policy</a>
+      <a>Data protection</a>
+      <a>COBAC compliance</a>
+    </div>
+  </footer>
+  <div class="footer-bottom">
+    <span>© 2026 KYC-API · Yaoundé, Cameroon</span>
+    <span>Built with open-source tools · Zero licensing cost</span>
+  </div>
+
+  <!-- Email-capture modal (real signup flow) -->
   @if (selected(); as plan) {
     <div class="modal-overlay" (click)="cancel()">
       <div class="modal" (click)="$event.stopPropagation()">
         <div class="modal__title">Get started — {{ plan.name }} plan</div>
-        <p class="modal__sub">Enter your email; we'll send a link to finish
-          setting up your account.</p>
+        <p class="modal__sub">Enter your email; we'll send a link to finish setting up your account.</p>
         <form (submit)="$event.preventDefault(); submit()">
           <label class="field-label">Work email</label>
-          <input
-            class="field"
-            type="email"
-            autocomplete="email"
-            placeholder="you@mfi.cm"
-            [value]="email()"
-            (input)="email.set($any($event.target).value)"
-          />
+          <input class="field" type="email" autocomplete="email" placeholder="you@mfi.cm"
+            [value]="email()" (input)="email.set($any($event.target).value)" />
           @if (error()) { <div class="err">{{ error() }}</div> }
           <div class="modal__actions">
-            <button type="button" class="ox-btn ox-btn--outline" (click)="cancel()">Cancel</button>
-            <button type="submit" class="ox-btn ox-btn--primary" [disabled]="loading()">
+            <button type="button" class="btn-ghost" (click)="cancel()">Cancel</button>
+            <button type="submit" class="btn-primary" [disabled]="loading()">
               {{ loading() ? 'Sending…' : 'Send signup link' }}
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  }
+
+  <!-- Signup-sent toast -->
+  @if (sentEmail()) {
+    <div class="sent-toast">
+      <span class="ic ic-sm" [innerHTML]="icon('circle-check')"></span>
+      <div>
+        <div class="sent-toast__title">Check your email</div>
+        <div class="sent-toast__meta">Signup link sent to <b>{{ sentEmail() }}</b>.</div>
+        @if (sentLink()) { <a class="sent-toast__dev" [href]="sentLink()">Dev link — open signup →</a> }
       </div>
     </div>
   }
