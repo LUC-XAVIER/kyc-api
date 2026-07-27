@@ -58,3 +58,6 @@ Thumbs.db
 #personal Info (real ID images — never commit)
 docs/Identifiers/testImages/
 docs/identifiers/testImages/
+
+# Internal reference doc (report template — never commit)
+docs/Guide de Redaction du Rapport de Stage ISJ-2025.pdf
