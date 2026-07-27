@@ -28,6 +28,10 @@
         </div>
         <p class="hero-coverage">Active in <strong>Cameroon</strong> · supporting MFIs across the CEMAC zone</p>
 
+        <div class="hero-showcase">
+          <img src="/illustrations/verification-card.svg" alt="A verified KYC-API result: a client's selfie matched to their national ID, with liveness, OCR and duplicate-check scores" />
+        </div>
+
         <div class="pipeline">
           @for (s of pipeline; track s.title; let last = $last) {
             <div class="pipe-step" [class.pipe-step--final]="last">
@@ -65,13 +69,18 @@
         <div class="section-label">How it works</div>
         <h2>Simple for agents, powerful underneath</h2>
         <p class="section-sub">Your agents don't need technical training. The workflow is straightforward.</p>
-        <div class="steps">
-          @for (st of steps; track st.n) {
-            <div class="step-row">
-              <div class="step-num">{{ st.n }}</div>
-              <div class="step-content"><h3>{{ st.title }}</h3><p>{{ st.desc }}</p></div>
-            </div>
-          }
+        <div class="how-layout">
+          <div class="steps">
+            @for (st of steps; track st.n) {
+              <div class="step-row">
+                <div class="step-num">{{ st.n }}</div>
+                <div class="step-content"><h3>{{ st.title }}</h3><p>{{ st.desc }}</p></div>
+              </div>
+            }
+          </div>
+          <div class="how-visual">
+            <img src="/illustrations/capture-scene.svg" alt="An agent capturing a client's national ID and selfie on a phone, with live OCR, face-match and liveness scores appearing" />
+          </div>
         </div>
       </div>
 
