@@ -16,6 +16,7 @@ from app.api.v1.routes import (
     health,
     monitoring,
     onboarding,
+    payments,
     reports,
     reviews,
     verifications,
@@ -35,4 +36,5 @@ api_router.include_router(reviews.router)
 api_router.include_router(verifications.router)
 api_router.include_router(reports.router)
 api_router.include_router(monitoring.router)
+api_router.include_router(payments.router)
 api_router.include_router(admin.router)

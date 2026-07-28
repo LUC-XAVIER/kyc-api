@@ -31,6 +31,10 @@ dependencies = [
     # authenticator-app enrolment (SVG factory — no Pillow dependency).
     "pyotp>=2.9",
     "qrcode>=7.4",
+    # HTTP client for the Campay mobile-money calls (collect / status). Also
+    # a dev dep via the FastAPI test client, but declared here because the
+    # payment provider imports it at runtime and prod images omit dev deps.
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
