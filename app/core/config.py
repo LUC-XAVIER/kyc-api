@@ -101,6 +101,12 @@ class Settings(BaseSettings):
     campay_webhook_key: str = ""
     # Currency every collection is charged in (Campay is XAF-only for now).
     payments_currency: str = "XAF"
+    # Sandbox testing aid. Campay's sandbox caps a transaction at 25 XAF, but
+    # our plans cost far more. When > 0 the collection sent to the provider
+    # uses this amount instead of the plan price (the payment record still
+    # stores the real price), so the flow is testable under the cap. Leave 0
+    # in production so real plan prices are charged.
+    campay_test_amount: int = 0
 
     @property
     def is_production(self) -> bool:

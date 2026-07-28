@@ -12,6 +12,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.validation import normalize_cm_phone
 from app.models import MfiAccount, Payment, SubscriptionPlan
@@ -72,6 +73,8 @@ def start_subscription_payment(
     payment = Payment(
         mfi_account_id=mfi.id,
         plan_name=plan_name,
+        # Record the real plan price; a sandbox test override only changes
+        # what we ask the provider to collect, not what the plan costs.
         amount=plan.monthly_price,
         currency="XAF",
         phone=normalized,
@@ -82,8 +85,9 @@ def start_subscription_payment(
     db.add(payment)
     db.flush()
 
+    charge = settings.campay_test_amount or plan.monthly_price
     result = provider.initiate_collection(
-        amount=plan.monthly_price,
+        amount=charge,
         currency="XAF",
         # Campay wants bare international digits (no leading '+').
         phone=normalized.lstrip("+"),
