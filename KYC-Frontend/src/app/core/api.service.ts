@@ -12,6 +12,7 @@ import {
   AgentProfile,
   ModelHealthReport,
   OperationsReport,
+  Payment,
   AgentSummary,
   ApiKeyCreated,
   ApiKeySummary,
@@ -227,5 +228,24 @@ export class ApiService {
     return this.http.get<AdminAuditEntry[]>(`${this.base}/admin/audit`, {
       params,
     });
+  }
+
+  // ---- Payments (mobile-money subscription) ----
+  subscribePayment(plan: string, phone: string): Observable<Payment> {
+    return this.http.post<Payment>(`${this.base}/payments/subscribe`, {
+      plan,
+      phone,
+    });
+  }
+
+  getPayment(id: string): Observable<Payment> {
+    // Skip the global overlay — the billing panel shows its own status.
+    return this.http.get<Payment>(`${this.base}/payments/${id}`, {
+      context: skipLoading(),
+    });
+  }
+
+  listPayments(): Observable<Payment[]> {
+    return this.http.get<Payment[]>(`${this.base}/payments`);
   }
 }

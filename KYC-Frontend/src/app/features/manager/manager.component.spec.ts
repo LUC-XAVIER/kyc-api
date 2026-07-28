@@ -225,4 +225,53 @@ describe('ManagerComponent', () => {
     component.toggleNotif('weekly');
     expect(component.notifs()['weekly']).toBe(!before);
   });
+
+  it('loads payment history when opening the Subscription tab', () => {
+    component.setSettingsTab('Subscription');
+    http.expectOne(`${API_URL}/payments`).flush([
+      {
+        id: 'p1',
+        plan_name: 'GROWTH',
+        amount: 65000,
+        currency: 'XAF',
+        phone: '+237677123456',
+        status: 'SUCCESSFUL',
+        provider: 'MOCK',
+        ussd_code: null,
+        failure_reason: null,
+        created_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      },
+    ]);
+    expect(component.payHistory().length).toBe(1);
+  });
+
+  it('starts a payment and holds it as the active pending payment', () => {
+    component.payPhone.set('677123456');
+    component.startPayment();
+    http.expectOne(`${API_URL}/payments/subscribe`).flush({
+      id: 'p2',
+      plan_name: 'GROWTH',
+      amount: 65000,
+      currency: 'XAF',
+      phone: '+237677123456',
+      status: 'PENDING',
+      provider: 'MOCK',
+      ussd_code: '*126#',
+      failure_reason: null,
+      created_at: new Date().toISOString(),
+      completed_at: null,
+    });
+    expect(component.activePayment()?.status).toBe('PENDING');
+    expect(component.payError()).toBe('');
+    component.dismissPayment();
+    expect(component.activePayment()).toBeNull();
+  });
+
+  it('rejects a payment with no phone number', () => {
+    component.payPhone.set('');
+    component.startPayment();
+    http.expectNone(`${API_URL}/payments/subscribe`);
+    expect(component.payError()).toContain('number');
+  });
 });

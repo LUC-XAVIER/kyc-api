@@ -1,5 +1,11 @@
-import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { DatePipe, DecimalPipe, NgTemplateOutlet } from '@angular/common';
+import {
+  Component,
+  OnDestroy,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
@@ -12,6 +18,7 @@ import {
   ApiKeyCreated,
   BranchSummary,
   ImageKind,
+  Payment,
   ReportSummary,
   ReviewItem,
   VerificationDetail,
@@ -186,11 +193,20 @@ const SETTINGS_TABS: SettingsTab[] = [
  */
 @Component({
   selector: 'app-manager',
-  imports: [VerificationScoresComponent, NgTemplateOutlet],
+  imports: [
+    VerificationScoresComponent,
+    NgTemplateOutlet,
+    DatePipe,
+    DecimalPipe,
+  ],
   templateUrl: './manager.component.html',
   styleUrl: './manager.component.scss',
 })
-export class ManagerComponent {
+export class ManagerComponent implements OnDestroy {
+  ngOnDestroy(): void {
+    clearInterval(this.payPoll);
+  }
+
   private readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly loading = inject(LoadingService);
@@ -1142,6 +1158,74 @@ export class ManagerComponent {
 
   setSettingsTab(t: SettingsTab): void {
     this.settingsTab.set(t);
+    if (t === 'Subscription') this.loadPayments();
+  }
+
+  // ---- Subscription payment (mobile money) ----
+  readonly PLANS = PLANS;
+  readonly payPlan = signal<string>('GROWTH');
+  readonly payPhone = signal('');
+  readonly payLoading = signal(false);
+  readonly payError = signal('');
+  readonly activePayment = signal<Payment | null>(null);
+  readonly payHistory = signal<Payment[]>([]);
+  private payPoll: ReturnType<typeof setInterval> | undefined;
+
+  /** Payable plans only (Enterprise is custom-priced — contact sales). */
+  readonly payablePlans = PLANS.filter((p) => p.key !== 'ENTERPRISE');
+
+  loadPayments(): void {
+    this.api.listPayments().subscribe({
+      next: (list) => this.payHistory.set(list),
+      error: () => undefined,
+    });
+  }
+
+  startPayment(): void {
+    if (this.payLoading()) return;
+    const phone = this.payPhone().trim();
+    if (phone.length < 9) {
+      this.payError.set('Enter the mobile-money number to charge.');
+      return;
+    }
+    this.payLoading.set(true);
+    this.payError.set('');
+    this.api.subscribePayment(this.payPlan(), phone).subscribe({
+      next: (p) => {
+        this.payLoading.set(false);
+        this.activePayment.set(p);
+        this.pollPayment(p.id);
+      },
+      error: (err) => {
+        this.payLoading.set(false);
+        this.payError.set(apiMessage(err, 'Could not start the payment.'));
+      },
+    });
+  }
+
+  /** Poll a pending payment until it settles, then refresh account + list. */
+  private pollPayment(id: string): void {
+    clearInterval(this.payPoll);
+    this.payPoll = setInterval(() => {
+      this.api.getPayment(id).subscribe({
+        next: (p) => {
+          this.activePayment.set(p);
+          if (p.status !== 'PENDING') {
+            clearInterval(this.payPoll);
+            this.loadPayments();
+            if (p.status === 'SUCCESSFUL') this.loadAccount();
+          }
+        },
+        error: () => undefined,
+      });
+    }, 3000);
+  }
+
+  dismissPayment(): void {
+    clearInterval(this.payPoll);
+    this.activePayment.set(null);
+    this.payPhone.set('');
+    this.payError.set('');
   }
 
   saveSettings(): void {
