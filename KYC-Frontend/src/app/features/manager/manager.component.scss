@@ -539,3 +539,11 @@
     line-height: 1.5;
   }
 }
+
+/* ---- Locked nav / tabs while the subscription is pending ---- */
+.nav-item.is-locked,
+.settings-tab.is-locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

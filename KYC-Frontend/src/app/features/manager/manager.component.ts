@@ -535,6 +535,9 @@ export class ManagerComponent implements OnDestroy {
   );
 
   setPage(p: ManagerPage): void {
+    // Locked to the pay screen until the subscription is activated: an
+    // unpaid account may only see Settings → Subscription.
+    if (this.needsActivation() && p !== 'settings') return;
     this.page.set(p);
     // Bracket the switch so a page that fetches nothing (Dashboard) still
     // gets the transition. When a load does run, its request nests inside
@@ -1172,6 +1175,8 @@ export class ManagerComponent implements OnDestroy {
   }
 
   setSettingsTab(t: SettingsTab): void {
+    // While unpaid, the only reachable settings tab is Subscription.
+    if (this.needsActivation() && t !== 'Subscription') return;
     this.settingsTab.set(t);
     if (t === 'Subscription') this.loadPayments();
   }
