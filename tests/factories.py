@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.security import generate_api_key, hash_password
 from app.core.validation import normalize_cm_phone
 from app.models import ApiKey, Branch, MfiAccount, SubscriptionPlan, User
-from app.models.enums import AgentRole, PlanName
+from app.models.enums import AgentRole, MfiStatus, PlanName
 
 _IDENT_SEQ = itertools.count(1)
 
@@ -55,6 +55,9 @@ def create_mfi_with_key(
         name=name,
         email=email,
         plan_id=plan.id,
+        # Active by default: the usual test precondition is a paid, working
+        # subscription. Tests that need a fresh/unpaid account set PENDING.
+        status=MfiStatus.ACTIVE,
         current_period_usage=usage,
         # An account already consuming quota is within an active billing
         # cycle; without this, roll_period_if_needed would reset usage.

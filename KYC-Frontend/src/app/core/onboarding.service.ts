@@ -3,10 +3,16 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 import { API_URL } from './config';
+import { Principal } from './auth.service';
 
 export interface StartResponse {
   status: string;
   signup_link: string | null;
+}
+
+/** Completing signup returns a session (auto-login) so the wizard can pay. */
+export interface CompleteResponse extends Principal {
+  email: string;
 }
 
 export interface InviteInfo {
@@ -40,8 +46,8 @@ export class OnboardingService {
     );
   }
 
-  complete(payload: CompletePayload): Observable<{ email: string }> {
-    return this.http.post<{ email: string }>(
+  complete(payload: CompletePayload): Observable<CompleteResponse> {
+    return this.http.post<CompleteResponse>(
       `${API_URL}/onboarding/complete`,
       payload,
     );

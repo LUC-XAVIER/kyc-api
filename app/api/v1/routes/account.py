@@ -22,6 +22,7 @@ def _summary(mfi: MfiAccount) -> AccountSummary:
         id=mfi.id,
         name=mfi.name,
         email=mfi.email,
+        status=mfi.status,
         plan_name=plan.name.value if plan else None,
         verification_quota=plan.verification_quota if plan else None,
         current_period_usage=mfi.current_period_usage,

@@ -213,6 +213,14 @@ by bearer/key and instead **verified by the request signature**; it is
 is set to the paid plan, `status = ACTIVE`, and a fresh billing cycle starts
 (usage reset). Enterprise is custom-priced and rejected for self-checkout.
 
+**Signup is gated on payment.** `/onboarding/complete` now creates the MFI as
+`PENDING` (not `ACTIVE`) and returns a **session token** (auto-login), so the
+signup wizard drops the new manager straight onto the dashboard's pay gate. A
+`PENDING` account can log in but **cannot run verifications** — the metered
+dependency rejects any non-`ACTIVE` subscription (403). The first successful
+payment flips it to `ACTIVE`; an abandoned signup resumes the same gate on next
+login. `AccountSummary` now carries `status` so the dashboard knows to show it.
+
 The gateway sits behind an interface (`app/services/payment_provider.py`):
 when `PAYMENTS_ENABLED=false` (dev/tests) a **mock provider** simulates the
 whole flow with no network — a payer phone ending in `0000` simulates a

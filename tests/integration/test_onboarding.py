@@ -3,6 +3,9 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.models import MfiAccount
+from app.models.enums import MfiStatus
+
 BASE = "/api/v1/onboarding"
 LOGIN_URL = "/api/v1/auth/login"
 
@@ -69,7 +72,17 @@ def test_complete_creates_account_then_manager_logs_in(
         },
     )
     assert complete.status_code == 201
-    assert complete.json()["email"] == "boss@mfi.cm"
+    body = complete.json()
+    assert body["email"] == "boss@mfi.cm"
+    # Auto-login session is returned so the wizard can run the payment step.
+    assert body["access_token"]
+    assert body["role"] == "MANAGER"
+
+    # The account is PENDING until its first payment activates it.
+    mfi = (
+        db_session.query(MfiAccount).filter_by(email="boss@mfi.cm").one()
+    )
+    assert mfi.status == MfiStatus.PENDING
 
     login = api_client.post(
         LOGIN_URL, json={"identifier": "boss@mfi.cm", "pin": "778899"}

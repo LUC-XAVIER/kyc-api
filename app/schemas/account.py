@@ -4,6 +4,8 @@ import uuid
 
 from pydantic import BaseModel
 
+from app.models.enums import MfiStatus
+
 
 class AccountSummary(BaseModel):
     """Public summary of an authenticated MFI account and its quota."""
@@ -11,6 +13,9 @@ class AccountSummary(BaseModel):
     id: uuid.UUID
     name: str
     email: str
+    # PENDING until the first payment activates the subscription; the
+    # dashboard shows a pay-to-activate gate while it is not ACTIVE.
+    status: MfiStatus
     plan_name: str | None
     verification_quota: int | None
     current_period_usage: int
