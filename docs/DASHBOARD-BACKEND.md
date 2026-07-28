@@ -147,6 +147,9 @@ caller is manager-level. Audit-log entries now record the real actor
 | `GET /kyc/monitoring/drift` | API key *(see §9)* | face-match drift report |
 | `GET /agents` · `POST /agents` · `PATCH /agents/{id}` | **manager** | staff management |
 | `GET /api-keys` · `POST /api-keys` · `DELETE /api-keys/{id}` | **manager** | key management |
+| `POST /payments/subscribe` | **manager** | start a plan payment (mobile money) |
+| `GET /payments` · `/{id}` | **manager** | list / poll payments (scoped to the MFI) |
+| `POST /payments/webhook` | **signature-verified** | provider payment-status callback |
 | `GET /admin/stats` | **platform admin** | cross-tenant Overview totals |
 | `GET /admin/mfis` | **platform admin** | every MFI + rollup counts |
 | `GET /admin/mfis/{id}` | **platform admin** | one MFI drill-down |
@@ -197,6 +200,27 @@ confidences, `face_embeddings`, `duplicate_flags` — so no figure is
 fabricated. Metrics needing ground-truth labels (FAR/FRR), attack-type
 breakdowns, or request-level telemetry (per-endpoint latency, uptime) are
 deliberately **not** produced.
+
+### Payments (mobile-money subscription)
+An MFI manager subscribes to / renews a plan by paying with **MTN Mobile Money
+or Orange Money** through **Campay** (an aggregator — one API covers both
+networks). `POST /payments/subscribe` (plan + phone) creates a `PENDING`
+`Payment` and asks Campay to push a USSD PIN prompt to the payer; the client
+then polls `GET /payments/{id}` (which re-checks the provider) until it settles.
+Campay also confirms out-of-band at `POST /payments/webhook` — unauthenticated
+by bearer/key and instead **verified by the request signature**; it is
+**idempotent**, so a duplicate callback never re-activates. On success the MFI
+is set to the paid plan, `status = ACTIVE`, and a fresh billing cycle starts
+(usage reset). Enterprise is custom-priced and rejected for self-checkout.
+
+The gateway sits behind an interface (`app/services/payment_provider.py`):
+when `PAYMENTS_ENABLED=false` (dev/tests) a **mock provider** simulates the
+whole flow with no network — a payer phone ending in `0000` simulates a
+decline — so payments are fully testable without a merchant account. Set
+`PAYMENTS_ENABLED=true` + `CAMPAY_TOKEN` + `CAMPAY_WEBHOOK_KEY` to go live;
+production refuses to boot with payments enabled but those unset. Sandbox base
+URL is `https://demo.campay.net/api`, production `https://campay.net/api`.
+Every state change is audited (`payment.initiated/succeeded/failed`).
 
 `GET /admin/operations` backs the System Health and API Performance screens
 with real figures only: table counts (verifications, embeddings, users, MFIs,

@@ -20,6 +20,9 @@ REVIEW_REJECTED = "review.rejected"
 REPORT_GENERATED = "report.generated"
 MFI_SUSPENDED = "mfi.suspended"
 MFI_REACTIVATED = "mfi.reactivated"
+PAYMENT_INITIATED = "payment.initiated"
+PAYMENT_SUCCEEDED = "payment.succeeded"
+PAYMENT_FAILED = "payment.failed"
 
 
 def record(

@@ -377,3 +377,137 @@
 
 // Reset-PIN link in the agent detail pane (Phase D3)
 .detail__resetpin { margin-top: 12px; display: inline-block; }
+
+/* ---- Subscription payment (mobile money) ---- */
+.pay-card {
+  margin-top: 16px;
+}
+.pay-intro {
+  font-size: 13px;
+  color: var(--ox-muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.pay-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+  .field {
+    display: flex;
+    flex-direction: column;
+  }
+}
+.pay-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--ox-border);
+  border-radius: var(--ox-radius);
+  background: var(--ox-bg);
+  &--ok {
+    border-color: var(--ox-green);
+    background: var(--ox-green-soft);
+  }
+  &--fail {
+    border-color: var(--ox-reject-text);
+    background: var(--ox-reject-soft);
+  }
+  &__title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  &__meta {
+    font-size: 12.5px;
+    color: var(--ox-muted);
+    margin-top: 2px;
+  }
+  &__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #fff;
+    flex: none;
+  }
+  &--ok &__icon {
+    background: var(--ox-green);
+  }
+  &--fail &__icon {
+    background: var(--ox-reject-text);
+  }
+  &__close {
+    margin-left: auto;
+  }
+  &__spin {
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--ox-border);
+    border-top-color: var(--ox-red);
+    border-radius: 50%;
+    animation: pay-spin 0.8s linear infinite;
+    flex: none;
+  }
+}
+@keyframes pay-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pay-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pay-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ox-line);
+  font-size: 13px;
+  &:last-child {
+    border-bottom: none;
+  }
+  &__main {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    flex: 1;
+  }
+  &__plan {
+    font-weight: 600;
+  }
+  &__amt {
+    color: var(--ox-muted);
+  }
+  &__date {
+    color: var(--ox-muted);
+    font-size: 12px;
+  }
+}
+.pay-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--ox-line);
+  color: var(--ox-muted);
+  &--ok {
+    background: var(--ox-green-soft);
+    color: var(--ox-green-text);
+  }
+  &--fail {
+    background: var(--ox-reject-soft);
+    color: var(--ox-reject-text);
+  }
+  &--pending {
+    background: var(--ox-orange-soft);
+    color: var(--ox-orange-text);
+  }
+}

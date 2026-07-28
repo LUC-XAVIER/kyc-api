@@ -40,6 +40,19 @@ def _email_dev_mode() -> Generator[None, None, None]:
     settings.email_enabled = original
 
 
+@pytest.fixture(autouse=True)
+def _payments_mock_mode() -> Generator[None, None, None]:
+    """Never hit the real payment gateway — force the mock provider.
+
+    Guards against a local ``.env`` that enables payments: tests must always
+    use the network-free mock regardless of how the environment is set.
+    """
+    original = settings.payments_enabled
+    settings.payments_enabled = False
+    yield
+    settings.payments_enabled = original
+
+
 @pytest.fixture
 def client() -> TestClient:
     """Return a TestClient bound to a fresh app instance (no DB override)."""

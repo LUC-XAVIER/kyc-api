@@ -113,3 +113,24 @@ class ReportFormat(enum.StrEnum):
     """Output format of a generated compliance report."""
 
     PDF = "PDF"
+
+
+class PaymentStatus(enum.StrEnum):
+    """Lifecycle of a mobile-money subscription payment.
+
+    ``PENDING`` — a collection was initiated and the payer prompted; the
+    outcome is not yet known. ``SUCCESSFUL`` — funds collected; the account
+    is activated/renewed. ``FAILED`` — the payer declined, timed out, or the
+    provider rejected it.
+    """
+
+    PENDING = "PENDING"
+    SUCCESSFUL = "SUCCESSFUL"
+    FAILED = "FAILED"
+
+
+class PaymentProvider(enum.StrEnum):
+    """Which gateway processed a payment (mock for dev/tests)."""
+
+    CAMPAY = "CAMPAY"
+    MOCK = "MOCK"

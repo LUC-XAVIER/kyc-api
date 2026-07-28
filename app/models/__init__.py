@@ -14,6 +14,7 @@ from app.models.mfi import (
     User,
 )
 from app.models.onboarding import PinReset, SignupInvite
+from app.models.payment import Payment
 from app.models.verification import (
     DuplicateFlag,
     ExtractedData,
@@ -42,4 +43,5 @@ __all__ = [
     "ComplianceReport",
     "SignupInvite",
     "PinReset",
+    "Payment",
 ]

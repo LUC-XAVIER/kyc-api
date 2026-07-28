@@ -22,6 +22,7 @@ EXPECTED_TABLES = {
     "duplicate_flags",
     "audit_logs",
     "compliance_reports",
+    "payments",
 }
 
 

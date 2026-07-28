@@ -88,6 +88,26 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
 
+    # --- Payments (Campay: MTN MoMo + Orange Money aggregator) ---
+    # When disabled (dev / no keys), a mock provider simulates the collection
+    # flow so the whole feature is testable without a real merchant account.
+    # Set payments_enabled=true + a real token to talk to Campay.
+    payments_enabled: bool = False
+    # Sandbox: https://demo.campay.net/api ; production: https://campay.net/api
+    campay_base_url: str = "https://demo.campay.net/api"
+    # Permanent access token from the Campay app's APP KEYS section.
+    campay_token: str = ""
+    # Webhook signing key, used to verify Campay's payment-status callbacks.
+    campay_webhook_key: str = ""
+    # Currency every collection is charged in (Campay is XAF-only for now).
+    payments_currency: str = "XAF"
+    # Sandbox testing aid. Campay's sandbox caps a transaction at 25 XAF, but
+    # our plans cost far more. When > 0 the collection sent to the provider
+    # uses this amount instead of the plan price (the payment record still
+    # stores the real price), so the flow is testable under the cap. Leave 0
+    # in production so real plan prices are charged.
+    campay_test_amount: int = 0
+
     @property
     def is_production(self) -> bool:
         """True when running under the production environment name."""
@@ -124,6 +144,23 @@ class Settings(BaseSettings):
                     f"Insecure {', '.join(weak)} in production: set a "
                     f"random value of at least {MIN_SECRET_BYTES} bytes."
                 )
+            # Real money must not flow through a half-configured integration:
+            # if payments are on in production, the Campay credentials that
+            # authenticate calls and verify webhooks have to be present.
+            if self.payments_enabled:
+                missing = [
+                    name
+                    for name, value in (
+                        ("CAMPAY_TOKEN", self.campay_token),
+                        ("CAMPAY_WEBHOOK_KEY", self.campay_webhook_key),
+                    )
+                    if not value
+                ]
+                if missing:
+                    raise ValueError(
+                        f"Payments enabled but {', '.join(missing)} unset "
+                        "in production."
+                    )
         return self
 
 

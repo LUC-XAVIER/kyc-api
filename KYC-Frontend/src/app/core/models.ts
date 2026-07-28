@@ -374,3 +374,20 @@ export interface AdminMfiDetail {
   agents: AdminAgentSummary[];
   performance: MfiPerformance;
 }
+
+// ---- Payments ----
+export type PaymentStatus = 'PENDING' | 'SUCCESSFUL' | 'FAILED';
+
+export interface Payment {
+  id: string;
+  plan_name: 'STARTER' | 'GROWTH' | 'PRO' | 'ENTERPRISE';
+  amount: number;
+  currency: string;
+  phone: string;
+  status: PaymentStatus;
+  provider: 'CAMPAY' | 'MOCK';
+  ussd_code: string | null;
+  failure_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+}

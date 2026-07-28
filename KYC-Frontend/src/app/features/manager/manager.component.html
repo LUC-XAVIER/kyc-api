@@ -501,11 +501,86 @@
                 <div class="plan-banner">
                   <div class="plan-banner__row">
                     <div><div class="plan-banner__name">{{ account()?.plan_name || 'No plan' }}</div><div class="plan-banner__desc">{{ account()?.verification_quota || 0 }} verifications / month</div></div>
-                    <button class="ox-btn plan-banner__btn" (click)="goPricing()">Upgrade plan</button>
+                    <button class="ox-btn plan-banner__btn" (click)="goPricing()">Compare plans</button>
                   </div>
                   <div class="plan-banner__track"><div class="plan-banner__fill" [style.width.%]="usagePct()"></div></div>
                   <div class="plan-banner__meta">{{ account()?.current_period_usage || 0 }} / {{ account()?.verification_quota || 0 }} verifications used this cycle</div>
                 </div>
+
+                <!-- Pay / renew with mobile money -->
+                <div class="ox-card card--pad pay-card">
+                  <div class="section-label">PAY OR RENEW — MOBILE MONEY</div>
+                  <p class="pay-intro">Pick a plan and pay with MTN Mobile Money or Orange Money. You'll get a prompt on your phone to approve.</p>
+
+                  @if (activePayment(); as pay) {
+                    <div class="pay-status" [class.pay-status--ok]="pay.status === 'SUCCESSFUL'" [class.pay-status--fail]="pay.status === 'FAILED'">
+                      @switch (pay.status) {
+                        @case ('PENDING') {
+                          <div class="pay-status__spin"></div>
+                          <div>
+                            <div class="pay-status__title">Waiting for approval…</div>
+                            <div class="pay-status__meta">Approve the {{ pay.amount | number }} {{ pay.currency }} prompt on {{ pay.phone }}@if (pay.ussd_code) { , or dial {{ pay.ussd_code }} }.</div>
+                          </div>
+                        }
+                        @case ('SUCCESSFUL') {
+                          <div class="pay-status__icon">✓</div>
+                          <div>
+                            <div class="pay-status__title">Payment successful</div>
+                            <div class="pay-status__meta">Your {{ pay.plan_name }} plan is active.</div>
+                          </div>
+                        }
+                        @case ('FAILED') {
+                          <div class="pay-status__icon">✕</div>
+                          <div>
+                            <div class="pay-status__title">Payment failed</div>
+                            <div class="pay-status__meta">{{ pay.failure_reason || 'The payment was not completed.' }}</div>
+                          </div>
+                        }
+                      }
+                      @if (pay.status !== 'PENDING') {
+                        <button class="ox-btn ox-btn--outline pay-status__close" (click)="dismissPayment()">Done</button>
+                      }
+                    </div>
+                  } @else {
+                    <div class="pay-form">
+                      <div class="field">
+                        <label class="input-label">Plan</label>
+                        <select class="input input--block" [value]="payPlan()" (change)="payPlan.set($any($event.target).value)">
+                          @for (p of payablePlans; track p.key) {
+                            <option [value]="p.key">{{ p.name }} — {{ p.volume }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="field">
+                        <label class="input-label">Mobile-money number</label>
+                        <input class="input input--block" type="tel" inputmode="numeric" placeholder="6XXXXXXXX"
+                          [value]="payPhone()" (input)="payPhone.set($any($event.target).value)" />
+                      </div>
+                      @if (payError()) { <div class="state-msg state-msg--error">{{ payError() }}</div> }
+                      <button class="ox-btn ox-btn--primary" [disabled]="payLoading()" (click)="startPayment()">
+                        {{ payLoading() ? 'Starting…' : 'Pay now' }}
+                      </button>
+                    </div>
+                  }
+                </div>
+
+                @if (payHistory().length) {
+                  <div class="ox-card card--pad">
+                    <div class="section-label">PAYMENT HISTORY</div>
+                    <div class="pay-history">
+                      @for (p of payHistory(); track p.id) {
+                        <div class="pay-row">
+                          <div class="pay-row__main">
+                            <span class="pay-row__plan">{{ p.plan_name }}</span>
+                            <span class="pay-row__amt">{{ p.amount | number }} {{ p.currency }}</span>
+                          </div>
+                          <span class="pay-row__date">{{ p.created_at | date: 'mediumDate' }}</span>
+                          <span class="pay-badge" [class.pay-badge--ok]="p.status === 'SUCCESSFUL'" [class.pay-badge--fail]="p.status === 'FAILED'" [class.pay-badge--pending]="p.status === 'PENDING'">{{ p.status }}</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
               }
               @case ('MFI profile') {
                 <div class="ox-card card--pad">
