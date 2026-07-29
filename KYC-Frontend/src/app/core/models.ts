@@ -179,6 +179,7 @@ export interface AccountSummary {
   id: string;
   name: string;
   email: string;
+  status: 'ACTIVE' | 'SUSPENDED' | 'PENDING';
   plan_name: string | null;
   verification_quota: number | null;
   current_period_usage: number;

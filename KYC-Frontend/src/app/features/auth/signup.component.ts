@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
+import { AuthService } from '../../core/auth.service';
 import { InviteInfo, OnboardingService } from '../../core/onboarding.service';
 import {
   CM_PHONE_DIGITS,
@@ -20,6 +21,7 @@ import {
 export class SignupComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly onboarding = inject(OnboardingService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   readonly token = signal<string | null>(null);
@@ -83,10 +85,12 @@ export class SignupComponent {
         phone: phone || null,
       })
       .subscribe({
-        next: () =>
-          this.router.navigate(['/login'], {
-            queryParams: { created: '1' },
-          }),
+        next: (res) => {
+          // Auto-login and go straight to the dashboard's activation gate —
+          // the account is PENDING until the payment step there succeeds.
+          this.auth.adoptSession(res);
+          this.router.navigateByUrl('/manager');
+        },
         error: (err: HttpErrorResponse) => {
           this.loading.set(false);
           this.error.set(

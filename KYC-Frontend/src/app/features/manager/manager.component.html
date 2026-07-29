@@ -7,17 +7,17 @@
     </div>
 
     <div class="sidebar__section">OVERVIEW</div>
-    <button class="nav-item" [class.is-active]="page() === 'dashboard'" (click)="setPage('dashboard')">Dashboard</button>
-    <button class="nav-item" [class.is-active]="page() === 'review'" (click)="setPage('review')">
+    <button class="nav-item" [class.is-active]="page() === 'dashboard'" [class.is-locked]="needsActivation()" [disabled]="needsActivation()" (click)="setPage('dashboard')">Dashboard</button>
+    <button class="nav-item" [class.is-active]="page() === 'review'" [class.is-locked]="needsActivation()" [disabled]="needsActivation()" (click)="setPage('review')">
       Review queue
       @if (pendingCount() > 0) { <span class="nav-badge">{{ pendingCount() }}</span> }
     </button>
-    <button class="nav-item" [class.is-active]="page() === 'history'" (click)="setPage('history')">History</button>
-    <button class="nav-item" [class.is-active]="page() === 'reports'" (click)="setPage('reports')">Reports</button>
+    <button class="nav-item" [class.is-active]="page() === 'history'" [class.is-locked]="needsActivation()" [disabled]="needsActivation()" (click)="setPage('history')">History</button>
+    <button class="nav-item" [class.is-active]="page() === 'reports'" [class.is-locked]="needsActivation()" [disabled]="needsActivation()" (click)="setPage('reports')">Reports</button>
 
     <div class="sidebar__section sidebar__section--spaced">ACCOUNT</div>
-    <button class="nav-item" [class.is-active]="page() === 'agents'" (click)="setPage('agents')">Agents</button>
-    <button class="nav-item" [class.is-active]="page() === 'apikeys'" (click)="setPage('apikeys')">API keys</button>
+    <button class="nav-item" [class.is-active]="page() === 'agents'" [class.is-locked]="needsActivation()" [disabled]="needsActivation()" (click)="setPage('agents')">Agents</button>
+    <button class="nav-item" [class.is-active]="page() === 'apikeys'" [class.is-locked]="needsActivation()" [disabled]="needsActivation()" (click)="setPage('apikeys')">API keys</button>
     <button class="nav-item" [class.is-active]="page() === 'settings'" (click)="setPage('settings')">Settings</button>
 
     <div class="sidebar__spacer"></div>
@@ -492,12 +492,21 @@
         <div class="split">
           <div class="ox-card settings-tabs">
             @for (t of settingsTabs; track t) {
-              <button class="settings-tab" [class.is-active]="settingsTab() === t" (click)="setSettingsTab(t)">{{ t }}</button>
+              <button class="settings-tab" [class.is-active]="settingsTab() === t" [class.is-locked]="needsActivation() && t !== 'Subscription'" [disabled]="needsActivation() && t !== 'Subscription'" (click)="setSettingsTab(t)">{{ t }}</button>
             }
           </div>
           <div class="settings-content">
             @switch (settingsTab()) {
               @case ('Subscription') {
+                @if (needsActivation()) {
+                  <div class="activate-banner">
+                    <div class="activate-banner__icon">⚠</div>
+                    <div>
+                      <div class="activate-banner__title">Your account is pending activation</div>
+                      <div class="activate-banner__meta">Pay for your <b>{{ account()?.plan_name }}</b> plan below to start using KYC-API. Until then, verifications are disabled.</div>
+                    </div>
+                  </div>
+                }
                 <div class="plan-banner">
                   <div class="plan-banner__row">
                     <div><div class="plan-banner__name">{{ account()?.plan_name || 'No plan' }}</div><div class="plan-banner__desc">{{ account()?.verification_quota || 0 }} verifications / month</div></div>

@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import NotFoundError, ValidationError
-from app.core.security import generate_token, hash_password, hash_token
+from app.core.security import (
+    create_access_token,
+    generate_token,
+    hash_password,
+    hash_token,
+)
 from app.db.session import get_db
 from app.models import MfiAccount, SignupInvite, SubscriptionPlan, User
 from app.models.enums import AgentRole, AgentStatus, MfiStatus, PlanName
@@ -118,12 +123,14 @@ def complete_onboarding(
     ):
         raise ValidationError("That phone number is already in use.")
 
+    # Created PENDING, not ACTIVE: the subscription only turns on once the
+    # final payment step succeeds (payment activates it). billing_cycle_start
+    # is left unset until then, so a fresh cycle begins at activation.
     mfi = MfiAccount(
         name=payload.mfi_name,
         email=invite.email,
         plan_id=plan.id,
-        status=MfiStatus.ACTIVE,
-        billing_cycle_start=datetime.now(UTC).date().replace(day=1),
+        status=MfiStatus.PENDING,
     )
     db.add(mfi)
     db.flush()
@@ -140,4 +147,15 @@ def complete_onboarding(
     db.add(manager)
     invite.completed_at = datetime.now(UTC)
     db.flush()
-    return CompleteResponse(email=invite.email)
+    # Auto-login so the wizard can run the payment step as this manager.
+    token = create_access_token(
+        subject=str(manager.id), role=manager.role.value
+    )
+    return CompleteResponse(
+        email=invite.email,
+        access_token=token,
+        role=manager.role,
+        agent_id=manager.id,
+        full_name=manager.full_name,
+        mfi_account_id=mfi.id,
+    )

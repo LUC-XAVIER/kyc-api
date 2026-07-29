@@ -71,6 +71,11 @@ export class AuthService {
       .pipe(tap((p) => this.store(p)));
   }
 
+  /** Adopt a session minted elsewhere (e.g. completing signup). */
+  adoptSession(principal: Principal): void {
+    this.store(principal);
+  }
+
   private store(principal: Principal): void {
     this._principal.set(principal);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(principal));

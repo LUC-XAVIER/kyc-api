@@ -511,3 +511,39 @@
     color: var(--ox-orange-text);
   }
 }
+
+/* ---- Pending-activation banner ---- */
+.activate-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--ox-orange);
+  background: var(--ox-orange-soft);
+  border-radius: var(--ox-radius);
+  &__icon {
+    font-size: 20px;
+    line-height: 1;
+    color: var(--ox-orange-text);
+  }
+  &__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ox-orange-text);
+  }
+  &__meta {
+    font-size: 13px;
+    color: var(--ox-text);
+    margin-top: 3px;
+    line-height: 1.5;
+  }
+}
+
+/* ---- Locked nav / tabs while the subscription is pending ---- */
+.nav-item.is-locked,
+.settings-tab.is-locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}

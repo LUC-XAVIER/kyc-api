@@ -535,6 +535,9 @@ export class ManagerComponent implements OnDestroy {
   );
 
   setPage(p: ManagerPage): void {
+    // Locked to the pay screen until the subscription is activated: an
+    // unpaid account may only see Settings → Subscription.
+    if (this.needsActivation() && p !== 'settings') return;
     this.page.set(p);
     // Bracket the switch so a page that fetches nothing (Dashboard) still
     // gets the transition. When a load does run, its request nests inside
@@ -1145,18 +1148,35 @@ export class ManagerComponent implements OnDestroy {
     return pct(a?.current_period_usage, a?.verification_quota ?? undefined);
   });
 
+  /** An unpaid (PENDING) account must pay before it can use the product. */
+  readonly needsActivation = computed(
+    () => this.account()?.status === 'PENDING',
+  );
+
   loadAccount(): void {
     this.api.getAccount().subscribe({
       next: (a) => {
         this.account.set(a);
         this.mfiName.set(a.name);
         this.contactEmail.set(a.email);
+        // A brand-new / unpaid account lands straight on the pay gate,
+        // pre-selecting the plan they signed up for.
+        if (a.status === 'PENDING') {
+          if (a.plan_name && a.plan_name !== 'ENTERPRISE') {
+            this.payPlan.set(a.plan_name);
+          }
+          this.page.set('settings');
+          this.settingsTab.set('Subscription');
+          this.loadPayments();
+        }
       },
       error: () => undefined,
     });
   }
 
   setSettingsTab(t: SettingsTab): void {
+    // While unpaid, the only reachable settings tab is Subscription.
+    if (this.needsActivation() && t !== 'Subscription') return;
     this.settingsTab.set(t);
     if (t === 'Subscription') this.loadPayments();
   }

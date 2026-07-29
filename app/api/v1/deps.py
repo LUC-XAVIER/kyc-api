@@ -101,6 +101,19 @@ def get_current_mfi(
     return _mfi_from_key(api_key, db)
 
 
+def _require_active_subscription(mfi: MfiAccount) -> None:
+    """Reject metered use unless the subscription is paid and active.
+
+    A newly onboarded account is PENDING until its first payment succeeds, so
+    it must not be able to run verifications before then; SUSPENDED is blocked
+    earlier (login / API key) but guarded here too for defence in depth.
+    """
+    if mfi.status is not MfiStatus.ACTIVE:
+        raise AuthorizationError(
+            "Subscription inactive. Complete payment to activate."
+        )
+
+
 def get_metered_mfi(
     mfi: MfiAccount = Depends(get_current_mfi),
     db: Session = Depends(get_db),
@@ -110,6 +123,7 @@ def get_metered_mfi(
     Raises:
         QuotaExceededError: If the account is over its plan limit.
     """
+    _require_active_subscription(mfi)
     subscription.roll_period_if_needed(db, mfi)
     subscription.enforce_quota(mfi)
     return mfi
@@ -235,6 +249,7 @@ def get_metered_principal(
     Raises:
         QuotaExceededError: If the account is over its plan limit.
     """
+    _require_active_subscription(principal.mfi_account)
     subscription.roll_period_if_needed(db, principal.mfi_account)
     subscription.enforce_quota(principal.mfi_account)
     return principal

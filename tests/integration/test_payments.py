@@ -177,6 +177,27 @@ def _reference(db: Session, payment_id: str) -> str:
     return db.get(Payment, payment_id).external_reference
 
 
+def test_pending_account_cannot_verify(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """An unpaid (PENDING) account is blocked from metered use -> 403."""
+    mfi, key = create_mfi_with_key(db_session, email="p@x.cm")
+    mfi.status = MfiStatus.PENDING
+    db_session.flush()
+
+    resp = api_client.post(
+        "/api/v1/kyc/verify",
+        headers={"X-API-Key": key},
+        files={
+            "id_front": ("f.jpg", b"x", "image/jpeg"),
+            "selfie": ("s.jpg", b"x", "image/jpeg"),
+        },
+        data={"client_id": "C-1", "document_type": "NIC"},
+    )
+    assert resp.status_code == 403
+    assert "inactive" in resp.json()["error"]["message"].lower()
+
+
 def test_list_payments_returns_history(
     api_client: TestClient, db_session: Session
 ) -> None:
