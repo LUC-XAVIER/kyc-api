@@ -114,6 +114,24 @@ def send_signup_invite(to: str, token: str) -> None:
     )
 
 
+def send_quota_warning(to: str, *, used: int, limit: int) -> None:
+    """Warn a manager that usage crossed 80% of the plan's monthly quota."""
+    pct = round(used / limit * 100) if limit else 0
+    link = settings.dashboard_url
+    intro = (
+        f"Your MFI has used {used} of {limit} verifications this month "
+        f"({pct}%). Once you reach the limit, new verifications are blocked "
+        "until the next billing cycle — consider upgrading your plan."
+    )
+    send_email(
+        to,
+        "KYC-API: you've used 80% of your monthly quota",
+        f"Quota alert: {used} of {limit} verifications used this month "
+        f"({pct}%).\n\nManage your subscription here:\n{link}",
+        html=_action_html(intro, "View subscription", link, ""),
+    )
+
+
 def send_pin_reset(to: str, token: str) -> None:
     """Email a manager the link to reset their PIN."""
     link = reset_link(token)

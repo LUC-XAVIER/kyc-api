@@ -4,6 +4,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -61,6 +62,17 @@ class MfiAccount(UUIDMixin, TimestampMixin, Base):
     # Subscription usage tracking (Design doc §6.2).
     current_period_usage: Mapped[int] = mapped_column(Integer, default=0)
     billing_cycle_start: Mapped[date | None] = mapped_column()
+
+    # Manager email-notification preferences: which of the quota / weekly /
+    # maintenance alerts this MFI wants. Null = code defaults (see
+    # app.services.notifications.NOTIF_DEFAULTS).
+    notification_prefs: Mapped[dict | None] = mapped_column(JSON)
+    # Set once the 80%-quota warning email has gone out this billing period,
+    # so it fires once rather than on every verification above the threshold.
+    # Reset when the period rolls over.
+    quota_warning_sent: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
 
     plan: Mapped["SubscriptionPlan | None"] = relationship(
         back_populates="accounts"

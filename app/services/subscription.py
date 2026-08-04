@@ -95,6 +95,8 @@ def roll_period_if_needed(session: Session, account: MfiAccount) -> None:
     if start is None or (start.year, start.month) != (today.year, today.month):
         account.current_period_usage = 0
         account.billing_cycle_start = today.replace(day=1)
+        # New period, so the 80%-quota warning may fire again.
+        account.quota_warning_sent = False
         session.commit()
 
 

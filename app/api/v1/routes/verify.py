@@ -27,7 +27,7 @@ from app.models.enums import DocumentType, ImageKind, SubmissionMethod
 from app.pipeline.contracts import PipelineInput
 from app.pipeline.orchestrator import VerificationOutput, run_verification
 from app.schemas.verification import VerifyResponse
-from app.services import audit, subscription
+from app.services import audit, notifications, subscription
 from app.services.duplicate_store import PgVectorDuplicateStore
 from app.services.images import safe_compress_to_jpeg
 
@@ -253,6 +253,7 @@ def verify(
     db.refresh(verification)
 
     quota = subscription.get_quota_status(mfi)
+    notifications.maybe_send_quota_warning(db, mfi, quota)
     return VerifyResponse(
         verification_id=verification.id,
         client_id=verification.client_id,
