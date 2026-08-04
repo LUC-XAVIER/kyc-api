@@ -23,6 +23,7 @@ MFI_REACTIVATED = "mfi.reactivated"
 PAYMENT_INITIATED = "payment.initiated"
 PAYMENT_SUCCEEDED = "payment.succeeded"
 PAYMENT_FAILED = "payment.failed"
+MAINTENANCE_BROADCAST = "maintenance.broadcast"
 
 
 def record(

@@ -22,9 +22,9 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import EmailError
 from app.models import DuplicateFlag, MfiAccount, Verification
-from app.models.enums import VerificationStatus
+from app.models.enums import ActorType, MfiStatus, VerificationStatus
+from app.services import audit, subscription
 from app.services import email as email_service
-from app.services import subscription
 from app.services.subscription import QuotaStatus
 
 logger = logging.getLogger("app.notifications")
@@ -161,3 +161,44 @@ def send_weekly_digest_for(db: Session, account: MfiAccount) -> bool:
         logger.exception("weekly digest to %s failed", account.email)
         return False
     return True
+
+
+def broadcast_maintenance(
+    db: Session, *, subject: str, message: str, actor_id: str
+) -> tuple[int, int]:
+    """Email a maintenance notice to every opted-in active MFI.
+
+    Each successful send is written to that MFI's audit log. A failed send is
+    logged and skipped. Returns ``(eligible, sent)`` counts.
+    """
+    accounts = (
+        db.query(MfiAccount)
+        .filter(MfiAccount.status == MfiStatus.ACTIVE)
+        .all()
+    )
+    eligible = 0
+    sent = 0
+    for account in accounts:
+        if not pref_enabled(account, "maintenance"):
+            continue
+        eligible += 1
+        try:
+            email_service.send_maintenance_notice(
+                account.email, subject=subject, message=message
+            )
+        except EmailError:
+            logger.exception(
+                "maintenance notice to %s failed", account.email
+            )
+            continue
+        audit.record(
+            db,
+            mfi_account_id=account.id,
+            action=audit.MAINTENANCE_BROADCAST,
+            actor_type=ActorType.ADMIN,
+            actor_id=actor_id,
+            details={"subject": subject},
+        )
+        sent += 1
+    db.commit()
+    return eligible, sent

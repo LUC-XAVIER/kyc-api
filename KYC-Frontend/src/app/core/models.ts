@@ -175,6 +175,12 @@ export interface ApiKeyCreated {
 }
 
 // ---- Account ----
+/** Result of an admin maintenance broadcast. */
+export interface BroadcastResult {
+  eligible: number;
+  sent: number;
+}
+
 export interface AccountSummary {
   id: string;
   name: string;

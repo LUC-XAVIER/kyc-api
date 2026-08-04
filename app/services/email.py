@@ -9,6 +9,7 @@ plus SMTP credentials to send real mail.
 import logging
 import smtplib
 from email.message import EmailMessage
+from html import escape
 from typing import TYPE_CHECKING
 
 from app.core.config import settings
@@ -134,6 +135,26 @@ def send_quota_warning(to: str, *, used: int, limit: int) -> None:
         f"({pct}%).\n\nManage your subscription here:\n{link}",
         html=_action_html(intro, "View subscription", link, ""),
     )
+
+
+def send_maintenance_notice(to: str, *, subject: str, message: str) -> None:
+    """Email an admin-composed maintenance / announcement notice.
+
+    ``message`` is admin-authored plain text; it is HTML-escaped and rendered
+    with line breaks preserved.
+    """
+    body_html = escape(message).replace("\n", "<br>")
+    html = (
+        '<div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;'
+        'max-width:480px;margin:0 auto;padding:24px">'
+        '<div style="font-size:20px;font-weight:700;color:#c0392b;'
+        'margin-bottom:16px">KYC-API</div>'
+        f'<p style="font-size:15px;line-height:1.6">{body_html}</p>'
+        '<p style="font-size:13px;color:#666;margin-top:24px">'
+        '— The KYC-API team</p>'
+        '</div>'
+    )
+    send_email(to, subject, message, html=html)
 
 
 def send_weekly_digest(to: str, digest: "WeeklyDigest") -> None:

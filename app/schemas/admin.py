@@ -247,3 +247,18 @@ class AdminAuditEntry(BaseModel):
     verification_id: uuid.UUID | None
     details: dict | None
     timestamp: datetime
+
+
+class MaintenanceBroadcast(BaseModel):
+    """An admin-composed maintenance / announcement notice."""
+
+    subject: str
+    message: str
+
+
+class BroadcastResult(BaseModel):
+    """Outcome of a maintenance broadcast."""
+
+    # MFIs that opted in (were targeted) vs. emails actually sent.
+    eligible: int
+    sent: int

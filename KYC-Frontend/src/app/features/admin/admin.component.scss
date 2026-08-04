@@ -933,3 +933,30 @@ $cols: 1.6fr 0.8fr 0.9fr 1.3fr 0.7fr 0.6fr 0.6fr 0.8fr 1.3fr;
   }
   .topbar { padding: 16px 18px; }
 }
+
+/* ---- Maintenance broadcast form ---- */
+.bc {
+  max-width: 560px;
+  &__label {
+    display: block;
+    margin: 16px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  &__input,
+  &__textarea {
+    width: 100%;
+  }
+  &__textarea {
+    resize: vertical;
+    min-height: 120px;
+    font-family: inherit;
+    line-height: 1.5;
+  }
+  &__send {
+    margin-top: 18px;
+  }
+}

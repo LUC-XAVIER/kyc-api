@@ -7,6 +7,7 @@ import { skipLoading } from './loading.interceptor';
 import {
   AccountSummary,
   AdminAuditEntry,
+  BroadcastResult,
   AdminMfiDetail,
   AdminMfiSummary,
   AgentProfile,
@@ -228,6 +229,16 @@ export class ApiService {
       .set('offset', offset);
     return this.http.get<AdminAuditEntry[]>(`${this.base}/admin/audit`, {
       params,
+    });
+  }
+
+  broadcastMaintenance(
+    subject: string,
+    message: string,
+  ): Observable<BroadcastResult> {
+    return this.http.post<BroadcastResult>(`${this.base}/admin/broadcast`, {
+      subject,
+      message,
     });
   }
 

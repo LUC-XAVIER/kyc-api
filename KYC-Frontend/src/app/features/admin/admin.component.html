@@ -488,6 +488,39 @@
         </div>
       }
 
+      <!-- BROADCAST (maintenance notice) -->
+      @if (page() === 'broadcast') {
+        <div class="card bc">
+          <div class="card__title">Maintenance broadcast</div>
+          <div class="card__sub">
+            Email a notice to every active MFI that has the maintenance
+            notification turned on. Each send is recorded in that MFI's
+            audit log.
+          </div>
+
+          <label class="bc__label">Subject</label>
+          <input class="search bc__input" maxlength="120"
+            placeholder="Scheduled maintenance this weekend"
+            [value]="bcSubject()" (input)="bcSubject.set($any($event.target).value)" />
+
+          <label class="bc__label">Message</label>
+          <textarea class="search bc__textarea" rows="6"
+            placeholder="Describe the maintenance window, expected impact, and timing…"
+            [value]="bcMessage()" (input)="bcMessage.set($any($event.target).value)"></textarea>
+
+          @if (bcError()) { <div class="twofa__err">{{ bcError() }}</div> }
+          @if (bcResult(); as r) {
+            <div class="twofa__ok">
+              Sent to {{ r.sent }} of {{ r.eligible }} opted-in MFI(s).
+            </div>
+          }
+
+          <button class="btn btn--danger bc__send" [disabled]="bcSending()" (click)="sendBroadcast()">
+            {{ bcSending() ? 'Sending…' : 'Send broadcast' }}
+          </button>
+        </div>
+      }
+
       <!-- SECURITY (2FA) -->
       @if (page() === 'security') {
         <div class="card twofa">

@@ -16,12 +16,19 @@ import {
   AdminAuditEntry,
   AdminMfiDetail,
   AdminMfiSummary,
+  BroadcastResult,
   MfiStatus,
   ModelHealthReport,
   OperationsReport,
   PlatformStats,
   ScoreBucket,
 } from '../../core/models';
+
+/** Pull the API error message out of an HttpErrorResponse, or a fallback. */
+function apiMessage(err: unknown, fallback: string): string {
+  const body = (err as { error?: { error?: { message?: string } } })?.error;
+  return body?.error?.message ?? fallback;
+}
 
 type AdminPage =
   | 'overview'
@@ -34,6 +41,7 @@ type AdminPage =
   | 'api-performance'
   | 'system-health'
   | 'audit-logs'
+  | 'broadcast'
   | 'security';
 
 interface NavItem {
@@ -71,6 +79,7 @@ const NAV: NavSection[] = [
       { id: 'api-performance', label: 'API Performance', glyph: '⚡' },
       { id: 'system-health', label: 'System Health', glyph: '▥' },
       { id: 'audit-logs', label: 'Audit Logs', glyph: '▧' },
+      { id: 'broadcast', label: 'Broadcast', glyph: '📣' },
     ],
   },
   {
@@ -103,6 +112,7 @@ const ACTION_META: Record<string, ActionMeta> = {
   'report.generated': { icon: '📄', category: 'Report', label: 'Compliance report generated' },
   'mfi.suspended': { icon: '🚫', category: 'Admin action', label: 'MFI suspended' },
   'mfi.reactivated': { icon: '✅', category: 'Admin action', label: 'MFI reactivated' },
+  'maintenance.broadcast': { icon: '📣', category: 'Admin action', label: 'Maintenance broadcast' },
 };
 const AUDIT_CATEGORIES = [
   'All',
@@ -124,6 +134,7 @@ const TITLES: Record<AdminPage, [string, string]> = {
   'api-performance': ['API Performance', 'Coming with operations metrics'],
   'system-health': ['System Health', 'Coming with operations metrics'],
   'audit-logs': ['Audit Logs', 'Immutable platform-wide action trail'],
+  broadcast: ['Broadcast', 'Send a maintenance notice to MFIs'],
   security: ['Security', 'Protect your platform-admin account'],
 };
 
@@ -231,6 +242,38 @@ export class AdminComponent implements OnDestroy {
   }
   closeMobileNav(): void {
     this.mobileNav.set(false);
+  }
+
+  // ---- Maintenance broadcast ----
+  readonly bcSubject = signal('');
+  readonly bcMessage = signal('');
+  readonly bcSending = signal(false);
+  readonly bcError = signal('');
+  readonly bcResult = signal<BroadcastResult | null>(null);
+
+  sendBroadcast(): void {
+    if (this.bcSending()) return;
+    const subject = this.bcSubject().trim();
+    const message = this.bcMessage().trim();
+    if (!subject || !message) {
+      this.bcError.set('Subject and message are both required.');
+      return;
+    }
+    this.bcSending.set(true);
+    this.bcError.set('');
+    this.bcResult.set(null);
+    this.api.broadcastMaintenance(subject, message).subscribe({
+      next: (r) => {
+        this.bcSending.set(false);
+        this.bcResult.set(r);
+        this.bcSubject.set('');
+        this.bcMessage.set('');
+      },
+      error: (err) => {
+        this.bcSending.set(false);
+        this.bcError.set(apiMessage(err, 'Could not send the broadcast.'));
+      },
+    });
   }
 
   readonly stats = signal<PlatformStats | null>(null);

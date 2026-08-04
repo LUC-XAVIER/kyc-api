@@ -19,13 +19,15 @@ from app.schemas.admin import (
     AdminAuditEntry,
     AdminMfiDetail,
     AdminMfiSummary,
+    BroadcastResult,
+    MaintenanceBroadcast,
     MfiStatusUpdate,
     ModelHealthReport,
     OperationsReport,
     PlatformStats,
 )
 from app.services import admin as admin_service
-from app.services import admin_monitoring, audit
+from app.services import admin_monitoring, audit, notifications
 
 router = APIRouter(
     prefix="/admin",
@@ -79,6 +81,27 @@ def audit_log(
 ) -> list[AdminAuditEntry]:
     """Platform-wide audit trail, newest first (paginated)."""
     return admin_service.list_audit(db, limit=limit, offset=offset)
+
+
+@router.post("/broadcast", response_model=BroadcastResult)
+def broadcast_maintenance(
+    payload: MaintenanceBroadcast,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_platform_admin),
+) -> BroadcastResult:
+    """Email a maintenance notice to every opted-in active MFI.
+
+    Only MFIs with the ``maintenance`` notification preference on are
+    targeted. Each send is recorded in that MFI's audit log.
+    """
+    subject = payload.subject.strip()
+    message = payload.message.strip()
+    if not subject or not message:
+        raise ValidationError("Subject and message are required.")
+    eligible, sent = notifications.broadcast_maintenance(
+        db, subject=subject, message=message, actor_id=str(admin.id)
+    )
+    return BroadcastResult(eligible=eligible, sent=sent)
 
 
 @router.get("/mfis/{mfi_id}", response_model=AdminMfiDetail)
