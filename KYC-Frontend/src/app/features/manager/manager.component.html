@@ -729,4 +729,16 @@
       </div>
     </div>
   }
+
+  <!-- New-case toast (gated by the "New PENDING case" notification pref) -->
+  @if (newCaseToast() > 0) {
+    <div class="case-toast" (click)="openReviewFromToast()">
+      <span class="case-toast__dot"></span>
+      <div class="case-toast__body">
+        <div class="case-toast__title">{{ newCaseToast() }} new case{{ newCaseToast() > 1 ? 's' : '' }} to review</div>
+        <div class="case-toast__sub">Tap to open the review queue</div>
+      </div>
+      <button class="case-toast__x" aria-label="Dismiss" (click)="$event.stopPropagation(); dismissToast()">×</button>
+    </div>
+  }
 </div>
