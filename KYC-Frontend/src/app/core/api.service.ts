@@ -189,6 +189,7 @@ export class ApiService {
   updateAccount(payload: {
     name?: string;
     email?: string;
+    notification_prefs?: Record<string, boolean>;
   }): Observable<AccountSummary> {
     return this.http.patch<AccountSummary>(`${this.base}/account`, payload);
   }

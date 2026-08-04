@@ -182,24 +182,13 @@ const NOTIF_DEFS = [
   { key: 'maintenance', title: 'System maintenance alerts', desc: 'Be informed of scheduled downtime or updates' },
 ] as const;
 
-// Where notification preferences are persisted between sessions.
-const NOTIF_STORAGE_KEY = 'kyc.manager.notifs';
+// Defaults until the account loads; the server is the source of truth.
 const NOTIF_DEFAULTS: Record<string, boolean> = {
   quota: true,
   pending: true,
   weekly: false,
   maintenance: true,
 };
-
-/** Read saved notification prefs, falling back to defaults. */
-function loadNotifPrefs(): Record<string, boolean> {
-  try {
-    const raw = localStorage.getItem(NOTIF_STORAGE_KEY);
-    return raw ? { ...NOTIF_DEFAULTS, ...JSON.parse(raw) } : { ...NOTIF_DEFAULTS };
-  } catch {
-    return { ...NOTIF_DEFAULTS };
-  }
-}
 
 const SETTINGS_TABS: SettingsTab[] = [
   'Subscription', 'MFI profile', 'Notifications', 'Security', 'Danger zone',
@@ -1201,7 +1190,7 @@ export class ManagerComponent implements OnDestroy {
   readonly pinSaved = signal(false);
   readonly pinSaving = signal(false);
 
-  readonly notifs = signal<Record<string, boolean>>(loadNotifPrefs());
+  readonly notifs = signal<Record<string, boolean>>({ ...NOTIF_DEFAULTS });
   readonly notifDefs = NOTIF_DEFS;
 
   readonly usagePct = computed(() => {
@@ -1220,6 +1209,7 @@ export class ManagerComponent implements OnDestroy {
         this.account.set(a);
         this.mfiName.set(a.name);
         this.contactEmail.set(a.email);
+        this.notifs.set({ ...NOTIF_DEFAULTS, ...(a.notification_prefs ?? {}) });
         // A brand-new / unpaid account lands straight on the pay gate,
         // pre-selecting the plan they signed up for.
         if (a.status === 'PENDING') {
@@ -1356,12 +1346,14 @@ export class ManagerComponent implements OnDestroy {
   }
 
   toggleNotif(key: string): void {
-    this.notifs.update((n) => ({ ...n, [key]: !n[key] }));
-    try {
-      localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(this.notifs()));
-    } catch {
-      /* storage unavailable — the preference just won't persist */
-    }
+    // Optimistic flip, then persist to the account; revert if the save fails.
+    const previous = this.notifs();
+    const updated = { ...previous, [key]: !previous[key] };
+    this.notifs.set(updated);
+    this.api.updateAccount({ notification_prefs: updated }).subscribe({
+      next: (a) => this.account.set(a),
+      error: () => this.notifs.set(previous),
+    });
   }
 
   // ---- Pricing ----

@@ -183,6 +183,7 @@ export interface AccountSummary {
   plan_name: string | null;
   verification_quota: number | null;
   current_period_usage: number;
+  notification_prefs: Record<string, boolean>;
 }
 
 // ---- Profile (/auth/me) ----
