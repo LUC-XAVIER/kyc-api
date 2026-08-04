@@ -1,7 +1,7 @@
 @if (detail(); as d) {
   <div class="detail-overall"><span>Overall score</span><b>{{ overall() }}</b></div>
   @if (d.reject_reason) {
-    <div class="detail-reject">Rejected — {{ rejectLabel(d.reject_reason) }}</div>
+    <div class="detail-reject">Rejected, {{ rejectLabel(d.reject_reason) }}</div>
   }
   @if (d.reviewed && d.review_reason) {
     <div class="review-note"><span>Manager's note</span><p>{{ d.review_reason }}</p></div>

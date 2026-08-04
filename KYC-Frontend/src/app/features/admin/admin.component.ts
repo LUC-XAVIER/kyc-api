@@ -118,9 +118,9 @@ const TITLES: Record<AdminPage, [string, string]> = {
   'mfi-accounts': ['MFI Accounts', 'All registered institutions'],
   'mfi-detail': ['MFI Detail', 'Account drill-down'],
   'model-health': ['Model Health', 'Live metrics from stored pipeline results'],
-  'face-matching': ['Face Matching', 'ArcFace — from stored match scores'],
-  'anti-spoofing': ['Anti-Spoofing', 'Liveness — from stored anti-spoof scores'],
-  'ocr-engine': ['OCR Engine', 'Field confidence — from stored OCR results'],
+  'face-matching': ['Face Matching', 'ArcFace, from stored match scores'],
+  'anti-spoofing': ['Anti-Spoofing', 'Liveness, from stored anti-spoof scores'],
+  'ocr-engine': ['OCR Engine', 'Field confidence, from stored OCR results'],
   'api-performance': ['API Performance', 'Coming with operations metrics'],
   'system-health': ['System Health', 'Coming with operations metrics'],
   'audit-logs': ['Audit Logs', 'Immutable platform-wide action trail'],
@@ -278,7 +278,7 @@ export class AdminComponent implements OnDestroy {
 
   readonly title = computed<[string, string]>(() => {
     if (this.page() === 'mfi-detail' && this.detail()) {
-      return [`MFI — ${this.detail()!.name}`, this.detail()!.email];
+      return [`MFI, ${this.detail()!.name}`, this.detail()!.email];
     }
     return TITLES[this.page()];
   });
@@ -519,7 +519,7 @@ export class AdminComponent implements OnDestroy {
           id: e.id,
           icon: meta.icon,
           category: meta.category,
-          title: e.mfi_name ? `${meta.label} — ${e.mfi_name}` : meta.label,
+          title: e.mfi_name ? `${meta.label}, ${e.mfi_name}` : meta.label,
           meta: [
             e.actor_type,
             reason ? `reason: ${reason}` : null,

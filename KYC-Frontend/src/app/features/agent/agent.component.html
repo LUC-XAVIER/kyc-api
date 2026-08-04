@@ -89,7 +89,7 @@
           </div>
 
           <div class="note">
-            ℹ Camera capture only — file upload is disabled to ensure live, on-the-spot identity capture.
+            ℹ Camera capture only, file upload is disabled to ensure live, on-the-spot identity capture.
           </div>
 
           @if (verifyError()) {
@@ -108,7 +108,7 @@
           <section class="result-banner" [class.result-banner--reject]="r.status === 'REJECTED'">
             <div class="result-banner__icon">{{ r.status === 'REJECTED' ? '✕' : '✓' }}</div>
             <div>
-              <div class="result-banner__title">{{ r.status }} — confidence {{ scorePct(r.confidence_score) }}</div>
+              <div class="result-banner__title">{{ r.status }}, confidence {{ scorePct(r.confidence_score) }}</div>
               <div class="result-banner__meta">
                 Client {{ r.client_id }}{{ r.reject_reason ? ' · ' + r.reject_reason : '' }} · {{ r.quota_remaining }} verifications left this cycle
               </div>
@@ -228,7 +228,7 @@
   @if (cameraOpen(); as slot) {
     <div class="modal-overlay" (click)="closeCamera()">
       <div class="modal camera-modal" (click)="$event.stopPropagation()">
-        <div class="modal__title">Capture — {{ docLabel(slot) }}</div>
+        <div class="modal__title">Capture, {{ docLabel(slot) }}</div>
         @if (cameraError()) {
           <div class="state-msg state-msg--error">{{ cameraError() }}</div>
         }

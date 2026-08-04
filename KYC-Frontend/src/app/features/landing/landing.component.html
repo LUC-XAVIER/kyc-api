@@ -20,8 +20,8 @@
     <div class="page">
       <div class="hero">
         <div class="hero-badge"><span class="ic ic-sm" [innerHTML]="icon('shield-check')"></span> COBAC-compliant · Built for Cameroon</div>
-        <h1>Verify your clients' identity <span>automatically</span> — in under 5 seconds</h1>
-        <p class="hero-sub">KYC-API automates identity verification for Microfinance Institutions. Capture a NIC card and selfie — get a verified, pending, or rejected result instantly.</p>
+        <h1>Verify your clients' identity <span>automatically</span>, in under a minute</h1>
+        <p class="hero-sub">KYC-API automates identity verification for Microfinance Institutions. Capture a NIC card and selfie, get a verified, pending, or rejected result in under a minute.</p>
         <div class="hero-actions">
           <button class="btn-hero btn-hero-primary" (click)="setPage('demo')"><span class="ic ic-sm" [innerHTML]="icon('play')"></span> Get a demo</button>
           <button class="btn-hero btn-hero-secondary" (click)="setPage('contact')">Contact us</button>
@@ -52,7 +52,7 @@
 
       <div class="section">
         <div class="section-label">What KYC-API does</div>
-        <h2>Everything your MFI needs — nothing more</h2>
+        <h2>Everything your MFI needs, nothing more</h2>
         <p class="section-sub">A complete identity verification platform. Your agents capture the client's documents on-site; KYC-API handles everything else.</p>
         <div class="features-grid">
           @for (f of features; track f.title) {
@@ -109,7 +109,7 @@
       <div class="page-hero">
         <div class="section-label">Who uses KYC-API</div>
         <h1>Built for microfinance, ready for any financial institution</h1>
-        <p>KYC-API serves MFIs across the size spectrum — from single-branch cooperatives to nationwide networks — as well as financial platforms that embed identity verification in their own software.</p>
+        <p>KYC-API serves MFIs across the size spectrum, from single-branch cooperatives to nationwide networks, as well as financial platforms that embed identity verification in their own software.</p>
       </div>
       <div class="section">
         <div class="users-grid">
@@ -147,7 +147,7 @@
       <div class="page-hero">
         <div class="section-label">Pricing</div>
         <h1>Choose the volume that fits your institution</h1>
-        <p>All plans include the full verification pipeline, complete management dashboard, COBAC compliance reports, and duplicate detection. No hidden features — only volume and team size differ.</p>
+        <p>All plans include the full verification pipeline, complete management dashboard, COBAC compliance reports, and duplicate detection. No hidden features, only volume and team size differ.</p>
       </div>
       <div class="section">
         <div class="pricing-grid">
@@ -191,7 +191,7 @@
       <div class="page-hero">
         <div class="section-label">Contact</div>
         <h1>Get in touch</h1>
-        <p>Whether you want to subscribe, have a question, or want to talk through which plan fits your institution — we're here.</p>
+        <p>Whether you want to subscribe, have a question, or want to talk through which plan fits your institution, we're here.</p>
       </div>
       <div class="section">
         <div class="contact-layout">
@@ -222,7 +222,7 @@
                   @for (i of interests; track i) { <option [value]="i">{{ i }}</option> }
                 </select>
               </div>
-              <div class="form-group"><label>Message</label><textarea placeholder="Tell us about your MFI — number of branches, agents, estimated monthly verifications..." [value]="cMessage()" (input)="cMessage.set($any($event.target).value)"></textarea></div>
+              <div class="form-group"><label>Message</label><textarea placeholder="Tell us about your MFI, number of branches, agents, estimated monthly verifications..." [value]="cMessage()" (input)="cMessage.set($any($event.target).value)"></textarea></div>
               <button type="submit" class="form-submit">Send message</button>
             </form>
           </div>
@@ -237,7 +237,7 @@
       <div class="page-hero">
         <div class="section-label">Demonstration</div>
         <h1>See KYC-API in action</h1>
-        <p>Run a live sandbox verification using sample data and see the full pipeline response — no account required.</p>
+        <p>Run a live sandbox verification using sample data and see the full pipeline response, no account required.</p>
       </div>
       <div class="section">
         <div class="demo-layout">
@@ -250,7 +250,7 @@
               }
             </div>
             <div class="demo-warn">
-              <strong>Sandbox mode</strong> — this demo uses pre-loaded sample data, not real client images. No biometric data is captured or stored during the demonstration.
+              <strong>Sandbox mode</strong>, this demo uses pre-loaded sample data, not real client images. No biometric data is captured or stored during the demonstration.
             </div>
           </div>
 
@@ -326,7 +326,7 @@
   @if (selected(); as plan) {
     <div class="modal-overlay" (click)="cancel()">
       <div class="modal" (click)="$event.stopPropagation()">
-        <div class="modal__title">Get started — {{ plan.name }} plan</div>
+        <div class="modal__title">Get started, {{ plan.name }} plan</div>
         <p class="modal__sub">Enter your email; we'll send a link to finish setting up your account.</p>
         <form (submit)="$event.preventDefault(); submit()">
           <label class="field-label">Work email</label>
@@ -351,7 +351,7 @@
       <div>
         <div class="sent-toast__title">Check your email</div>
         <div class="sent-toast__meta">Signup link sent to <b>{{ sentEmail() }}</b>.</div>
-        @if (sentLink()) { <a class="sent-toast__dev" [href]="sentLink()">Dev link — open signup →</a> }
+        @if (sentLink()) { <a class="sent-toast__dev" [href]="sentLink()">Dev link, open signup →</a> }
       </div>
     </div>
   }

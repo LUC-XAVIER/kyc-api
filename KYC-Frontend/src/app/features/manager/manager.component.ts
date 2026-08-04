@@ -392,7 +392,7 @@ export class ManagerComponent implements OnDestroy {
         r: (d.rejected / max) * 100,
         // Shown on hover so a bare bar still reveals its exact counts.
         tip:
-          `${when} — ${total} verification${total === 1 ? '' : 's'}` +
+          `${when}, ${total} verification${total === 1 ? '' : 's'}` +
           ` (${d.verified} verified, ${d.pending} pending, ${d.rejected} rejected)`,
       };
     });

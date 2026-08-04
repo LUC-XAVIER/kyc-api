@@ -85,7 +85,7 @@ function cameraErrorMessage(err: unknown): string {
   if (name === 'NotReadableError') {
     return 'The camera is being used by another app. Close it and try again.';
   }
-  return 'Could not access the camera — please try again.';
+  return 'Could not access the camera, please try again.';
 }
 
 /**
@@ -164,8 +164,8 @@ export class AgentComponent {
   }
 
   docLabel(key: DocKey): string {
-    if (key === 'front') return 'ID card — front';
-    if (key === 'back') return 'ID card — back';
+    if (key === 'front') return 'ID card, front';
+    if (key === 'back') return 'ID card, back';
     return 'Selfie';
   }
 
@@ -299,7 +299,7 @@ export class AgentComponent {
         const body = (err as { error?: { error?: { message?: string } } })
           ?.error;
         this.verifyError.set(
-          body?.error?.message ?? 'Verification failed — please try again.',
+          body?.error?.message ?? 'Verification failed, please try again.',
         );
       },
     });

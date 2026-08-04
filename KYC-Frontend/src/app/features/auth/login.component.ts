@@ -41,9 +41,9 @@ export class LoginComponent {
       this.actor.set('agent');
     }
     if (params.has('created')) {
-      this.notice.set('Account created — please sign in.');
+      this.notice.set('Account created, please sign in.');
     } else if (params.has('reset')) {
-      this.notice.set('Your PIN was updated — please sign in.');
+      this.notice.set('Your PIN was updated, please sign in.');
     }
   }
 

@@ -22,7 +22,7 @@ import { isValidEmail } from '../../core/validators';
           </p>
           @if (sentLink()) {
             <a class="ox-btn ox-btn--primary block" [href]="sentLink()">
-              Dev link — reset your PIN →
+              Dev link, reset your PIN →
             </a>
           }
           <div class="link-row"><a routerLink="/login">Back to sign in</a></div>
