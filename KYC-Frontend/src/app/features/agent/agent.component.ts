@@ -131,6 +131,15 @@ export class AgentComponent {
 
   readonly page = signal<AgentPage>('new');
 
+  // Mobile off-canvas navigation drawer.
+  readonly mobileNav = signal(false);
+  toggleMobileNav(): void {
+    this.mobileNav.update((v) => !v);
+  }
+  closeMobileNav(): void {
+    this.mobileNav.set(false);
+  }
+
   // ---- New verification ----
   readonly clientId = signal('');
   readonly docType = signal<DocumentType>('NIC');
@@ -490,6 +499,7 @@ export class AgentComponent {
   });
 
   setPage(p: AgentPage): void {
+    this.mobileNav.set(false);
     this.page.set(p);
     this.result.set(null);
     // Bracket the switch so a page that fetches nothing still gets the

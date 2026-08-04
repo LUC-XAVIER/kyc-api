@@ -224,6 +224,15 @@ export class AdminComponent implements OnDestroy {
   readonly nav = NAV;
   readonly page = signal<AdminPage>('overview');
 
+  // Mobile off-canvas navigation drawer.
+  readonly mobileNav = signal(false);
+  toggleMobileNav(): void {
+    this.mobileNav.update((v) => !v);
+  }
+  closeMobileNav(): void {
+    this.mobileNav.set(false);
+  }
+
   readonly stats = signal<PlatformStats | null>(null);
   readonly mfis = signal<AdminMfiSummary[]>([]);
   readonly mfiFilter = signal<'all' | MfiStatus>('all');
@@ -288,6 +297,7 @@ export class AdminComponent implements OnDestroy {
 
   // ---- Navigation ----
   setPage(p: AdminPage): void {
+    this.mobileNav.set(false);
     if (p === 'mfi-detail' && !this.detail()) p = 'mfi-accounts';
     this.page.set(p);
     this.loading.start();

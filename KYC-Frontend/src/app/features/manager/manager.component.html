@@ -1,6 +1,7 @@
 <div class="layout">
+  @if (mobileNav()) { <div class="nav-backdrop" (click)="closeMobileNav()"></div> }
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" [class.is-open]="mobileNav()">
     <div class="sidebar__brand">
       <div class="sidebar__logo">K</div>
       <div class="sidebar__brandname">KYC-API</div>
@@ -45,6 +46,11 @@
   <!-- MAIN -->
   <main class="main">
     <header class="topbar">
+      <button class="menu-toggle" type="button" (click)="toggleMobileNav()" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
       <div>
         <div class="topbar__title">{{ title()[0] }}</div>
         <div class="topbar__subtitle">{{ title()[1] }}</div>

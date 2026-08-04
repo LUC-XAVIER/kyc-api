@@ -283,6 +283,15 @@ export class ManagerComponent implements OnDestroy {
     this.newCaseToast.set(0);
     clearTimeout(this.toastTimer);
   }
+
+  // Mobile off-canvas navigation drawer.
+  readonly mobileNav = signal(false);
+  toggleMobileNav(): void {
+    this.mobileNav.update((v) => !v);
+  }
+  closeMobileNav(): void {
+    this.mobileNav.set(false);
+  }
   readonly userInitials = computed(() => {
     const name = this.user()?.full_name ?? '';
     return (
@@ -591,6 +600,7 @@ export class ManagerComponent implements OnDestroy {
   );
 
   setPage(p: ManagerPage): void {
+    this.mobileNav.set(false);
     // Locked to the pay screen until the subscription is activated: an
     // unpaid account may only see Settings → Subscription.
     if (this.needsActivation() && p !== 'settings') return;
