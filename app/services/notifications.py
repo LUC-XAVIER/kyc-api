@@ -14,15 +14,23 @@ value means "use :data:`NOTIF_DEFAULTS`". This module owns *who* and *when*;
 """
 
 import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import EmailError
-from app.models import MfiAccount
+from app.models import DuplicateFlag, MfiAccount, Verification
+from app.models.enums import VerificationStatus
 from app.services import email as email_service
+from app.services import subscription
 from app.services.subscription import QuotaStatus
 
 logger = logging.getLogger("app.notifications")
+
+# How many days the weekly digest looks back over.
+DIGEST_DAYS = 7
 
 # Mirrors the frontend defaults (manager.component.ts NOTIF_DEFAULTS).
 NOTIF_DEFAULTS: dict[str, bool] = {
@@ -76,3 +84,80 @@ def maybe_send_quota_warning(
         return
     account.quota_warning_sent = True
     session.commit()
+
+
+@dataclass(frozen=True)
+class WeeklyDigest:
+    """Last-``DIGEST_DAYS`` activity summary for one MFI."""
+
+    days: int
+    total: int
+    verified: int
+    pending: int
+    rejected: int
+    open_pending: int  # cases currently awaiting a manager's review
+    duplicates: int
+    quota_used: int
+    quota_limit: int
+
+
+def build_weekly_digest(db: Session, account: MfiAccount) -> WeeklyDigest:
+    """Compute the weekly digest figures for ``account``."""
+    since = datetime.now(UTC) - timedelta(days=DIGEST_DAYS)
+    owned = Verification.mfi_account_id == account.id
+    recent = (owned, Verification.created_at >= since)
+
+    counts = dict(
+        db.query(Verification.status, func.count())
+        .filter(*recent)
+        .group_by(Verification.status)
+        .all()
+    )
+
+    def total_of(*statuses: VerificationStatus) -> int:
+        return sum(counts.get(s, 0) for s in statuses)
+
+    open_pending = (
+        db.query(func.count(Verification.id))
+        .filter(owned, Verification.status == VerificationStatus.PENDING)
+        .scalar()
+        or 0
+    )
+    duplicates = (
+        db.query(func.count(func.distinct(DuplicateFlag.verification_id)))
+        .join(Verification, DuplicateFlag.verification_id == Verification.id)
+        .filter(*recent)
+        .scalar()
+        or 0
+    )
+    quota = subscription.get_quota_status(account)
+    return WeeklyDigest(
+        days=DIGEST_DAYS,
+        total=sum(counts.values()),
+        verified=total_of(
+            VerificationStatus.VERIFIED, VerificationStatus.APPROVED
+        ),
+        pending=total_of(VerificationStatus.PENDING),
+        rejected=total_of(VerificationStatus.REJECTED),
+        open_pending=open_pending,
+        duplicates=duplicates,
+        quota_used=quota.used,
+        quota_limit=quota.limit,
+    )
+
+
+def send_weekly_digest_for(db: Session, account: MfiAccount) -> bool:
+    """Build and email the weekly digest for one MFI.
+
+    Returns True if an email was sent. Skips accounts with no activity in the
+    window (nothing worth a message). A failed send is logged, not raised.
+    """
+    digest = build_weekly_digest(db, account)
+    if digest.total == 0:
+        return False
+    try:
+        email_service.send_weekly_digest(account.email, digest)
+    except EmailError:
+        logger.exception("weekly digest to %s failed", account.email)
+        return False
+    return True
