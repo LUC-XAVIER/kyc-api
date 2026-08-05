@@ -1,6 +1,7 @@
 <div class="layout">
+  @if (mobileNav()) { <div class="nav-backdrop" (click)="closeMobileNav()"></div> }
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" [class.is-open]="mobileNav()">
     <div>
       <div class="sidebar__brand">
         <div class="sidebar__logo">K</div>
@@ -42,6 +43,11 @@
   <!-- MAIN -->
   <main class="main">
     <header class="topbar">
+      <button class="menu-toggle" type="button" (click)="toggleMobileNav()" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
       <div class="topbar__titles">
         <div class="topbar__title">{{ title()[0] }}</div>
         <div class="topbar__subtitle">{{ title()[1] }}</div>
@@ -482,6 +488,39 @@
         </div>
       }
 
+      <!-- BROADCAST (maintenance notice) -->
+      @if (page() === 'broadcast') {
+        <div class="card bc">
+          <div class="card__title">Maintenance broadcast</div>
+          <div class="card__sub">
+            Email a notice to every active MFI that has the maintenance
+            notification turned on. Each send is recorded in that MFI's
+            audit log.
+          </div>
+
+          <label class="bc__label">Subject</label>
+          <input class="search bc__input" maxlength="120"
+            placeholder="Scheduled maintenance this weekend"
+            [value]="bcSubject()" (input)="bcSubject.set($any($event.target).value)" />
+
+          <label class="bc__label">Message</label>
+          <textarea class="search bc__textarea" rows="6"
+            placeholder="Describe the maintenance window, expected impact, and timing…"
+            [value]="bcMessage()" (input)="bcMessage.set($any($event.target).value)"></textarea>
+
+          @if (bcError()) { <div class="twofa__err">{{ bcError() }}</div> }
+          @if (bcResult(); as r) {
+            <div class="twofa__ok">
+              Sent to {{ r.sent }} of {{ r.eligible }} opted-in MFI(s).
+            </div>
+          }
+
+          <button class="btn btn--danger bc__send" [disabled]="bcSending()" (click)="sendBroadcast()">
+            {{ bcSending() ? 'Sending…' : 'Send broadcast' }}
+          </button>
+        </div>
+      }
+
       <!-- SECURITY (2FA) -->
       @if (page() === 'security') {
         <div class="card twofa">
@@ -572,7 +611,7 @@
             <div class="card__title">Infrastructure</div>
             <div class="card__sub">Not yet instrumented</div>
             <p class="ops-note">
-              Uptime, CPU/RAM and container health aren't collected yet — they
+              Uptime, CPU/RAM and container health aren't collected yet, they
               need host-level metrics wiring. Shown here rather than faked.
             </p>
           </div>

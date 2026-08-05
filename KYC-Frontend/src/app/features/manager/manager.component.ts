@@ -177,10 +177,18 @@ function relativeTime(iso: string): string {
 
 const NOTIF_DEFS = [
   { key: 'quota', title: 'Quota warning alert', desc: 'Get notified when usage reaches 80% of monthly quota' },
-  { key: 'pending', title: 'New PENDING case', desc: 'Email alert when a verification requires your review' },
+  { key: 'pending', title: 'New PENDING case', desc: 'Show an in-app alert when a verification requires your review' },
   { key: 'weekly', title: 'Weekly summary report', desc: 'Receive a weekly digest of verification activity' },
   { key: 'maintenance', title: 'System maintenance alerts', desc: 'Be informed of scheduled downtime or updates' },
 ] as const;
+
+// Defaults until the account loads; the server is the source of truth.
+const NOTIF_DEFAULTS: Record<string, boolean> = {
+  quota: true,
+  pending: true,
+  weekly: false,
+  maintenance: true,
+};
 
 const SETTINGS_TABS: SettingsTab[] = [
   'Subscription', 'MFI profile', 'Notifications', 'Security', 'Danger zone',
@@ -205,6 +213,8 @@ const SETTINGS_TABS: SettingsTab[] = [
 export class ManagerComponent implements OnDestroy {
   ngOnDestroy(): void {
     clearInterval(this.payPoll);
+    clearInterval(this.pendingPoll);
+    clearTimeout(this.toastTimer);
   }
 
   private readonly auth = inject(AuthService);
@@ -215,17 +225,61 @@ export class ManagerComponent implements OnDestroy {
   // Sidebar badge: how many cases await review, kept fresh across pages.
   readonly pendingCount = signal(0);
 
+  // Toast: count of newly-arrived pending cases to announce (0 = hidden).
+  readonly newCaseToast = signal(0);
+  // The count we've already accounted for, so we only toast on a *rise*.
+  private lastPendingSeen: number | null = null;
+  private pendingPoll: ReturnType<typeof setInterval> | undefined;
+  private toastTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor() {
     this.loadStats();
     this.loadAccount();
     this.loadPendingCount();
+    // Keep the badge fresh and surface new cases while the manager sits on
+    // any page. Light poll — the review queue changes slowly.
+    this.pendingPoll = setInterval(() => this.loadPendingCount(), 45_000);
   }
 
   loadPendingCount(): void {
     this.api.listReviews().subscribe({
-      next: (items) => this.pendingCount.set(items.length),
+      next: (items) => this.setPending(items.length, true),
       error: () => undefined,
     });
+  }
+
+  /** Update the pending badge. When `announce` and the count has risen since
+   *  we last looked — and the "New PENDING case" preference is on — pop a
+   *  toast. The first load (prev === null) only seeds the baseline. */
+  private setPending(next: number, announce = false): void {
+    const prev = this.lastPendingSeen;
+    this.lastPendingSeen = next;
+    this.pendingCount.set(next);
+    if (announce && prev != null && next > prev && this.notifs()['pending']) {
+      this.newCaseToast.update((n) => n + (next - prev));
+      clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => this.newCaseToast.set(0), 8_000);
+    }
+  }
+
+  /** Dismiss the toast and jump to the review queue. */
+  openReviewFromToast(): void {
+    this.dismissToast();
+    this.setPage('review');
+  }
+
+  dismissToast(): void {
+    this.newCaseToast.set(0);
+    clearTimeout(this.toastTimer);
+  }
+
+  // Mobile off-canvas navigation drawer.
+  readonly mobileNav = signal(false);
+  toggleMobileNav(): void {
+    this.mobileNav.update((v) => !v);
+  }
+  closeMobileNav(): void {
+    this.mobileNav.set(false);
   }
   readonly userInitials = computed(() => {
     const name = this.user()?.full_name ?? '';
@@ -392,7 +446,7 @@ export class ManagerComponent implements OnDestroy {
         r: (d.rejected / max) * 100,
         // Shown on hover so a bare bar still reveals its exact counts.
         tip:
-          `${when} — ${total} verification${total === 1 ? '' : 's'}` +
+          `${when}, ${total} verification${total === 1 ? '' : 's'}` +
           ` (${d.verified} verified, ${d.pending} pending, ${d.rejected} rejected)`,
       };
     });
@@ -417,7 +471,7 @@ export class ManagerComponent implements OnDestroy {
     this.api.listReviews().subscribe({
       next: (items) => {
         this.reviewData.set(items);
-        this.pendingCount.set(items.length);
+        this.setPending(items.length);
         this.reviewLoading.set(false);
         const first = this.queueCases()[0]?.id ?? null;
         if (first && !this.reviewData().some((r) => r.id === this.activeCaseId())) {
@@ -535,6 +589,7 @@ export class ManagerComponent implements OnDestroy {
   );
 
   setPage(p: ManagerPage): void {
+    this.mobileNav.set(false);
     // Locked to the pay screen until the subscription is activated: an
     // unpaid account may only see Settings → Subscription.
     if (this.needsActivation() && p !== 'settings') return;
@@ -658,7 +713,7 @@ export class ManagerComponent implements OnDestroy {
       next: () => {
         const next = this.reviewData().filter((r) => r.id !== id);
         this.reviewData.set(next);
-        this.pendingCount.set(next.length);
+        this.setPending(next.length);
         this.activeDetail.set(null);
         this.deciding.set(false);
         this.decisionAction.set(null);
@@ -1135,12 +1190,7 @@ export class ManagerComponent implements OnDestroy {
   readonly pinSaved = signal(false);
   readonly pinSaving = signal(false);
 
-  readonly notifs = signal<Record<string, boolean>>({
-    quota: true,
-    pending: true,
-    weekly: false,
-    maintenance: true,
-  });
+  readonly notifs = signal<Record<string, boolean>>({ ...NOTIF_DEFAULTS });
   readonly notifDefs = NOTIF_DEFS;
 
   readonly usagePct = computed(() => {
@@ -1159,6 +1209,7 @@ export class ManagerComponent implements OnDestroy {
         this.account.set(a);
         this.mfiName.set(a.name);
         this.contactEmail.set(a.email);
+        this.notifs.set({ ...NOTIF_DEFAULTS, ...(a.notification_prefs ?? {}) });
         // A brand-new / unpaid account lands straight on the pay gate,
         // pre-selecting the plan they signed up for.
         if (a.status === 'PENDING') {
@@ -1295,7 +1346,14 @@ export class ManagerComponent implements OnDestroy {
   }
 
   toggleNotif(key: string): void {
-    this.notifs.update((n) => ({ ...n, [key]: !n[key] }));
+    // Optimistic flip, then persist to the account; revert if the save fails.
+    const previous = this.notifs();
+    const updated = { ...previous, [key]: !previous[key] };
+    this.notifs.set(updated);
+    this.api.updateAccount({ notification_prefs: updated }).subscribe({
+      next: (a) => this.account.set(a),
+      error: () => this.notifs.set(previous),
+    });
   }
 
   // ---- Pricing ----

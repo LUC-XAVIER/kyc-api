@@ -1,6 +1,7 @@
 <div class="layout">
+  @if (mobileNav()) { <div class="nav-backdrop" (click)="closeMobileNav()"></div> }
   <!-- SIDEBAR -->
-  <aside class="sidebar">
+  <aside class="sidebar" [class.is-open]="mobileNav()">
     <div class="sidebar__brand">
       <div class="sidebar__logo">K</div>
       <div class="sidebar__brandname">KYC-API</div>
@@ -45,6 +46,11 @@
   <!-- MAIN -->
   <main class="main">
     <header class="topbar">
+      <button class="menu-toggle" type="button" (click)="toggleMobileNav()" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
       <div>
         <div class="topbar__title">{{ title()[0] }}</div>
         <div class="topbar__subtitle">{{ title()[1] }}</div>
@@ -205,7 +211,7 @@
                 <div class="cell-muted">{{ c.submitted }}</div>
               </div>
             } @empty {
-              <div class="table__empty">All caught up — no cases pending review.</div>
+              <div class="table__empty">All caught up, no cases pending review.</div>
             }
           </div>
 
@@ -230,7 +236,7 @@
           <div class="modal-overlay" (click)="cancelDecision()">
             <div class="modal" (click)="$event.stopPropagation()">
               <div class="modal__title">{{ action === 'approve' ? 'Approve this verification?' : 'Reject this verification?' }}</div>
-              <p class="modal__sub">Add a reason for the agent (optional — they'll see it on the case).</p>
+              <p class="modal__sub">Add a reason for the agent (optional, they'll see it on the case).</p>
               <textarea class="input input--block decision-reason" rows="3"
                 [placeholder]="action === 'approve' ? 'e.g. Documents verified in person' : 'e.g. ID photo does not match the selfie'"
                 [value]="decisionReason()" (input)="decisionReason.set($any($event.target).value)"></textarea>
@@ -373,7 +379,7 @@
               @for (r of reportRows(); track r.id) {
                 <div class="report-table__row"><div>{{ r.id }}</div><div>{{ r.date }}</div><div>{{ r.branch }}</div><div><span [class]="badgeClass(r.status)">● {{ r.status }}</span></div></div>
               }
-              <div class="report-doc__foot"><span>Confidential — for COBAC audit purposes only</span><span>Page 1 of 24</span></div>
+              <div class="report-doc__foot"><span>Confidential, for COBAC audit purposes only</span><span>Page 1 of 24</span></div>
             </div>
           </div>
         </div>
@@ -427,7 +433,7 @@
                 <div><span [class]="badgeClass(agentStatusLabel(a.status))">● {{ agentStatusLabel(a.status) }}</span></div>
               </div>
             } @empty {
-              <div class="table__empty">No agents yet — add your first one.</div>
+              <div class="table__empty">No agents yet, add your first one.</div>
             }
           </div>
 
@@ -454,7 +460,7 @@
 
       <!-- API KEYS -->
       @if (page() === 'apikeys') {
-        <div class="info-banner">ℹ API keys let your internal software call <b>POST /kyc/verify</b> programmatically. Keep them secret — never expose them in client-side code or public repositories.</div>
+        <div class="info-banner">ℹ API keys let your internal software call <b>POST /kyc/verify</b> programmatically. Keep them secret, never expose them in client-side code or public repositories.</div>
         @if (keysLoading()) {
           <div class="state-msg">Loading API keys…</div>
         } @else if (keysError()) {
@@ -466,7 +472,7 @@
         @for (k of keys(); track k.id) {
           <div class="ox-card key-card">
             @if (k.fullKey) {
-              <div class="ok-msg key-reveal">New key — copy it now, it won't be shown again: <code>{{ k.fullKey }}</code></div>
+              <div class="ok-msg key-reveal">New key, copy it now, it won't be shown again: <code>{{ k.fullKey }}</code></div>
             }
             <div class="key-card__head">
               <div><div class="key-card__name">{{ k.prefix }}…</div><div class="key-card__meta">Created {{ k.created }} · Last used {{ k.lastUsed }}</div></div>
@@ -482,7 +488,7 @@
           </div>
         } @empty {
           @if (!keysLoading()) {
-            <div class="table__empty">No API keys yet — generate one to integrate.</div>
+            <div class="table__empty">No API keys yet, generate one to integrate.</div>
           }
         }
       }
@@ -518,7 +524,7 @@
 
                 <!-- Pay / renew with mobile money -->
                 <div class="ox-card card--pad pay-card">
-                  <div class="section-label">PAY OR RENEW — MOBILE MONEY</div>
+                  <div class="section-label">PAY OR RENEW, MOBILE MONEY</div>
                   <p class="pay-intro">Pick a plan and pay with MTN Mobile Money or Orange Money. You'll get a prompt on your phone to approve.</p>
 
                   @if (activePayment(); as pay) {
@@ -556,7 +562,7 @@
                         <label class="input-label">Plan</label>
                         <select class="input input--block" [value]="payPlan()" (change)="payPlan.set($any($event.target).value)">
                           @for (p of payablePlans; track p.key) {
-                            <option [value]="p.key">{{ p.name }} — {{ p.volume }}</option>
+                            <option [value]="p.key">{{ p.name }}, {{ p.volume }}</option>
                           }
                         </select>
                       </div>
@@ -727,6 +733,18 @@
           </div>
         }
       </div>
+    </div>
+  }
+
+  <!-- New-case toast (gated by the "New PENDING case" notification pref) -->
+  @if (newCaseToast() > 0) {
+    <div class="case-toast" (click)="openReviewFromToast()">
+      <span class="case-toast__dot"></span>
+      <div class="case-toast__body">
+        <div class="case-toast__title">{{ newCaseToast() }} new case{{ newCaseToast() > 1 ? 's' : '' }} to review</div>
+        <div class="case-toast__sub">Tap to open the review queue</div>
+      </div>
+      <button class="case-toast__x" aria-label="Dismiss" (click)="$event.stopPropagation(); dismissToast()">×</button>
     </div>
   }
 </div>

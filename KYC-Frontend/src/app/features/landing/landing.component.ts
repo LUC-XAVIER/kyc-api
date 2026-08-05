@@ -173,47 +173,47 @@ export class LandingComponent {
   ];
   readonly features = [
     { icon: 'scan', title: 'OCR on Cameroonian NIC', desc: 'Automatically reads name, ID number, date of birth, place of birth, expiry date, and sex from the national identity card.' },
-    { icon: 'face-id', title: 'ArcFace face matching', desc: "Compares the client's selfie to the photo on their NIC using the ArcFace deep learning model — 97%+ accuracy." },
-    { icon: 'shield', title: 'Anti-spoofing detection', desc: "Detects printed-photo and screen-replay attacks — even via API integrations where you can't control the capture device." },
+    { icon: 'face-id', title: 'ArcFace face matching', desc: "Compares the client's selfie to the photo on their NIC using the ArcFace deep learning model, 97%+ accuracy." },
+    { icon: 'shield', title: 'Anti-spoofing detection', desc: "Detects printed-photo and screen-replay attacks, even via API integrations where you can't control the capture device." },
     { icon: 'copy-check', title: 'Duplicate detection', desc: 'FAISS vector similarity search across stored face embeddings catches the same person registering under multiple identities.' },
-    { icon: 'dashboard', title: 'Full management dashboard', desc: 'Every subscriber gets a dashboard for agents, managers, compliance reports, statistics, and subscription usage — in every plan.' },
-    { icon: 'certificate', title: 'COBAC compliance reports', desc: 'Generate audit-ready PDF reports on demand — every verification, timestamp, agent, and decision recorded and exportable.' },
+    { icon: 'dashboard', title: 'Full management dashboard', desc: 'Every subscriber gets a dashboard for agents, managers, compliance reports, statistics, and subscription usage, in every plan.' },
+    { icon: 'certificate', title: 'COBAC compliance reports', desc: 'Generate audit-ready PDF reports on demand, every verification, timestamp, agent, and decision recorded and exportable.' },
     { icon: 'api', title: 'REST API integration', desc: 'MFIs with existing software call POST /kyc/verify from any application. JWT auth, rate limiting, full Swagger docs included.' },
     { icon: 'lock', title: 'Biometric data security', desc: 'Face images and embeddings are encrypted at rest. Role-based access control ensures only authorized staff can view client data.' },
   ];
   readonly stats = [
-    { num: '<5s', label: 'Full pipeline time' },
+    { num: '<1m', label: 'Full pipeline time' },
     { num: '<1%', label: 'False acceptance rate' },
     { num: '97%+', label: 'Face-match accuracy' },
     { num: '100%', label: 'Open-source stack' },
   ];
   readonly steps = [
-    { n: 1, title: 'Agent opens the dashboard or your own app', desc: 'Every subscribing MFI gets a web dashboard. If your MFI already has software, your developers integrate KYC-API via a single REST endpoint — POST /kyc/verify — and your agents keep using the interface they know.' },
-    { n: 2, title: 'Agent captures three images on-site', desc: 'The client’s NIC front, NIC back, and a selfie — all taken live via the camera. No file upload. The client is physically present with the agent throughout.' },
-    { n: 3, title: 'KYC-API runs the full verification pipeline', desc: 'In under 5 seconds: OCR extracts identity fields, liveness detection confirms a real person is present, ArcFace matches the selfie to the NIC photo, and FAISS checks for duplicate registrations across all MFIs.' },
-    { n: 4, title: 'Agent and manager act on the result', desc: 'VERIFIED — client is onboarded immediately. PENDING — a duplicate flag requires the manager to review and approve or reject. REJECTED — identity check failed; the agent is told the reason.' },
+    { n: 1, title: 'Agent opens the dashboard or your own app', desc: 'Every subscribing MFI gets a web dashboard. If your MFI already has software, your developers integrate KYC-API via a single REST endpoint, POST /kyc/verify, and your agents keep using the interface they know.' },
+    { n: 2, title: 'Agent captures three images on-site', desc: 'The client’s NIC front, NIC back, and a selfie, all taken live via the camera. No file upload. The client is physically present with the agent throughout.' },
+    { n: 3, title: 'KYC-API runs the full verification pipeline', desc: 'In under a minute: OCR extracts identity fields, liveness detection confirms a real person is present, ArcFace matches the selfie to the NIC photo, and FAISS checks for duplicate registrations across all MFIs.' },
+    { n: 4, title: 'Agent and manager act on the result', desc: 'VERIFIED, client is onboarded immediately. PENDING, a duplicate flag requires the manager to review and approve or reject. REJECTED, identity check failed; the agent is told the reason.' },
   ];
   readonly faqs = [
-    { q: 'Do agents need to be tech-savvy to use KYC-API?', a: 'No. The dashboard is designed for field agents in Cameroonian MFIs. The workflow is three steps: open the form, take three photos with the camera, submit. The result appears on screen within seconds.' },
+    { q: 'Do agents need to be tech-savvy to use KYC-API?', a: 'No. The dashboard is designed for field agents in Cameroonian MFIs. The workflow is three steps: open the form, take three photos with the camera, submit. The result appears on screen in under a minute.' },
     { q: 'What documents does KYC-API support?', a: "KYC-API is currently optimized for the Cameroonian National Identity Card (Carte Nationale d'Identité). The OCR extraction, expiry detection, and layout-based cropping are all tuned for its specific layout and typography." },
-    { q: 'Can we integrate KYC-API into our existing software?', a: 'Yes. Growth, Pro, and Enterprise plans include API access. Your developers integrate a single endpoint — POST /kyc/verify — using an API key. Even via API, your managers still use the dashboard for reviews, statistics, and compliance reports.' },
-    { q: 'How does KYC-API prevent duplicate clients across branches?', a: "Every verified client's face embedding — a 512-dimensional fingerprint — is stored in a FAISS index. When a new client registers, their embedding is compared against the index; if similarity exceeds the threshold, the case is flagged PENDING for human review." },
-    { q: 'Is biometric data shared between MFIs?', a: 'Raw images and identity fields are never shared between MFIs — each MFI sees only its own client records. Only anonymized face embeddings participate in duplicate detection, and these cannot be reverse-engineered into a recognizable image.' },
-    { q: 'What happens when a client is flagged as PENDING?', a: 'The manager is notified and the case appears in the review queue. They see the selfie and NIC photos plus all scores and the matched duplicate, then approve or reject — and the decision is logged for COBAC audit purposes.' },
-    { q: 'How are COBAC compliance reports generated?', a: 'Managers generate a PDF report from the dashboard for any date range. It includes every verification with client ID, date, branch, agent, and final status — formatted for COBAC audit submission, downloadable immediately.' },
+    { q: 'Can we integrate KYC-API into our existing software?', a: 'Yes. Growth, Pro, and Enterprise plans include API access. Your developers integrate a single endpoint, POST /kyc/verify, using an API key. Even via API, your managers still use the dashboard for reviews, statistics, and compliance reports.' },
+    { q: 'How does KYC-API prevent duplicate clients across branches?', a: "Every verified client's face embedding, a 512-dimensional fingerprint, is stored in a FAISS index. When a new client registers, their embedding is compared against the index; if similarity exceeds the threshold, the case is flagged PENDING for human review." },
+    { q: 'Is biometric data shared between MFIs?', a: 'Raw images and identity fields are never shared between MFIs, each MFI sees only its own client records. Only anonymized face embeddings participate in duplicate detection, and these cannot be reverse-engineered into a recognizable image.' },
+    { q: 'What happens when a client is flagged as PENDING?', a: 'The manager is notified and the case appears in the review queue. They see the selfie and NIC photos plus all scores and the matched duplicate, then approve or reject, and the decision is logged for COBAC audit purposes.' },
+    { q: 'How are COBAC compliance reports generated?', a: 'Managers generate a PDF report from the dashboard for any date range. It includes every verification with client ID, date, branch, agent, and final status, formatted for COBAC audit submission, downloadable immediately.' },
     { q: 'Can we upgrade our plan as our volume grows?', a: 'Yes. Upgrades take effect on your next billing cycle or immediately on confirmation. At 80% of your monthly quota your dashboard shows a warning; at 100%, new submissions pause until the cycle resets or you upgrade.' },
   ];
   readonly users = [
-    { type: 'Small MFI', title: 'Single-branch cooperatives', desc: 'A small MFI in a rural commune with one branch and a few agents. No existing software — agents log directly into the dashboard. Starter plan; monthly COBAC reports for audits.' },
+    { type: 'Small MFI', title: 'Single-branch cooperatives', desc: 'A small MFI in a rural commune with one branch and a few agents. No existing software, agents log directly into the dashboard. Starter plan; monthly COBAC reports for audits.' },
     { type: 'Growing MFI', title: 'Multi-branch MFIs', desc: 'An established MFI across several towns. Agents at each branch use the dashboard; the manager monitors statistics, reviews duplicate flags, and tracks all branches from one view. Growth plan.' },
-    { type: 'MFI network', title: 'Regional MFI federations', desc: 'A federation managing 20+ branches across regions. Pro plan with API integration — their internal system calls KYC-API at registration, managers use the dashboard for oversight and reporting.' },
+    { type: 'MFI network', title: 'Regional MFI federations', desc: 'A federation managing 20+ branches across regions. Pro plan with API integration, their internal system calls KYC-API at registration, managers use the dashboard for oversight and reporting.' },
     { type: 'Fintech platform', title: 'Digital financial platforms', desc: 'A platform powering multiple MFIs integrates KYC-API via the REST API. Each client registration triggers a verification call; their platform owns the UX, KYC-API owns identity assurance.' },
     { type: 'Core banking', title: 'MFIs with existing software', desc: 'An MFI running Musoni, Mifos X, or a custom loan system integrates KYC-API with a simple API call at onboarding. Agents keep their existing app; verification happens in the background.' },
     { type: 'Enterprise', title: 'Commercial banks & large institutions', desc: 'A bank needing a dedicated identity-verification layer alongside core banking. Enterprise plan: dedicated infrastructure, SLA-backed uptime, and a dedicated account manager.' },
   ];
   readonly testimonials = [
     { quote: 'Before KYC-API, we had no way of knowing if the same person had already registered at another caisse in our network. Now every flagged duplicate goes to review immediately.', cite: '— MFI Manager, Yaoundé' },
-    { quote: 'Our agents were spending 15 minutes per client on manual verification. With KYC-API it takes under a minute — and we have a digital record for COBAC.', cite: '— Operations Director, regional MFI' },
+    { quote: 'Our agents were spending 15 minutes per client on manual verification. With KYC-API it takes under a minute, and we have a digital record for COBAC.', cite: '— Operations Director, regional MFI' },
     { quote: 'Integrating KYC-API into our platform took two days. The docs are clear, the response is fast, and the compliance reporting is exactly what our MFI clients needed.', cite: '— Developer, fintech platform' },
   ];
   readonly regions = ['Yaoundé', 'Douala', 'Bafoussam', 'Garoua', 'Ngaoundéré', 'Maroua', 'Bertoua', 'Ebolowa', 'CEMAC zone'];
@@ -232,11 +232,11 @@ export class LandingComponent {
     'Full JSON API response format',
   ];
   readonly demoScenarios = [
-    { value: 'verified', label: 'Happy path — returns VERIFIED' },
-    { value: 'pending', label: 'Duplicate detected — returns PENDING' },
-    { value: 'rejected_spoof', label: 'Spoofing attempt — returns REJECTED' },
-    { value: 'rejected_mismatch', label: 'Face mismatch — returns REJECTED' },
-    { value: 'rejected_expired', label: 'Expired ID card — returns REJECTED' },
+    { value: 'verified', label: 'Happy path, returns VERIFIED' },
+    { value: 'pending', label: 'Duplicate detected, returns PENDING' },
+    { value: 'rejected_spoof', label: 'Spoofing attempt, returns REJECTED' },
+    { value: 'rejected_mismatch', label: 'Face mismatch, returns REJECTED' },
+    { value: 'rejected_expired', label: 'Expired ID card, returns REJECTED' },
   ];
 
   // ---- FAQ ----
@@ -335,7 +335,7 @@ export class LandingComponent {
       this.cMessage(),
     ].join('\n');
     const href =
-      `mailto:zazap1731@gmail.com?subject=${encodeURIComponent('KYC-API enquiry — ' + this.cInterest())}` +
+      `mailto:zazap1731@gmail.com?subject=${encodeURIComponent('KYC-API enquiry, ' + this.cInterest())}` +
       `&body=${encodeURIComponent(body)}`;
     window.location.href = href;
   }

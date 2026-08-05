@@ -175,6 +175,12 @@ export interface ApiKeyCreated {
 }
 
 // ---- Account ----
+/** Result of an admin maintenance broadcast. */
+export interface BroadcastResult {
+  eligible: number;
+  sent: number;
+}
+
 export interface AccountSummary {
   id: string;
   name: string;
@@ -183,6 +189,7 @@ export interface AccountSummary {
   plan_name: string | null;
   verification_quota: number | null;
   current_period_usage: number;
+  notification_prefs: Record<string, boolean>;
 }
 
 // ---- Profile (/auth/me) ----

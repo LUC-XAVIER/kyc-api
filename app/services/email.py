@@ -9,9 +9,14 @@ plus SMTP credentials to send real mail.
 import logging
 import smtplib
 from email.message import EmailMessage
+from html import escape
+from typing import TYPE_CHECKING
 
 from app.core.config import settings
 from app.core.exceptions import EmailError
+
+if TYPE_CHECKING:
+    from app.services.notifications import WeeklyDigest
 
 logger = logging.getLogger("app.email")
 
@@ -111,6 +116,75 @@ def send_signup_invite(to: str, token: str) -> None:
             link,
             expiry,
         ),
+    )
+
+
+def send_quota_warning(to: str, *, used: int, limit: int) -> None:
+    """Warn a manager that usage crossed 80% of the plan's monthly quota."""
+    pct = round(used / limit * 100) if limit else 0
+    link = settings.dashboard_url
+    intro = (
+        f"Your MFI has used {used} of {limit} verifications this month "
+        f"({pct}%). Once you reach the limit, new verifications are blocked "
+        "until the next billing cycle — consider upgrading your plan."
+    )
+    send_email(
+        to,
+        "KYC-API: you've used 80% of your monthly quota",
+        f"Quota alert: {used} of {limit} verifications used this month "
+        f"({pct}%).\n\nManage your subscription here:\n{link}",
+        html=_action_html(intro, "View subscription", link, ""),
+    )
+
+
+def send_maintenance_notice(to: str, *, subject: str, message: str) -> None:
+    """Email an admin-composed maintenance / announcement notice.
+
+    ``message`` is admin-authored plain text; it is HTML-escaped and rendered
+    with line breaks preserved.
+    """
+    body_html = escape(message).replace("\n", "<br>")
+    html = (
+        '<div style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;'
+        'max-width:480px;margin:0 auto;padding:24px">'
+        '<div style="font-size:20px;font-weight:700;color:#c0392b;'
+        'margin-bottom:16px">KYC-API</div>'
+        f'<p style="font-size:15px;line-height:1.6">{body_html}</p>'
+        '<p style="font-size:13px;color:#666;margin-top:24px">'
+        '— The KYC-API team</p>'
+        '</div>'
+    )
+    send_email(to, subject, message, html=html)
+
+
+def send_weekly_digest(to: str, digest: "WeeklyDigest") -> None:
+    """Email an MFI its weekly activity summary."""
+    link = settings.dashboard_url
+    limit = digest.quota_limit
+    pct = round(digest.quota_used / limit * 100) if limit else 0
+    text = (
+        f"Here's your KYC-API activity for the last {digest.days} days:\n\n"
+        f"  Total verifications  : {digest.total}\n"
+        f"  Verified             : {digest.verified}\n"
+        f"  Pending              : {digest.pending}\n"
+        f"  Rejected             : {digest.rejected}\n"
+        f"  Duplicates flagged   : {digest.duplicates}\n\n"
+        f"  Awaiting your review : {digest.open_pending}\n"
+        f"  Quota used this month: {digest.quota_used} / {limit} ({pct}%)\n\n"
+        f"Open your dashboard:\n{link}"
+    )
+    intro = (
+        f"Your KYC-API activity for the last {digest.days} days: "
+        f"{digest.total} verifications ({digest.verified} verified, "
+        f"{digest.pending} pending, {digest.rejected} rejected). "
+        f"{digest.open_pending} case(s) await your review. "
+        f"Quota: {digest.quota_used}/{limit} ({pct}%)."
+    )
+    send_email(
+        to,
+        "Your KYC-API weekly summary",
+        text,
+        html=_action_html(intro, "Open dashboard", link, ""),
     )
 
 

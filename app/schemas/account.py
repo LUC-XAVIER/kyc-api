@@ -19,6 +19,9 @@ class AccountSummary(BaseModel):
     plan_name: str | None
     verification_quota: int | None
     current_period_usage: int
+    # Email-notification toggles (quota / pending / weekly / maintenance),
+    # always fully populated (defaults filled server-side).
+    notification_prefs: dict[str, bool]
 
 
 class AccountUpdate(BaseModel):
@@ -26,3 +29,5 @@ class AccountUpdate(BaseModel):
 
     name: str | None = None
     email: str | None = None
+    # Partial map of notification toggles to update; unknown keys ignored.
+    notification_prefs: dict[str, bool] | None = None

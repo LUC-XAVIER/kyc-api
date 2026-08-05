@@ -12,6 +12,7 @@ from app.core.exceptions import ValidationError
 from app.db.session import get_db
 from app.models import MfiAccount
 from app.schemas.account import AccountSummary, AccountUpdate
+from app.services import notifications
 
 router = APIRouter(prefix="/account", tags=["account"])
 
@@ -26,6 +27,7 @@ def _summary(mfi: MfiAccount) -> AccountSummary:
         plan_name=plan.name.value if plan else None,
         verification_quota=plan.verification_quota if plan else None,
         current_period_usage=mfi.current_period_usage,
+        notification_prefs=notifications.get_prefs(mfi),
     )
 
 
@@ -57,5 +59,10 @@ def update_account(
         if clash is not None:
             raise ValidationError("That email is already in use.")
         mfi.email = email
+    if payload.notification_prefs is not None:
+        # Merge onto current prefs so a partial toggle update is preserved.
+        current = notifications.get_prefs(mfi)
+        current.update(notifications.sanitize_prefs(payload.notification_prefs))
+        mfi.notification_prefs = current
     db.flush()
     return _summary(mfi)

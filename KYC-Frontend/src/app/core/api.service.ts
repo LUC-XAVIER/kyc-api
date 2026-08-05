@@ -7,6 +7,7 @@ import { skipLoading } from './loading.interceptor';
 import {
   AccountSummary,
   AdminAuditEntry,
+  BroadcastResult,
   AdminMfiDetail,
   AdminMfiSummary,
   AgentProfile,
@@ -189,6 +190,7 @@ export class ApiService {
   updateAccount(payload: {
     name?: string;
     email?: string;
+    notification_prefs?: Record<string, boolean>;
   }): Observable<AccountSummary> {
     return this.http.patch<AccountSummary>(`${this.base}/account`, payload);
   }
@@ -227,6 +229,16 @@ export class ApiService {
       .set('offset', offset);
     return this.http.get<AdminAuditEntry[]>(`${this.base}/admin/audit`, {
       params,
+    });
+  }
+
+  broadcastMaintenance(
+    subject: string,
+    message: string,
+  ): Observable<BroadcastResult> {
+    return this.http.post<BroadcastResult>(`${this.base}/admin/broadcast`, {
+      subject,
+      message,
     });
   }
 

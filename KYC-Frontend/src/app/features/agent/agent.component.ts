@@ -85,7 +85,7 @@ function cameraErrorMessage(err: unknown): string {
   if (name === 'NotReadableError') {
     return 'The camera is being used by another app. Close it and try again.';
   }
-  return 'Could not access the camera — please try again.';
+  return 'Could not access the camera, please try again.';
 }
 
 /**
@@ -131,6 +131,15 @@ export class AgentComponent {
 
   readonly page = signal<AgentPage>('new');
 
+  // Mobile off-canvas navigation drawer.
+  readonly mobileNav = signal(false);
+  toggleMobileNav(): void {
+    this.mobileNav.update((v) => !v);
+  }
+  closeMobileNav(): void {
+    this.mobileNav.set(false);
+  }
+
   // ---- New verification ----
   readonly clientId = signal('');
   readonly docType = signal<DocumentType>('NIC');
@@ -164,8 +173,8 @@ export class AgentComponent {
   }
 
   docLabel(key: DocKey): string {
-    if (key === 'front') return 'ID card — front';
-    if (key === 'back') return 'ID card — back';
+    if (key === 'front') return 'ID card, front';
+    if (key === 'back') return 'ID card, back';
     return 'Selfie';
   }
 
@@ -299,7 +308,7 @@ export class AgentComponent {
         const body = (err as { error?: { error?: { message?: string } } })
           ?.error;
         this.verifyError.set(
-          body?.error?.message ?? 'Verification failed — please try again.',
+          body?.error?.message ?? 'Verification failed, please try again.',
         );
       },
     });
@@ -490,6 +499,7 @@ export class AgentComponent {
   });
 
   setPage(p: AgentPage): void {
+    this.mobileNav.set(false);
     this.page.set(p);
     this.result.set(null);
     // Bracket the switch so a page that fetches nothing still gets the

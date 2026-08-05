@@ -34,7 +34,7 @@ export class VerificationScoresComponent {
   readonly faceMatch = computed(() => {
     const fm = this.detail()?.face_match_result;
     if (!fm) return '—';
-    return `${fm.match_score.toFixed(2)} — ${fm.verified ? 'match' : 'weak'}`;
+    return `${fm.match_score.toFixed(2)}, ${fm.verified ? 'match' : 'weak'}`;
   });
 
   readonly liveness = computed(() => {
@@ -66,7 +66,7 @@ export class VerificationScoresComponent {
     const warning = top.matched_client_id
       ? `Matches existing client ${top.matched_client_id}. Review before approving.`
       : '';
-    return { sim: `${top.similarity_score.toFixed(2)} — ${level}`, warning };
+    return { sim: `${top.similarity_score.toFixed(2)}, ${level}`, warning };
   });
 
   readonly ocrFields = computed(() => {
