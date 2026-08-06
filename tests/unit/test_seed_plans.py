@@ -16,12 +16,12 @@ def test_four_tiers_defined() -> None:
 
 
 def test_starter_tier_values() -> None:
-    """Starter matches Design doc §6.2 (200 quota, 25k FCFA, no API)."""
+    """Starter matches Design doc §6.2 (200 quota, 15k FCFA, no API)."""
     starter = next(
         d for d in plan_definitions() if d["name"] == PlanName.STARTER
     )
     assert starter["verification_quota"] == 200
-    assert starter["monthly_price"] == 25_000
+    assert starter["monthly_price"] == 15_000
     assert starter["max_agents"] == 3
     assert starter["api_access"] is False
 

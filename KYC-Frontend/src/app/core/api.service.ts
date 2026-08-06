@@ -93,8 +93,13 @@ export class ApiService {
   }
 
   // ---- Review queue ----
-  listReviews(): Observable<ReviewItem[]> {
-    return this.http.get<ReviewItem[]>(`${this.base}/kyc/reviews`);
+  listReviews(silent = false): Observable<ReviewItem[]> {
+    // `silent` skips the global loading overlay — used by the background
+    // pending-count poll so the K logo doesn't flash every refresh.
+    return this.http.get<ReviewItem[]>(
+      `${this.base}/kyc/reviews`,
+      silent ? { context: skipLoading() } : {},
+    );
   }
 
   decideReview(

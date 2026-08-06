@@ -155,6 +155,9 @@ export class AgentComponent {
   // Camera modal
   readonly cameraOpen = signal<DocKey | null>(null);
   readonly cameraError = signal('');
+  // Which camera to use: rear ('environment') by default, front ('user')
+  // when the agent flips. Reset to rear each time the camera opens.
+  readonly facing = signal<'environment' | 'user'>('environment');
 
   readonly requiredDocs = computed<DocKey[]>(() =>
     this.docType() === 'PASSPORT' ? ['front', 'selfie'] : ['front', 'back', 'selfie'],
@@ -180,6 +183,8 @@ export class AgentComponent {
 
   async openCamera(key: DocKey): Promise<void> {
     this.cameraError.set('');
+    // Start every capture on the rear camera; the agent can flip if needed.
+    this.facing.set('environment');
     const media = navigator.mediaDevices;
     // getUserMedia (which triggers the browser's permission prompt) only exists
     // in a secure context — https or http://localhost. Over a plain LAN IP
@@ -201,18 +206,18 @@ export class AgentComponent {
     }
   }
 
-  /** Ask for the rear camera, falling back to any available one.
+  /** Ask for the currently-selected camera, falling back to any available one.
    *
-   * Rear for every slot, selfie included: the agent holds the device and
-   * photographs the client standing opposite them, so the client is always
-   * behind the phone, never in front of it.
+   * Rear ('environment') is the default for every slot, selfie included: the
+   * agent holds the device and photographs the client standing opposite them.
+   * The agent can flip to the front ('user') camera when it suits them.
    */
   private async requestCamera(): Promise<MediaStream> {
     const media = navigator.mediaDevices;
     try {
       return await media.getUserMedia({
         video: {
-          facingMode: 'environment',
+          facingMode: this.facing(),
           // Hint for a large frame (the default 640x480 is coarse for the
           // portrait printed on a card). Width only, deliberately: pinning
           // height too would force 16:9 and stretch a portrait-shaped source,
@@ -252,6 +257,23 @@ export class AgentComponent {
       'image/jpeg',
       0.95, // the pipeline reads fine detail (MRZ glyphs, printed portrait)
     );
+  }
+
+  /** Switch between the rear and front camera, restarting the live stream. */
+  async flipCamera(): Promise<void> {
+    this.facing.update((f) => (f === 'environment' ? 'user' : 'environment'));
+    this.cameraError.set('');
+    this.stopStream();
+    try {
+      this.stream = await this.requestCamera();
+      const el = this.camVideo()?.nativeElement;
+      if (el) {
+        el.srcObject = this.stream;
+        void el.play().catch(() => undefined);
+      }
+    } catch (err) {
+      this.cameraError.set(cameraErrorMessage(err));
+    }
   }
 
   closeCamera(): void {

@@ -19,6 +19,8 @@ class AccountSummary(BaseModel):
     plan_name: str | None
     verification_quota: int | None
     current_period_usage: int
+    # Whether the plan includes API access (Growth and up).
+    api_access: bool
     # Email-notification toggles (quota / pending / weekly / maintenance),
     # always fully populated (defaults filled server-side).
     notification_prefs: dict[str, bool]

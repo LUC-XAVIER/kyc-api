@@ -20,7 +20,7 @@ def plan_definitions() -> list[dict]:
     return [
         {
             "name": PlanName.STARTER,
-            "monthly_price": 25_000,
+            "monthly_price": 15_000,
             "verification_quota": 200,
             "max_branches": 1,
             "max_agents": 3,
@@ -30,7 +30,7 @@ def plan_definitions() -> list[dict]:
         },
         {
             "name": PlanName.GROWTH,
-            "monthly_price": 65_000,
+            "monthly_price": 40_000,
             "verification_quota": 1_000,
             "max_branches": 5,
             "max_agents": 15,
@@ -40,7 +40,7 @@ def plan_definitions() -> list[dict]:
         },
         {
             "name": PlanName.PRO,
-            "monthly_price": 150_000,
+            "monthly_price": 100_000,
             "verification_quota": 5_000,
             "max_branches": None,  # unlimited
             "max_agents": None,  # unlimited

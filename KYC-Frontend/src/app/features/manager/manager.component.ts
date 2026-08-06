@@ -242,7 +242,9 @@ export class ManagerComponent implements OnDestroy {
   }
 
   loadPendingCount(): void {
-    this.api.listReviews().subscribe({
+    // Silent: this runs on a timer in the background, so it must not raise
+    // the loading overlay (that caused the K logo to flash every 45s).
+    this.api.listReviews(true).subscribe({
       next: (items) => this.setPending(items.length, true),
       error: () => undefined,
     });
@@ -1055,9 +1057,22 @@ export class ManagerComponent implements OnDestroy {
       }
     };
 
-    if (f.newBranch.trim()) {
+    // Only mint a new branch when none is selected. Otherwise the chosen
+    // branch is reused — and, crucially, a retry after a failed agent-create
+    // won't try to create a *second* branch and trip the plan's branch limit.
+    if (!f.branchId && f.newBranch.trim()) {
       this.api.createBranch(f.newBranch.trim()).subscribe({
-        next: (b) => withBranch(b.id),
+        next: (b) => {
+          // Remember the new branch so a retry reuses it instead of
+          // re-creating it (which would hit the plan's branch limit).
+          this.branchList.update((list) => [...list, b]);
+          this.agentForm.update((prev) => ({
+            ...prev,
+            branchId: b.id,
+            newBranch: '',
+          }));
+          withBranch(b.id);
+        },
         error: (err) => {
           this.agentSaving.set(false);
           this.agentFormError.set(
@@ -1202,6 +1217,9 @@ export class ManagerComponent implements OnDestroy {
   readonly needsActivation = computed(
     () => this.account()?.status === 'PENDING',
   );
+
+  /** Whether the plan includes API access (Growth and up). */
+  readonly apiAllowed = computed(() => this.account()?.api_access ?? false);
 
   loadAccount(): void {
     this.api.getAccount().subscribe({

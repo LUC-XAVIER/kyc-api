@@ -42,7 +42,7 @@ def test_subscribe_starts_a_pending_payment(
     body = resp.json()
     assert body["status"] == "PENDING"
     assert body["plan_name"] == "GROWTH"
-    assert body["amount"] == 65000
+    assert body["amount"] == 40000
     assert body["provider"] == "MOCK"
     assert body["ussd_code"]
 
