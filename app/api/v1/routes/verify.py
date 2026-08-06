@@ -23,7 +23,12 @@ from app.models import (
     Verification,
     VerificationImage,
 )
-from app.models.enums import DocumentType, ImageKind, SubmissionMethod
+from app.models.enums import (
+    DocumentType,
+    ImageKind,
+    SubmissionMethod,
+    VerificationStatus,
+)
 from app.pipeline.contracts import PipelineInput
 from app.pipeline.orchestrator import VerificationOutput, run_verification
 from app.schemas.verification import VerifyResponse
@@ -126,14 +131,21 @@ def _persist_stage_results(
 def _ensure_unique_client_id(
     db: Session, mfi_account_id: uuid.UUID, client_id: str
 ) -> None:
-    """Reject a client ID already used by this MFI.
+    """Reject a client ID already tied to a live verification for this MFI.
 
-    Client IDs are unique per MFI: an agent may type any ID, but a repeat is
-    refused so the same reference never points at two different people.
+    Client IDs are unique per MFI so the same reference never points at two
+    different people — but only *active* records reserve an ID. A REJECTED
+    attempt did not onboard anyone, so its ID is freed for a retry (the
+    rejected row is kept for the audit trail). VERIFIED/APPROVED/PENDING
+    records still block reuse.
     """
     exists = (
         db.query(Verification.id)
-        .filter_by(mfi_account_id=mfi_account_id, client_id=client_id)
+        .filter(
+            Verification.mfi_account_id == mfi_account_id,
+            Verification.client_id == client_id,
+            Verification.status != VerificationStatus.REJECTED,
+        )
         .first()
     )
     if exists is not None:
