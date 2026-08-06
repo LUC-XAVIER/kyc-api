@@ -242,7 +242,9 @@ export class ManagerComponent implements OnDestroy {
   }
 
   loadPendingCount(): void {
-    this.api.listReviews().subscribe({
+    // Silent: this runs on a timer in the background, so it must not raise
+    // the loading overlay (that caused the K logo to flash every 45s).
+    this.api.listReviews(true).subscribe({
       next: (items) => this.setPending(items.length, true),
       error: () => undefined,
     });
