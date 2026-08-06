@@ -95,7 +95,10 @@ def create_agent(
             )
 
     if db.query(User).filter_by(phone=payload.phone).first() is not None:
-        raise ValidationError("That phone number is already in use.")
+        raise ValidationError(
+            "That phone number is already in use. " \
+            "(It's possible to say that the agent you wish to add already " \
+            "belongs to an existing Microfinance Institution)")
 
     _require_branch(db, payload.branch_id, mfi.id)
 
