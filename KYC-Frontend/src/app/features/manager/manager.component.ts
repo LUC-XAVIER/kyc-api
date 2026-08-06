@@ -1216,6 +1216,9 @@ export class ManagerComponent implements OnDestroy {
     () => this.account()?.status === 'PENDING',
   );
 
+  /** Whether the plan includes API access (Growth and up). */
+  readonly apiAllowed = computed(() => this.account()?.api_access ?? false);
+
   loadAccount(): void {
     this.api.getAccount().subscribe({
       next: (a) => {

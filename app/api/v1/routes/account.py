@@ -27,6 +27,7 @@ def _summary(mfi: MfiAccount) -> AccountSummary:
         plan_name=plan.name.value if plan else None,
         verification_quota=plan.verification_quota if plan else None,
         current_period_usage=mfi.current_period_usage,
+        api_access=plan.api_access if plan else False,
         notification_prefs=notifications.get_prefs(mfi),
     )
 

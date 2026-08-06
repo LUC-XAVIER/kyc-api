@@ -189,6 +189,7 @@ export interface AccountSummary {
   plan_name: string | null;
   verification_quota: number | null;
   current_period_usage: number;
+  api_access: boolean;
   notification_prefs: Record<string, boolean>;
 }
 

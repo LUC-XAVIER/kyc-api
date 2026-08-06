@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import Principal, require_manager_principal
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, ValidationError
 from app.core.security import generate_api_key
 from app.db.session import get_db
 from app.models import ApiKey
@@ -43,9 +43,16 @@ def create_api_key(
     db: Session = Depends(get_db),
 ) -> ApiKeyCreated:
     """Mint a new API key and return its secret exactly once."""
+    mfi = principal.mfi_account
+    plan = mfi.plan
+    if plan is None or not plan.api_access:
+        raise ValidationError(
+            "API access isn't included in your plan. Upgrade to Growth or "
+            "higher to generate API keys."
+        )
     generated = generate_api_key()
     key = ApiKey(
-        mfi_account_id=principal.mfi_account.id,
+        mfi_account_id=mfi.id,
         hashed_key=generated.hashed_key,
         prefix=generated.prefix,
     )

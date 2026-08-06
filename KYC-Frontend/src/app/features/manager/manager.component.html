@@ -83,7 +83,7 @@
           <button class="ox-btn ox-btn--primary" (click)="openAddAgent()">+ Add agent</button>
         </div>
       }
-      @if (page() === 'apikeys') {
+      @if (page() === 'apikeys' && apiAllowed()) {
         <div class="topbar__actions">
           <button class="ox-btn ox-btn--primary" (click)="generateKey()">+ Generate new key</button>
         </div>
@@ -460,6 +460,9 @@
 
       <!-- API KEYS -->
       @if (page() === 'apikeys') {
+        @if (!apiAllowed()) {
+          <div class="info-banner">🔒 API access isn't included in your current plan. Upgrade to <b>Growth</b> or higher to generate API keys and call <b>POST /kyc/verify</b> from your own software.</div>
+        } @else {
         <div class="info-banner">ℹ API keys let your internal software call <b>POST /kyc/verify</b> programmatically. Keep them secret, never expose them in client-side code or public repositories.</div>
         @if (keysLoading()) {
           <div class="state-msg">Loading API keys…</div>
@@ -490,6 +493,7 @@
           @if (!keysLoading()) {
             <div class="table__empty">No API keys yet, generate one to integrate.</div>
           }
+        }
         }
       }
 

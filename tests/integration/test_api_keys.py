@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.security import KEY_PREFIX, create_access_token
-from app.models.enums import AgentRole
+from app.models.enums import AgentRole, PlanName
 from tests.factories import create_agent, create_mfi_with_key
 
 KEYS_URL = "/api/v1/api-keys"
@@ -21,7 +21,7 @@ def test_created_key_can_authenticate(
     api_client: TestClient, db_session: Session
 ) -> None:
     """A minted key is returned once and immediately usable."""
-    _, key = create_mfi_with_key(db_session)
+    _, key = create_mfi_with_key(db_session, plan_name=PlanName.GROWTH)
 
     resp = api_client.post(KEYS_URL, headers=_auth(key))
 
@@ -37,7 +37,7 @@ def test_list_hides_secrets(
     api_client: TestClient, db_session: Session
 ) -> None:
     """Listing shows the factory key plus the new one, never a secret."""
-    _, key = create_mfi_with_key(db_session)
+    _, key = create_mfi_with_key(db_session, plan_name=PlanName.GROWTH)
     api_client.post(KEYS_URL, headers=_auth(key))
 
     listing = api_client.get(KEYS_URL, headers=_auth(key))
@@ -52,7 +52,7 @@ def test_revoke_disables_the_key(
     api_client: TestClient, db_session: Session
 ) -> None:
     """A revoked key is marked inactive and can no longer authenticate."""
-    _, key = create_mfi_with_key(db_session)
+    _, key = create_mfi_with_key(db_session, plan_name=PlanName.GROWTH)
     created = api_client.post(KEYS_URL, headers=_auth(key)).json()
 
     revoked = api_client.delete(
@@ -74,6 +74,17 @@ def test_revoke_unknown_is_404(
         f"{KEYS_URL}/{uuid.uuid4()}", headers=_auth(key)
     )
     assert resp.status_code == 404
+
+
+def test_starter_plan_cannot_mint_a_key(
+    api_client: TestClient, db_session: Session
+) -> None:
+    """A Starter plan has no API access, so minting a key is refused."""
+    _, key = create_mfi_with_key(db_session, plan_name=PlanName.STARTER)
+
+    resp = api_client.post(KEYS_URL, headers=_auth(key))
+
+    assert resp.status_code == 400
 
 
 def test_plain_agent_is_forbidden(
