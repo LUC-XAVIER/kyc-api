@@ -232,7 +232,7 @@ describe('ManagerComponent', () => {
       {
         id: 'p1',
         plan_name: 'GROWTH',
-        amount: 65000,
+        amount: 40000,
         currency: 'XAF',
         phone: '+237677123456',
         status: 'SUCCESSFUL',
@@ -252,7 +252,7 @@ describe('ManagerComponent', () => {
     http.expectOne(`${API_URL}/payments/subscribe`).flush({
       id: 'p2',
       plan_name: 'GROWTH',
-      amount: 65000,
+      amount: 40000,
       currency: 'XAF',
       phone: '+237677123456',
       status: 'PENDING',
