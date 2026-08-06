@@ -1055,9 +1055,22 @@ export class ManagerComponent implements OnDestroy {
       }
     };
 
-    if (f.newBranch.trim()) {
+    // Only mint a new branch when none is selected. Otherwise the chosen
+    // branch is reused — and, crucially, a retry after a failed agent-create
+    // won't try to create a *second* branch and trip the plan's branch limit.
+    if (!f.branchId && f.newBranch.trim()) {
       this.api.createBranch(f.newBranch.trim()).subscribe({
-        next: (b) => withBranch(b.id),
+        next: (b) => {
+          // Remember the new branch so a retry reuses it instead of
+          // re-creating it (which would hit the plan's branch limit).
+          this.branchList.update((list) => [...list, b]);
+          this.agentForm.update((prev) => ({
+            ...prev,
+            branchId: b.id,
+            newBranch: '',
+          }));
+          withBranch(b.id);
+        },
         error: (err) => {
           this.agentSaving.set(false);
           this.agentFormError.set(
