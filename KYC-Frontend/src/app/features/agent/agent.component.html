@@ -241,6 +241,7 @@
         <video #cam class="camera-video" autoplay playsinline muted></video>
         <div class="modal__actions">
           <button class="ox-btn ox-btn--outline" (click)="closeCamera()">Cancel</button>
+          <button class="ox-btn ox-btn--outline" [disabled]="!!cameraError()" (click)="flipCamera()" title="Switch between the front and rear camera">⟲ Flip camera</button>
           <button class="ox-btn ox-btn--primary" [disabled]="!!cameraError()" (click)="capture(slot)">Capture</button>
         </div>
       </div>
