@@ -28,7 +28,9 @@ _DETECTOR_BACKEND = "opencv"
 
 # Cosine-similarity floor for the selfie and portrait to be the same person.
 # ArcFace separates identities well above this; tune on real selfie/ID pairs.
-DEFAULT_FACE_MATCH_THRESHOLD = 0.40
+# At or above this counts as a match (VERIFIED); the decision engine sends a
+# near-miss (0.20–0.60) to review and rejects anything below 0.20.
+DEFAULT_FACE_MATCH_THRESHOLD = 0.60
 
 
 def match_faces(
