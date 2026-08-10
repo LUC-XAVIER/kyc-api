@@ -2,9 +2,10 @@
 
 Implements the priority order of Design doc §6.3.1: a clearly-spoofed
 liveness check rejects outright, an *uncertain* liveness score (the review
-band) sends the case to manual review, then a failed face match rejects,
-then a positive duplicate hit also goes to review (PENDING); otherwise the
-verification is VERIFIED. The function is tolerant of ``None`` for stages
+band) sends the case to manual review, then a failed face match also goes to
+manual review (PENDING) rather than an outright reject, then a positive
+duplicate hit likewise goes to review (PENDING); otherwise the verification
+is VERIFIED. The function is tolerant of ``None`` for stages
 skipped by the orchestrator's early-exit, so it stays the single source of
 truth for the verdict without forcing every stage to run.
 """
@@ -71,10 +72,13 @@ def decide(
         )
 
     if face_match is not None and not face_match.verified:
+        # A selfie that doesn't match the ID is sent to a manager for review
+        # (PENDING) rather than auto-rejected: a genuine client with a poor
+        # photo shouldn't be turned away by the machine alone.
         return Decision(
-            status=VerificationStatus.REJECTED,
+            status=VerificationStatus.PENDING,
             confidence=face_match.match_score,
-            reject_reason=RejectReason.FACE_MISMATCH,
+            reject_reason=RejectReason.FACE_MATCH_REVIEW,
         )
 
     if duplicate is not None and duplicate.is_duplicate:

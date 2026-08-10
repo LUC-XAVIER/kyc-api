@@ -16,7 +16,7 @@ flowchart LR
     B --> C[Liveness]
     C -->|spoof / no face| R
     C --> D[Face match]
-    D -->|mismatch| R
+    D -->|mismatch| P
     D --> E[Duplicate search]
     E -->|hit| P[(PENDING)]
     E --> V[(VERIFIED + enroll)]
@@ -38,7 +38,10 @@ the heavy ML stack.
   lets the orchestrator, decision engine, and API run and be tested without
   installing OpenCV/DeepFace/FAISS.
 - **Decision engine** (`app/pipeline/decision.py`) — `decide(...)` applies
-  the §6.3.3 priority order (liveness → face → duplicate) and is tolerant of
+  the §6.3.3 priority order (liveness → face → duplicate). A face **mismatch**
+  (score below `face_match_threshold`, 0.40) is sent to **manual review**
+  (`PENDING` / `FACE_MATCH_REVIEW`), not auto-rejected, so a genuine client
+  with a poor photo isn't turned away by the machine alone. It is tolerant of
   `None` for stages skipped by early-exit, so it stays the single source of
   the verdict.
 - **Orchestrator stub** — Phase-2 canned `VERIFIED`, later replaced by the

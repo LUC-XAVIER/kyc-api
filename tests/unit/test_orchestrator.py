@@ -195,7 +195,7 @@ def test_uncertain_liveness_goes_to_pending_review(wire) -> None:
 
 
 def test_face_mismatch_skips_duplicate(wire) -> None:
-    """A face mismatch rejects without a duplicate search."""
+    """A face mismatch goes to review (PENDING) without a duplicate search."""
     store = wire(
         ocr=OcrResult(success=True),
         liveness=LivenessOutcome(passed=True, score=0.9, method="m"),
@@ -204,8 +204,8 @@ def test_face_mismatch_skips_duplicate(wire) -> None:
 
     output = orchestrator.run_verification(_input(), duplicate_store=store)
 
-    assert output.result.status is VerificationStatus.REJECTED
-    assert output.result.reject_reason == RejectReason.FACE_MISMATCH
+    assert output.result.status is VerificationStatus.PENDING
+    assert output.result.reject_reason == RejectReason.FACE_MATCH_REVIEW
     assert store.built_for == []
     assert output.embedding is None
 
