@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     )
 
     # --- Pipeline thresholds (tunable; see Design doc §6.3.1) ---
-    face_match_threshold: float = 0.40
+    face_match_threshold: float = 0.60
     liveness_threshold: float = 0.50
     duplicate_threshold: float = 0.70
     pipeline_timeout_seconds: int = 10  # NFR01

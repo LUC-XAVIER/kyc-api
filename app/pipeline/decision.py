@@ -2,10 +2,11 @@
 
 Implements the priority order of Design doc §6.3.1: a clearly-spoofed
 liveness check rejects outright, an *uncertain* liveness score (the review
-band) sends the case to manual review, then a failed face match also goes to
-manual review (PENDING) rather than an outright reject, then a positive
-duplicate hit likewise goes to review (PENDING); otherwise the verification
-is VERIFIED. The function is tolerant of ``None`` for stages
+band) sends the case to manual review, then a face match that misses the
+threshold goes to manual review (PENDING) if it is a near-miss or is rejected
+if it falls below the review floor, then a positive duplicate hit likewise
+goes to review (PENDING); otherwise the verification is VERIFIED. The function
+is tolerant of ``None`` for stages
 skipped by the orchestrator's early-exit, so it stays the single source of
 truth for the verdict without forcing every stage to run.
 """
@@ -29,6 +30,13 @@ _FACE_WEIGHT = 0.6
 # review (PENDING) rather than an outright reject. Below the floor it is
 # rejected. See docs/ML-PIPELINE.md §4.2.
 LIVENESS_REVIEW_THRESHOLD = 0.30
+
+# Face-match review band: a selfie that misses the match threshold
+# (``face_match_threshold``, 0.60) but scores at or above this floor is
+# uncertain, not a clear impostor, so it goes to manual review (PENDING).
+# Below the floor it is rejected outright. So: >0.60 pass, 0.20–0.60 review,
+# <0.20 reject.
+FACE_MATCH_REVIEW_THRESHOLD = 0.20
 
 
 def _blend_confidence(
@@ -72,13 +80,20 @@ def decide(
         )
 
     if face_match is not None and not face_match.verified:
-        # A selfie that doesn't match the ID is sent to a manager for review
-        # (PENDING) rather than auto-rejected: a genuine client with a poor
-        # photo shouldn't be turned away by the machine alone.
+        # A near-miss is sent to a manager for review (PENDING) rather than
+        # auto-rejected: a genuine client with a poor photo shouldn't be turned
+        # away by the machine alone. A clear non-match (below the floor) is
+        # still rejected outright.
+        if face_match.match_score >= FACE_MATCH_REVIEW_THRESHOLD:
+            return Decision(
+                status=VerificationStatus.PENDING,
+                confidence=face_match.match_score,
+                reject_reason=RejectReason.FACE_MATCH_REVIEW,
+            )
         return Decision(
-            status=VerificationStatus.PENDING,
+            status=VerificationStatus.REJECTED,
             confidence=face_match.match_score,
-            reject_reason=RejectReason.FACE_MATCH_REVIEW,
+            reject_reason=RejectReason.FACE_MISMATCH,
         )
 
     if duplicate is not None and duplicate.is_duplicate:
