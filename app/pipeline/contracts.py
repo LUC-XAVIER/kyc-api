@@ -17,8 +17,10 @@ from app.models.enums import DocumentType, Sex, VerificationStatus
 class RejectReason:
     """Machine-readable outcome codes stored on ``Verification``.
 
-    Mostly reject reasons; ``LIVENESS_REVIEW`` marks a PENDING case sent to
-    a human because the liveness score fell in the uncertain review band.
+    Mostly reject reasons; ``LIVENESS_REVIEW`` and ``FACE_MATCH_REVIEW`` mark
+    PENDING cases sent to a human — the first when the liveness score fell in
+    the uncertain review band, the second when the selfie did not match the ID
+    (a mismatch is reviewed rather than auto-rejected).
     """
 
     OCR_FAILED = "OCR_FAILED"
@@ -26,6 +28,7 @@ class RejectReason:
     LIVENESS_FAILED = "LIVENESS_FAILED"
     LIVENESS_REVIEW = "LIVENESS_REVIEW"
     FACE_MISMATCH = "FACE_MISMATCH"
+    FACE_MATCH_REVIEW = "FACE_MATCH_REVIEW"
     MANUAL_REJECT = "MANUAL_REJECT"
 
 

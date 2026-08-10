@@ -42,11 +42,11 @@ def test_uncertain_liveness_goes_to_review() -> None:
     assert decision.confidence == _LIVE_REVIEW.score
 
 
-def test_failed_face_match_rejects() -> None:
-    """Live but mismatched face is rejected for FACE_MISMATCH."""
+def test_failed_face_match_goes_to_review() -> None:
+    """Live but mismatched face is sent to review (PENDING), not rejected."""
     decision = decide(_LIVE_PASS, _FACE_FAIL)
-    assert decision.status == VerificationStatus.REJECTED
-    assert decision.reject_reason == RejectReason.FACE_MISMATCH
+    assert decision.status == VerificationStatus.PENDING
+    assert decision.reject_reason == RejectReason.FACE_MATCH_REVIEW
 
 
 def test_duplicate_sends_to_manual_review() -> None:
