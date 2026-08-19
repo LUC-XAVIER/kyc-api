@@ -38,10 +38,12 @@ the heavy ML stack.
   lets the orchestrator, decision engine, and API run and be tested without
   installing OpenCV/DeepFace/FAISS.
 - **Decision engine** (`app/pipeline/decision.py`) — `decide(...)` applies
-  the §6.3.3 priority order (liveness → face → duplicate). A face **mismatch**
-  (score below `face_match_threshold`, 0.40) is sent to **manual review**
-  (`PENDING` / `FACE_MATCH_REVIEW`), not auto-rejected, so a genuine client
-  with a poor photo isn't turned away by the machine alone. It is tolerant of
+  the §6.3.3 priority order (liveness → face → duplicate). The face score is
+  split three ways against `face_match_threshold` (0.60): **≥0.60** passes,
+  a **near-miss (0.20–0.60)** is sent to **manual review** (`PENDING` /
+  `FACE_MATCH_REVIEW`) so a genuine client with a poor photo isn't turned away
+  by the machine alone, and a **clear non-match (<0.20)** is rejected outright
+  (`FACE_MISMATCH`). It is tolerant of
   `None` for stages skipped by early-exit, so it stays the single source of
   the verdict.
 - **Orchestrator stub** — Phase-2 canned `VERIFIED`, later replaced by the
@@ -368,8 +370,9 @@ attempts. The LBP-SVM + trainer remain in the tree as a fallback/baseline.
 
 **Built:** `represent_face` embeds a face into a **512-d ArcFace** vector
 (DeepFace); `match_faces` scores the cosine similarity of the selfie vs the
-NIC `photo_zone` against a tunable threshold (default **0.40**). The same
-`represent_face` embedding is reused by the duplicate stage.
+NIC `photo_zone` against a tunable threshold (default **0.60**); the decision
+engine then routes a near-miss (0.20–0.60) to review and rejects below 0.20.
+The same `represent_face` embedding is reused by the duplicate stage.
 
 **Problems / solutions:**
 - *ArcFace weights (~137 MB) download slowly* — fetched once to
@@ -391,8 +394,9 @@ NIC `photo_zone` against a tunable threshold (default **0.40**). The same
 | opencv on whole image (before) | 0.574 | 0.119 |
 | **BlazeFace crop + opencv align (after)** | **0.601** | **0.127** |
 
-The threshold 0.40 sits cleanly in the gap; the shared-detector version
-improves separation.
+Same-person (0.601) clears the 0.60 pass bar while different-person (0.127)
+falls below the 0.20 reject floor, so both land on the correct side of the
+band; the shared-detector version improves separation.
 
 ---
 
