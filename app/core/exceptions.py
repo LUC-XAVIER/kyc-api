@@ -69,6 +69,20 @@ class ConflictError(KycError):
     code = "CONFLICT"
 
 
+class PayloadTooLargeError(KycError):
+    """Raised when an uploaded image exceeds the accepted size limit."""
+
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+    code = "PAYLOAD_TOO_LARGE"
+
+
+class RateLimitedError(KycError):
+    """Raised when a caller exceeds its allowed request rate."""
+
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "RATE_LIMITED"
+
+
 class EmailError(KycError):
     """Raised when an outbound email could not be sent (SMTP failure)."""
 

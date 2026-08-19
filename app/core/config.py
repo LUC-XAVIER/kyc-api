@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     )
 
     # --- Pipeline thresholds (tunable; see Design doc §6.3.1) ---
-    face_match_threshold: float = 0.40
+    face_match_threshold: float = 0.60
     liveness_threshold: float = 0.50
     duplicate_threshold: float = 0.70
     pipeline_timeout_seconds: int = 10  # NFR01
@@ -71,6 +71,22 @@ class Settings(BaseSettings):
 
     # --- Subscription enforcement (Design doc §6.2) ---
     quota_warning_ratio: float = 0.80
+
+    # --- Partner API (stateless external integration) ---
+    # A single shared secret authenticating the standalone /partner/verify
+    # endpoint (an external enterprise embedding KYC in its own system). It
+    # is NOT an MFI: no plan, no quota, no stored data. Empty by default,
+    # which keeps the endpoint closed until a key is configured. Set
+    # PARTNER_API_KEY in .env to a long random value to switch it on.
+    partner_api_key: str = ""
+    # Per-key throttle standing in for the MFI quota the partner path drops:
+    # the pipeline is CPU-heavy and synchronous, so this caps how many calls
+    # a partner key may make per rolling minute before getting a 429.
+    partner_rate_limit_per_minute: int = 30
+    # Largest single uploaded image accepted (bytes). Rejects oversized or
+    # junk uploads before they reach the pipeline. 10 MiB is generous for a
+    # phone photo of an ID card or a selfie.
+    max_upload_bytes: int = 10 * 1024 * 1024
 
     # --- Onboarding / email ---
     # Where the dashboard lives, for the links we email (signup, PIN reset).

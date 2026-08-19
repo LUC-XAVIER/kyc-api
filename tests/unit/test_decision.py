@@ -12,8 +12,13 @@ from app.pipeline.decision import decide
 _LIVE_PASS = LivenessOutcome(passed=True, score=0.95, method="lbp-svm")
 _LIVE_FAIL = LivenessOutcome(passed=False, score=0.20, method="lbp-svm")
 _LIVE_REVIEW = LivenessOutcome(passed=False, score=0.50, method="lbp-svm")
-_FACE_PASS = FaceMatchOutcome(match_score=0.82, verified=True, threshold=0.40)
-_FACE_FAIL = FaceMatchOutcome(match_score=0.10, verified=False, threshold=0.40)
+_FACE_PASS = FaceMatchOutcome(match_score=0.82, verified=True, threshold=0.60)
+# In the review band (0.20–0.60): a near-miss sent to a manager.
+_FACE_REVIEW = FaceMatchOutcome(
+    match_score=0.40, verified=False, threshold=0.60
+)
+# Below the 0.20 floor: a clear non-match, rejected outright.
+_FACE_FAIL = FaceMatchOutcome(match_score=0.10, verified=False, threshold=0.60)
 _DUP_HIT = DuplicateOutcome(
     is_duplicate=True, similarity=0.91, matched_client_id="C-9"
 )
@@ -42,8 +47,16 @@ def test_uncertain_liveness_goes_to_review() -> None:
     assert decision.confidence == _LIVE_REVIEW.score
 
 
-def test_failed_face_match_rejects() -> None:
-    """Live but mismatched face is rejected for FACE_MISMATCH."""
+def test_near_miss_face_match_goes_to_review() -> None:
+    """A near-miss face score (review band) becomes PENDING, not rejected."""
+    decision = decide(_LIVE_PASS, _FACE_REVIEW)
+    assert decision.status == VerificationStatus.PENDING
+    assert decision.reject_reason == RejectReason.FACE_MATCH_REVIEW
+    assert decision.confidence == _FACE_REVIEW.match_score
+
+
+def test_clear_face_mismatch_rejects_below_floor() -> None:
+    """A face score below the review floor is rejected outright."""
     decision = decide(_LIVE_PASS, _FACE_FAIL)
     assert decision.status == VerificationStatus.REJECTED
     assert decision.reject_reason == RejectReason.FACE_MISMATCH
